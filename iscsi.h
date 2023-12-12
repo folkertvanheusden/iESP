@@ -1,4 +1,5 @@
 #include <cstdint>
+
 #include <utility>
 #include <sys/types.h>
 
@@ -12,8 +13,8 @@ private:
 		uint8_t  opcode    :  6;
 		bool     F         :  1;
 		uint32_t ospecf    : 23;  // opcode specific fields
-		uint8_t  ahslen    :  8;  // total ahs length
-		uint32_t datalen   : 24;  // data segment length
+		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
+		uint32_t datalen   : 24;  // data segment length (bytes, excluding padding)
 		uint8_t  lunfields[8];    // lun or opcode specific fields
 		uint32_t Itasktag  : 32;  // initiator task tag
 		uint8_t  ofields[28];     // opcode specific fields
@@ -23,7 +24,7 @@ public:
 	iscsi_pdu_bhs();
 	virtual ~iscsi_pdu_bhs();
 
-	enum iscsi_opcode {
+	enum iscsi_bhs_opcode {
 		// initiator opcodes
 		o_nop_out       = 0x00,  // NOP-Out
 		o_scsi_cmd      = 0x01,  // SCSI Command (encapsulates a SCSI Command Descriptor Block)
@@ -49,6 +50,32 @@ public:
 	ssize_t set(const uint8_t *const in, const size_t n);
 	std::pair<const uint8_t *, std::size_t> get();
 
-	iscsi_opcode get_opcode() const { return iscsi_opcode(bhs.opcode); }
-	void         set_opcode(const iscsi_opcode opcode) { bhs.opcode = opcode; }
+	iscsi_bhs_opcode get_opcode() const { return iscsi_bhs_opcode(bhs.opcode); }
+	void             set_opcode(const iscsi_bhs_opcode opcode) { bhs.opcode = opcode; }
+};
+
+class iscsi_pdu_ahs
+{
+private:
+	struct __ahs_header__ {
+		uint16_t length: 16;
+		uint8_t  type  :  8;
+	} __attribute__((packed));
+
+	__ahs_header__ *ahs { nullptr };
+
+public:
+	iscsi_pdu_ahs();
+	virtual ~iscsi_pdu_ahs();
+
+	enum iscsi_ahs_type {
+		t_extended_cdb = 1,
+		t_bi_data_len  = 2,  // Expected Bidirectional Read Data Length
+	};
+
+	ssize_t set(const uint8_t *const in, const size_t n);
+	std::pair<const uint8_t *, std::size_t> get();
+
+	iscsi_ahs_type get_ahs_type() { return iscsi_ahs_type(ahs->type >> 2); }
+	void           set_ahs_type(const iscsi_ahs_type type) { ahs->type = type << 2; }
 };
