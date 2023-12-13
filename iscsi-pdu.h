@@ -1,5 +1,5 @@
 #include <cstdint>
-
+#include <string>
 #include <utility>
 #include <sys/types.h>
 
@@ -53,6 +53,8 @@ public:
 	iscsi_bhs_opcode get_opcode() const { return iscsi_bhs_opcode(bhs.opcode); }
 	void             set_opcode(const iscsi_bhs_opcode opcode) { bhs.opcode = opcode; }
 };
+
+std::string pdu_opcode_to_string(const iscsi_pdu_bhs::iscsi_bhs_opcode opcode);
 
 class iscsi_pdu_ahs
 {

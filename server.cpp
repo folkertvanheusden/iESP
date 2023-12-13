@@ -66,7 +66,7 @@ void server::handler()
 
 			bhs.set(pdu, sizeof pdu);
 
-			printf("opcode: %02x\n", bhs.get_opcode());
+			printf("opcode: %02x / %s\n", bhs.get_opcode(), pdu_opcode_to_string(bhs.get_opcode()).c_str());
 		}
 
 		close(fd);
