@@ -6,19 +6,21 @@
 
 class iscsi_pdu_bhs  // basic header segment
 {
-private:
+public:
 	struct __bhs__ {
-		bool     filler    :  1;
-		bool     I         :  1;
 		uint8_t  opcode    :  6;
-		bool     F         :  1;
+		bool     I         :  1;
+		bool     filler    :  1;
 		uint32_t ospecf    : 23;  // opcode specific fields
+		bool     F         :  1;
 		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
 		uint32_t datalen   : 24;  // data segment length (bytes, excluding padding)
 		uint8_t  lunfields[8];    // lun or opcode specific fields
 		uint32_t Itasktag  : 32;  // initiator task tag
 		uint8_t  ofields[28];     // opcode specific fields
-	} bhs __attribute__((packed));
+	};
+
+	__bhs__ bhs __attribute__((packed));
 
 public:
 	iscsi_pdu_bhs();
@@ -50,8 +52,11 @@ public:
 	ssize_t set(const uint8_t *const in, const size_t n);
 	std::pair<const uint8_t *, std::size_t> get();
 
-	iscsi_bhs_opcode get_opcode() const { return iscsi_bhs_opcode(bhs.opcode); }
+	iscsi_bhs_opcode get_opcode()      const { return iscsi_bhs_opcode(bhs.opcode); }
 	void             set_opcode(const iscsi_bhs_opcode opcode) { bhs.opcode = opcode; }
+
+	size_t           get_ahs_length()  const { return bhs.ahslen;         }
+	size_t           get_data_length() const { return ntohl(bhs.datalen); }
 };
 
 std::string pdu_opcode_to_string(const iscsi_pdu_bhs::iscsi_bhs_opcode opcode);
