@@ -11,7 +11,7 @@ iscsi_pdu_bhs::iscsi_pdu_bhs()
 {
 	assert(sizeof(bhs) == 48);
 
-	bhs = { 0 };
+	bhs = { };
 }
 
 iscsi_pdu_bhs::~iscsi_pdu_bhs()
