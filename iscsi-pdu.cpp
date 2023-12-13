@@ -2,7 +2,7 @@
 #include <cstring>
 #include <arpa/inet.h>
 
-#include "iscsi.h"
+#include "iscsi-pdu.h"
 
 
 // BHS
@@ -54,6 +54,7 @@ ssize_t iscsi_pdu_ahs::set(const uint8_t *const in, const size_t n)
 	size_t expected_size = ntohs(reinterpret_cast<const __ahs_header__ *>(in)->length);
 	assert(expected_size + 3 == n);
 
+	delete ahs;
 	ahs = reinterpret_cast<__ahs_header__ *>(new uint8_t[expected_size + 3]);
 	memcpy(ahs, in, n);
 
