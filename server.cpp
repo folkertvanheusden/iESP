@@ -67,6 +67,46 @@ void server::handler()
 			bhs.set(pdu, sizeof pdu);
 
 			printf("opcode: %02x / %s\n", bhs.get_opcode(), pdu_opcode_to_string(bhs.get_opcode()).c_str());
+
+			uint8_t *ahs        = nullptr;
+			size_t   ahs_length = bhs.get_ahs_length() * 4;
+			printf("AHS size: %zu\n", ahs_length);
+			if (ahs_length) {
+				ahs = new uint8_t[ahs_length];
+
+				if (READ(fd, ahs, ahs_length) == -1) {
+					delete [] ahs;
+					break;
+				}
+			}
+
+			uint8_t *data        = nullptr;
+			size_t   data_length = bhs.get_data_length();
+			printf("DATA size: %zu (%x)\n", data_length, unsigned(data_length));
+			if (data_length) {
+				bool ok = true;
+
+				data = new uint8_t[data_length];
+				if (READ(fd, data, data_length) == -1)
+					ok = false;
+
+				size_t padding = ((data_length + 3) & ~3) - data_length;
+				if (ok && padding) {
+					uint8_t padding_temp[4];
+					if (READ(fd, padding_temp, padding) == -1)
+						ok = false;
+				}
+
+				if (!ok) {
+					delete [] ahs;
+					delete [] data;
+					break;
+				}
+
+				printf("%s\n", std::string(reinterpret_cast<char *>(data), data_length).c_str());
+			}
+
+			printf("\n");
 		}
 
 		close(fd);
