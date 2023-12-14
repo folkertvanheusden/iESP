@@ -4,6 +4,8 @@
 #include <sys/types.h>
 
 
+uint32_t get_b24(const uint32_t in);
+
 class iscsi_pdu_bhs  // basic header segment
 {
 public:
@@ -14,7 +16,9 @@ public:
 		uint32_t ospecf    : 23;  // opcode specific fields
 		bool     F         :  1;
 		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
-		uint32_t datalen   : 24;  // data segment length (bytes, excluding padding)
+		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
+		uint32_t datalenM  :  8;  // data segment length (bytes, excluding padding) 15...8
+		uint32_t datalenL  :  8;  // data segment length (bytes, excluding padding) 7...0
 		uint8_t  lunfields[8];    // lun or opcode specific fields
 		uint32_t Itasktag  : 32;  // initiator task tag
 		uint8_t  ofields[28];     // opcode specific fields
@@ -56,7 +60,7 @@ public:
 	void             set_opcode(const iscsi_bhs_opcode opcode) { bhs.opcode = opcode; }
 
 	size_t           get_ahs_length()  const { return bhs.ahslen;         }
-	size_t           get_data_length() const { return ntohl(bhs.datalen); }
+	size_t           get_data_length() const { return (bhs.datalenH << 16) | (bhs.datalenM << 8) | bhs.datalenL; }
 };
 
 std::string pdu_opcode_to_string(const iscsi_pdu_bhs::iscsi_bhs_opcode opcode);
