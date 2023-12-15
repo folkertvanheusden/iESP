@@ -127,4 +127,5 @@ public:
 	std::pair<const uint8_t *, std::size_t> get();
 
 	const uint8_t *get_ISID() const { return login.ISID; }
+	      uint16_t get_CID()  const { return login.CID;  }
 };
