@@ -126,6 +126,7 @@ public:
 	ssize_t set(const uint8_t *const in, const size_t n);
 	std::pair<const uint8_t *, std::size_t> get();
 
-	const uint8_t *get_ISID() const { return login.ISID; }
-	      uint16_t get_CID()  const { return login.CID;  }
+	const uint8_t *get_ISID() const  { return login.ISID;  }
+	      uint16_t get_CID()  const  { return login.CID;   }
+	const uint32_t get_CmdSN() const { return login.CmdSN; }
 };
