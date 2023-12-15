@@ -50,6 +50,41 @@ bool server::begin()
 	return true;
 }
 
+session * server::handle_login(const uint8_t pdu[48], std::pair<uint8_t *, size_t> data, const int fd)
+{
+	iscsi_pdu_login_request plr;
+	plr.set(pdu, 48);
+
+	for(size_t i=0; i<data.second; i++) {
+		if (data.first[i] == 0x00)
+			data.first[i] = '\n';
+	}
+
+	auto parts = split(std::string(reinterpret_cast<char *>(data.first), data.second), "\n");
+
+	// TODO verify at least the TargetName
+	for(auto & p : parts)
+		printf("%s\n", p.c_str());
+
+	if (plr.get_NSG() == 0)  // not supporting SecurityNegotiation
+		return nullptr;
+
+	session *s = new session(plr.get_ISID(), plr.get_CID(), plr.get_CmdSN());
+
+	iscsi_pdu_login_reply plrep;
+	plrep.set(plr);
+	auto reply = plrep.get();
+
+	if (WRITE(fd, reply.first, reply.second) == -1) {
+		delete s;
+		s = nullptr;
+	}
+
+	delete reply.first;
+
+	return s;
+}
+
 void server::handler()
 {
 	for(;;) {
@@ -59,7 +94,10 @@ void server::handler()
 
 		iscsi_pdu_bhs bhs;
 
-		for(;;) {
+		session *s  = nullptr;
+		bool     ok = true;
+
+		do {
 			uint8_t pdu[48] { 0 };
 			if (READ(fd, pdu, sizeof pdu) == -1)
 				break;
@@ -102,13 +140,26 @@ void server::handler()
 					delete [] data;
 					break;
 				}
+			}
 
-				printf("%s\n", std::string(reinterpret_cast<char *>(data), data_length).c_str());
+			if (bhs.get_opcode() == iscsi_pdu_bhs::iscsi_bhs_opcode::o_login_req) {
+				if (s)
+					delete s;
+
+				s = handle_login(pdu, { data, data_length }, fd);
+				if (s == nullptr)
+					ok = false;
 			}
 
 			printf("\n");
+
+			delete [] data;
+			delete [] ahs;
 		}
+		while(ok);
 
 		close(fd);
+
+		delete s;
 	}
 }
