@@ -4,8 +4,6 @@
 #include <sys/types.h>
 
 
-uint32_t get_b24(const uint32_t in);
-
 class iscsi_pdu_bhs  // basic header segment
 {
 public:
@@ -89,4 +87,42 @@ public:
 
 	iscsi_ahs_type get_ahs_type() { return iscsi_ahs_type(ahs->type >> 2); }
 	void           set_ahs_type(const iscsi_ahs_type type) { ahs->type = type << 2; }
+};
+
+class iscsi_pdu_login_request : public iscsi_pdu_bhs  // login request
+{
+public:
+	struct __login__ {
+		uint8_t  opcode    :  6;
+		bool     I_is_1    :  1;
+		bool     filler    :  1;
+		bool     T         :  1;
+		bool     C         :  1;
+		uint8_t  filler2   :  2;
+		uint8_t  CSG       :  2;
+		uint8_t  NSG       :  2;
+		uint8_t  versionmax:  8;
+		uint8_t  versionmin:  8;
+		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
+		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
+		uint32_t datalenM  :  8;  // data segment length (bytes, excluding padding) 15...8
+		uint32_t datalenL  :  8;  // data segment length (bytes, excluding padding) 7...0
+		uint8_t  ISID[6];
+		uint8_t  TSIH[2];
+		uint32_t Itasktag  : 32;  // initiator task tag
+		uint16_t CID       : 16;
+		uint16_t reserved  : 16;
+		uint32_t CmdSN     : 32;
+		uint32_t ExpStatSN : 32;
+		uint8_t  filler3[16];
+	};
+
+	__login__ login __attribute__((packed));
+
+public:
+	iscsi_pdu_login_request();
+	virtual ~iscsi_pdu_login_request();
+
+	ssize_t set(const uint8_t *const in, const size_t n);
+	std::pair<const uint8_t *, std::size_t> get();
 };

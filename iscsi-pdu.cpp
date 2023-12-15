@@ -96,3 +96,32 @@ std::pair<const uint8_t *, std::size_t> iscsi_pdu_ahs::get()
 
 	return { reinterpret_cast<const uint8_t *>(out), out_size };
 }
+
+iscsi_pdu_login_request::iscsi_pdu_login_request()
+{
+	assert(sizeof(login) == 48);
+
+	login = { };
+}
+
+iscsi_pdu_login_request::~iscsi_pdu_login_request()
+{
+}
+
+ssize_t iscsi_pdu_login_request::set(const uint8_t *const in, const size_t n)
+{
+	assert(n == 48);
+
+	memcpy(&login, in, sizeof login);
+
+	return sizeof login;
+}
+
+std::pair<const uint8_t *, std::size_t> iscsi_pdu_login_request::get()
+{
+	void *out = new uint8_t[sizeof login];
+	memcpy(out, &login, sizeof login);
+
+	return { reinterpret_cast<const uint8_t *>(out), sizeof login };
+}
+
