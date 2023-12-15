@@ -99,9 +99,9 @@ std::pair<const uint8_t *, std::size_t> iscsi_pdu_ahs::get()
 
 iscsi_pdu_login_request::iscsi_pdu_login_request()
 {
-	assert(sizeof(login) == 48);
+	assert(sizeof(login_req) == 48);
 
-	login = { };
+	login_req = { };
 }
 
 iscsi_pdu_login_request::~iscsi_pdu_login_request()
@@ -112,16 +112,50 @@ ssize_t iscsi_pdu_login_request::set(const uint8_t *const in, const size_t n)
 {
 	assert(n == 48);
 
-	memcpy(&login, in, sizeof login);
+	memcpy(&login_req, in, sizeof login_req);
 
-	return sizeof login;
+	return sizeof login_req;
 }
 
 std::pair<const uint8_t *, std::size_t> iscsi_pdu_login_request::get()
 {
-	void *out = new uint8_t[sizeof login];
-	memcpy(out, &login, sizeof login);
+	void *out = new uint8_t[sizeof login_req];
+	memcpy(out, &login_req, sizeof login_req);
 
-	return { reinterpret_cast<const uint8_t *>(out), sizeof login };
+	return { reinterpret_cast<const uint8_t *>(out), sizeof login_req };
 }
 
+iscsi_pdu_login_reply::iscsi_pdu_login_reply()
+{
+}
+
+iscsi_pdu_login_reply::~iscsi_pdu_login_reply()
+{
+}
+
+void iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
+{
+	login_reply = { };
+	login_reply.opcode     = 0x23;
+	login_reply.T          = reply_to.get_T();
+	login_reply.C          = reply_to.get_C();
+	login_reply.CSG        = reply_to.get_CSG();
+	login_reply.NSG        = reply_to.get_NSG();
+	login_reply.versionmax = reply_to.get_versionmin();
+	login_reply.versionact = reply_to.get_versionmin();
+	login_reply.ahslen     = 0;
+	// login_reply.datalenH / M / L;
+	memcpy(login_reply.ISID, reply_to.get_ISID(), 6);
+	login_reply.TSIH       = reply_to.get_TSIH();
+	login_reply.Itasktag   = reply_to.get_Itasktag();
+	login_reply.ExpCmdSN   = 1;  // won't handle re-login!
+	login_reply.MaxStatSN  = 1;
+}
+
+std::pair<const uint8_t *, std::size_t> iscsi_pdu_login_reply::get()
+{
+	void *out = new uint8_t[sizeof login_reply];
+	memcpy(out, &login_reply, sizeof login_reply);
+
+	return { reinterpret_cast<const uint8_t *>(out), sizeof login_reply };
+}

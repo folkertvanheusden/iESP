@@ -92,7 +92,7 @@ public:
 class iscsi_pdu_login_request : public iscsi_pdu_bhs  // login request
 {
 public:
-	struct __login__ {
+	struct __login_req__ {
 		uint8_t  opcode    :  6;
 		bool     I_is_1    :  1;
 		bool     filler    :  1;
@@ -108,7 +108,7 @@ public:
 		uint32_t datalenM  :  8;  // data segment length (bytes, excluding padding) 15...8
 		uint32_t datalenL  :  8;  // data segment length (bytes, excluding padding) 7...0
 		uint8_t  ISID[6];
-		uint8_t  TSIH[2];
+		uint16_t TSIH;
 		uint32_t Itasktag  : 32;  // initiator task tag
 		uint16_t CID       : 16;
 		uint16_t reserved  : 16;
@@ -117,7 +117,7 @@ public:
 		uint8_t  filler3[16];
 	};
 
-	__login__ login __attribute__((packed));
+	__login_req__ login_req __attribute__((packed));
 
 public:
 	iscsi_pdu_login_request();
@@ -126,9 +126,55 @@ public:
 	ssize_t set(const uint8_t *const in, const size_t n);
 	std::pair<const uint8_t *, std::size_t> get();
 
-	const uint8_t *get_ISID()  const { return login.ISID;  }
-	      uint16_t get_CID()   const { return login.CID;   }
-	      uint32_t get_CmdSN() const { return login.CmdSN; }
+	const uint8_t *get_ISID()       const { return login_req.ISID;       }
+	      uint16_t get_CID()        const { return login_req.CID;        }
+	      uint32_t get_CmdSN()      const { return login_req.CmdSN;      }
+	      uint16_t get_TSIH()       const { return login_req.TSIH;       }
+	      bool     get_T()          const { return login_req.T;          }
+	      bool     get_C()          const { return login_req.C;          }
+	      uint8_t  get_CSG()        const { return login_req.CSG;        }
+	      uint8_t  get_NSG()        const { return login_req.NSG;        }
+	      uint8_t  get_versionmin() const { return login_req.versionmin; }
+	      uint32_t get_Itasktag()   const { return login_req.Itasktag;   }
+};
 
-	      uint8_t  get_NSG()   const { return login.NSG;   }
+class iscsi_pdu_login_reply : public iscsi_pdu_bhs
+{
+public:
+	struct __login_reply__ {
+		uint8_t  opcode    :  6;  // 0x23
+		bool     filler0   :  1;
+		bool     filler1   :  1;
+		bool     T         :  1;
+		bool     C         :  1;
+		uint8_t  filler2   :  2;
+		uint8_t  CSG       :  2;
+		uint8_t  NSG       :  2;
+		uint8_t  versionmax:  8;
+		uint8_t  versionact:  8;
+		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
+		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
+		uint32_t datalenM  :  8;  // data segment length (bytes, excluding padding) 15...8
+		uint32_t datalenL  :  8;  // data segment length (bytes, excluding padding) 7...0
+		uint8_t  ISID[6];
+		uint16_t TSIH;
+		uint32_t Itasktag  : 32;  // initiator task tag
+		uint32_t reserved  : 32;
+		uint32_t StatSN    : 32;
+		uint32_t ExpCmdSN  : 32;
+		uint32_t MaxStatSN : 32;
+		uint8_t  statuscls :  8;  // status-class
+		uint8_t  statusdet :  8;  // status-detail
+		uint16_t reserved2 : 16;
+		uint8_t  filler3[8];
+	};
+
+	__login_reply__ login_reply __attribute__((packed));
+
+public:
+	iscsi_pdu_login_reply();
+	virtual ~iscsi_pdu_login_reply();
+
+	void set(const iscsi_pdu_login_request & reply_to);
+	std::pair<const uint8_t *, std::size_t> get();
 };
