@@ -171,10 +171,97 @@ public:
 
 	__login_reply__ login_reply __attribute__((packed));
 
+	std::pair<uint8_t *, size_t> login_reply_reply_data { nullptr, 0 };
+
 public:
 	iscsi_pdu_login_reply();
 	virtual ~iscsi_pdu_login_reply();
 
 	void set(const iscsi_pdu_login_request & reply_to);
+	std::pair<const uint8_t *, std::size_t> get();
+};
+
+class iscsi_pdu_scsi_command : public iscsi_pdu_bhs
+{
+public:
+	struct __cdb_pdu_req__ {
+		uint8_t  opcode    :  6;
+		bool     I         :  1;
+		bool     F         :  1;
+		bool     R         :  1;
+		bool     W         :  1;
+		uint8_t  filler0   :  2;
+		uint8_t  ATTR      :  3;
+		uint16_t reserved  : 16;
+		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
+		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
+		uint32_t datalenM  :  8;  // data segment length (bytes, excluding padding) 15...8
+		uint32_t datalenL  :  8;  // data segment length (bytes, excluding padding) 7...0
+		uint8_t  LUN[8];
+		uint32_t Itasktag  : 32;  // initiator task tag
+		uint32_t expdatlen : 32;  // expected data transfer lenth
+		uint32_t CmdSN     : 32;
+		uint32_t ExpStatSN : 32;
+		uint8_t  CDB[16];
+	};
+
+	__cdb_pdu_req__ cdb_pdu_req __attribute__((packed));
+
+public:
+	iscsi_pdu_scsi_command();
+	virtual ~iscsi_pdu_scsi_command();
+
+	ssize_t set(const uint8_t *const in, const size_t n);
+	std::pair<const uint8_t *, std::size_t> get();
+
+	const uint8_t * get_CDB()       const { return cdb_pdu_req.CDB;       }
+	      uint32_t  get_Itasktag()  const { return cdb_pdu_req.Itasktag;  }
+	      uint32_t  get_ExpStatSN() const { return cdb_pdu_req.ExpStatSN; }
+	      uint32_t  get_CmdSN()     const { return cdb_pdu_req.CmdSN;     }
+};
+
+class iscsi_pdu_scsi_command_reply : public iscsi_pdu_bhs
+{
+public:
+	struct __cdb_pdu_reply__ {
+		uint8_t  opcode    :  6;
+		bool     reserved0 :  1;
+		bool     reserved1 :  1;
+
+		bool     reserved2 :  1;
+		bool     U         :  1;
+		bool     O         :  1;
+		bool     u         :  1;
+		bool     o         :  1;
+		bool     reserved3 :  1;
+		bool     reserved4 :  1;
+		bool     set_to_1  :  1;  // 1
+
+		uint8_t  response  :  8;
+		uint8_t  status    :  8;
+		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
+		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
+		uint32_t datalenM  :  8;  // data segment length (bytes, excluding padding) 15...8
+		uint32_t datalenL  :  8;  // data segment length (bytes, excluding padding) 7...0
+		uint8_t  reserved5[8];
+		uint32_t Itasktag  : 32;  // initiator task tag
+		uint32_t snack_tag : 32;
+		uint32_t StatSN    : 32;
+		uint32_t ExpCmdSN  : 32;
+		uint32_t MaxCmdSN  : 32;
+		uint32_t ExpDataSN : 32;
+		uint32_t BidirResCt: 32;  // bidirectional read residual count or reserved
+		uint32_t ResidualCt: 32;  // residual count or reserved
+	};
+
+	__cdb_pdu_reply__ cdb_pdu_reply __attribute__((packed));
+
+	std::pair<uint8_t *, size_t> cdb_pdu_reply_data { nullptr, 0 };
+
+public:
+	iscsi_pdu_scsi_command_reply();
+	virtual ~iscsi_pdu_scsi_command_reply();
+
+	ssize_t set(const iscsi_pdu_scsi_command & reply_to, const std::pair<uint8_t *, size_t> scsi_reply);
 	std::pair<const uint8_t *, std::size_t> get();
 };

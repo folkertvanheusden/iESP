@@ -73,20 +73,43 @@ session * server::handle_login(const uint8_t pdu[48], std::pair<uint8_t *, size_
 
 	iscsi_pdu_login_reply plrep;
 	plrep.set(plr);
-	auto reply = plrep.get();
+	auto iscsi_reply = plrep.get();
 
-	if (WRITE(fd, reply.first, reply.second) == -1) {
+	if (WRITE(fd, iscsi_reply.first, iscsi_reply.second) == -1) {
 		delete s;
 		s = nullptr;
 	}
 
-	delete reply.first;
+	delete [] iscsi_reply.first;
 
 	return s;
 }
 
+bool server::handle_scsi_command(const uint8_t pdu[48], std::pair<uint8_t *, size_t> data, scsi *const sd, const int fd)
+{
+	bool ok = true;
+
+	iscsi_pdu_scsi_command psc;
+	psc.set(pdu, 48);
+
+	auto scsi_reply = sd->send(psc.get_CDB(), 16);
+	iscsi_pdu_scsi_command_reply pscr;
+	pscr.set(psc, scsi_reply);
+	delete [] scsi_reply.first;
+
+	auto iscsi_reply = pscr.get();
+	printf("SCSI command reply is %zu bytes\n", iscsi_reply.second);
+	if (WRITE(fd, iscsi_reply.first, iscsi_reply.second) == -1)
+		ok = false;
+	delete [] iscsi_reply.first;
+
+	return ok;
+}
+
 void server::handler()
 {
+	scsi scsi_dev;
+
 	for(;;) {
 		int fd = accept(listen_fd, nullptr, nullptr);
 		if (fd == -1)
@@ -149,6 +172,9 @@ void server::handler()
 				s = handle_login(pdu, { data, data_length }, fd);
 				if (s == nullptr)
 					ok = false;
+			}
+			else if (bhs.get_opcode() == iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_cmd) {
+				ok = handle_scsi_command(pdu, { data, data_length }, &scsi_dev, fd);
 			}
 
 			printf("\n");

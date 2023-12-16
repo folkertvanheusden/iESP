@@ -12,6 +12,7 @@ add_executable(
 	main.cpp
 	random.cpp
 	server.cpp
+	scsi.cpp
 	session.cpp
 	utils.cpp
 )
