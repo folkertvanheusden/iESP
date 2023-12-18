@@ -39,7 +39,7 @@ ssize_t WRITE(const int fd, const uint8_t *whereto, size_t len)
 	return cnt;
 }
 
-std::vector<std::string> split(std::string in, std::string splitter)
+std::vector<std::string> split(std::string in, const std::string & splitter)
 {
 	std::vector<std::string> out;
 	size_t splitter_size = splitter.size();

@@ -28,7 +28,7 @@ bool server::begin()
 		return false;
 
         int reuse_addr = 1;
-        if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, (char *)&reuse_addr, sizeof(reuse_addr)) == -1)
+        if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<char *>(&reuse_addr), sizeof reuse_addr) == -1)
 		return false;
 
 #ifdef linux
@@ -118,42 +118,14 @@ void server::handler()
 			continue;
 
 		session *s  = nullptr;
-		bool     ok = true;
 
-		do {
+		for(;;) {
 			iscsi_pdu_bhs *pdu = receive_pdu(fd, &s);
 			if (!pdu)
 				break;
 
-			/*
-			uint8_t *data        = nullptr;
-			size_t   data_length = bhs.get_data_length();
-			printf("DATA size: %zu (%x)\n", data_length, unsigned(data_length));
-			if (data_length) {
-				bool ok = true;
-
-				data = new uint8_t[data_length];
-				if (READ(fd, data, data_length) == -1)
-					ok = false;
-
-				size_t padding = ((data_length + 3) & ~3) - data_length;
-				if (ok && padding) {
-					uint8_t padding_temp[4];
-					if (READ(fd, padding_temp, padding) == -1)
-						ok = false;
-				}
-
-				if (!ok) {
-					delete [] ahs;
-					delete [] data;
-					break;
-				}
-			}
-
-			delete [] data;
-			*/
+			delete pdu;
 		}
-		while(ok);
 
 		close(fd);
 

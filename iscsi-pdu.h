@@ -193,7 +193,7 @@ public:
 	virtual ~iscsi_pdu_login_reply();
 
 	bool set(const iscsi_pdu_login_request & reply_to);
-	std::pair<const uint8_t *, std::size_t> get();
+	std::pair<const uint8_t *, std::size_t> get() override;
 };
 
 class iscsi_pdu_scsi_command : public iscsi_pdu_bhs
@@ -279,7 +279,7 @@ public:
 	virtual ~iscsi_pdu_scsi_response();
 
 	bool set(const iscsi_pdu_scsi_command & reply_to, const std::tuple<iscsi_pdu_bhs::iscsi_bhs_opcode, uint8_t *, size_t> scsi_reply);
-	std::pair<const uint8_t *, std::size_t> get();
+	std::pair<const uint8_t *, std::size_t> get() override;
 };
 
 class iscsi_pdu_scsi_data_in : public iscsi_pdu_bhs  // 0x25
@@ -326,5 +326,5 @@ public:
 	virtual ~iscsi_pdu_scsi_data_in();
 
 	bool set(const iscsi_pdu_scsi_command & reply_to, const std::tuple<iscsi_pdu_bhs::iscsi_bhs_opcode, uint8_t *, size_t> scsi_reply);
-	std::pair<const uint8_t *, std::size_t> get();
+	std::pair<const uint8_t *, std::size_t> get() override;
 };

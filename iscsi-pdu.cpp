@@ -184,7 +184,7 @@ iscsi_pdu_login_reply::~iscsi_pdu_login_reply()
 
 bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 {
-	std::vector<std::string> kvs {
+	const std::vector<std::string> kvs {
 		"HeaderDigest=None",
 		"DataDigest=None",
 		"MaxConnections=1",
@@ -198,12 +198,12 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 	};
 	// determine total length
 	login_reply_reply_data.second = 0;
-	for(auto & kv: kvs)
+	for(const auto & kv: kvs)
 		login_reply_reply_data.second += kv.size() + 1;
 
 	login_reply_reply_data.first = new uint8_t[login_reply_reply_data.second + 4/*padding*/]();
 	size_t data_offset = 0;
-	for(auto & kv: kvs) {
+	for(const auto & kv: kvs) {
 		memcpy(&login_reply_reply_data.first[data_offset], kv.c_str(), kv.size());
 		data_offset += kv.size() + 1;  // for 0x00
 	}
@@ -339,7 +339,6 @@ bool iscsi_pdu_scsi_data_in::set(const iscsi_pdu_scsi_command & reply_to, const 
 	pdu_data_in->opcode     = std::get<0>(scsi_reply);  // scsi_reply contains an iscsi opcode hint
 	pdu_data_in->datalenH   = reply_data_plus_sense_data >> 16;
 	pdu_data_in->datalenM   = reply_data_plus_sense_data >>  8;
-	pdu_data_in->datalenL   = reply_data_plus_sense_data      ;
 	pdu_data_in->datalenL   = reply_data_plus_sense_data      ;
 	memcpy(pdu_data_in->LUN, reply_to.get_LUN(), sizeof pdu_data_in->LUN);
 	pdu_data_in->Itasktag   = reply_to.get_Itasktag();
