@@ -1,3 +1,4 @@
+#pragma once
 #include <cstdint>
 #include <string>
 #include <utility>
@@ -218,12 +219,13 @@ public:
 	      uint32_t  get_Itasktag()  const { return cdb_pdu_req.Itasktag;  }
 	      uint32_t  get_ExpStatSN() const { return cdb_pdu_req.ExpStatSN; }
 	      uint32_t  get_CmdSN()     const { return cdb_pdu_req.CmdSN;     }
+	const uint8_t * get_LUN()       const { return cdb_pdu_req.LUN;       }
 };
 
-class iscsi_pdu_scsi_command_reply : public iscsi_pdu_bhs
+class iscsi_pdu_scsi_response : public iscsi_pdu_bhs  // 0x21
 {
 public:
-	struct __cdb_pdu_reply__ {
+	struct __pdu_response__ {
 		uint8_t  opcode    :  6;
 		bool     reserved0 :  1;
 		bool     reserved1 :  1;
@@ -254,14 +256,61 @@ public:
 		uint32_t ResidualCt: 32;  // residual count or reserved
 	};
 
-	__cdb_pdu_reply__ cdb_pdu_reply __attribute__((packed));
+	__pdu_response__ pdu_response __attribute__((packed));
 
-	std::pair<uint8_t *, size_t> cdb_pdu_reply_data { nullptr, 0 };
+	std::pair<uint8_t *, size_t> pdu_response_data { nullptr, 0 };
 
 public:
-	iscsi_pdu_scsi_command_reply();
-	virtual ~iscsi_pdu_scsi_command_reply();
+	iscsi_pdu_scsi_response();
+	virtual ~iscsi_pdu_scsi_response();
 
-	ssize_t set(const iscsi_pdu_scsi_command & reply_to, const std::pair<uint8_t *, size_t> scsi_reply);
+	ssize_t set(const iscsi_pdu_scsi_command & reply_to, const std::tuple<iscsi_pdu_bhs::iscsi_bhs_opcode, uint8_t *, size_t> scsi_reply);
+	std::pair<const uint8_t *, std::size_t> get();
+};
+
+class iscsi_pdu_scsi_data_in : public iscsi_pdu_bhs  // 0x25
+{
+public:
+	struct __pdu_data_in__ {
+		uint8_t  opcode    :  6;
+		bool     reserved0 :  1;
+		bool     reserved1 :  1;
+
+		bool     S         :  1;
+		bool     U         :  1;
+		bool     O         :  1;
+		bool     reserved3 :  1;
+		bool     reserved4 :  1;
+		bool     reserved5 :  1;
+		bool     A         :  1;
+		bool     F         :  1;
+
+		uint8_t  reserved6 :  8;
+		uint8_t  status    :  8;
+
+		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
+		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
+		uint32_t datalenM  :  8;  // data segment length (bytes, excluding padding) 15...8
+		uint32_t datalenL  :  8;  // data segment length (bytes, excluding padding) 7...0
+		uint8_t  LUN[8];
+		uint32_t Itasktag  : 32;  // initiator task tag
+		uint32_t TTF       : 32;
+		uint32_t StatSN    : 32;
+		uint32_t ExpCmdSN  : 32;
+		uint32_t MaxCmdSN  : 32;
+		uint32_t DataSN    : 32;
+		uint32_t bufferoff : 32;
+		uint32_t ResidualCt: 32;  // residual count or reserved
+	};
+
+	__pdu_data_in__ pdu_data_in __attribute__((packed));
+
+	std::pair<uint8_t *, size_t> pdu_data_in_data { nullptr, 0 };
+
+public:
+	iscsi_pdu_scsi_data_in();
+	virtual ~iscsi_pdu_scsi_data_in();
+
+	ssize_t set(const iscsi_pdu_scsi_command & reply_to, const std::tuple<iscsi_pdu_bhs::iscsi_bhs_opcode, uint8_t *, size_t> scsi_reply);
 	std::pair<const uint8_t *, std::size_t> get();
 };

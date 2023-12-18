@@ -93,9 +93,9 @@ bool server::handle_scsi_command(const uint8_t pdu[48], std::pair<uint8_t *, siz
 	psc.set(pdu, 48);
 
 	auto scsi_reply = sd->send(psc.get_CDB(), 16);
-	iscsi_pdu_scsi_command_reply pscr;
+	iscsi_pdu_scsi_response pscr;
 	pscr.set(psc, scsi_reply);
-	delete [] scsi_reply.first;
+	delete [] std::get<1>(scsi_reply);
 
 	auto iscsi_reply = pscr.get();
 	printf("SCSI command reply is %zu bytes\n", iscsi_reply.second);

@@ -3,6 +3,8 @@
 #include <utility>
 
 
+#include "iscsi-pdu.h"
+
 class scsi
 {
 public:
@@ -17,5 +19,5 @@ public:
 		o_seek            = 0x0b,
 	};
 
-	std::pair<uint8_t *, size_t> send(const uint8_t *const CDB, const size_t size);
+	std::tuple<iscsi_pdu_bhs::iscsi_bhs_opcode, uint8_t *, size_t> send(const uint8_t *const CDB, const size_t size);
 };
