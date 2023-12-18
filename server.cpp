@@ -60,7 +60,7 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 		return nullptr;
 
 	iscsi_pdu_bhs bhs;
-	if (bhs.set(pdu, sizeof pdu) == false)
+	if (bhs.set(*s, pdu, sizeof pdu) == false)
 		return nullptr;
 
 	printf("opcode: %02x / %s\n", bhs.get_opcode(), pdu_opcode_to_string(bhs.get_opcode()).c_str());
@@ -76,7 +76,7 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 	if (pdu_obj) {
 		bool ok = true;
 
-		if (pdu_obj->set(pdu, sizeof pdu) == false)
+		if (pdu_obj->set(*s, pdu, sizeof pdu) == false)
 			ok = false;
 
 		size_t ahs_len = pdu_obj->get_ahs_length();
@@ -101,7 +101,7 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 		
 		if (!ok) {
 			delete pdu_obj;
-			pdu_obj == nullptr;
+			pdu_obj = nullptr;
 		}
 	}
 

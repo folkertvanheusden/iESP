@@ -154,7 +154,7 @@ iscsi_pdu_login_request::~iscsi_pdu_login_request()
 {
 }
 
-bool iscsi_pdu_login_request::set(const uint8_t *const in, const size_t n)
+bool iscsi_pdu_login_request::set(session *const s, const uint8_t *const in, const size_t n)
 {
 	if (n != 48)
 		return false;
@@ -255,7 +255,7 @@ iscsi_pdu_scsi_command::~iscsi_pdu_scsi_command()
 {
 }
 
-bool iscsi_pdu_scsi_command::set(const uint8_t *const in, const size_t n)
+bool iscsi_pdu_scsi_command::set(session *const s, const uint8_t *const in, const size_t n)
 {
 	if (n != 48)
 		return false;

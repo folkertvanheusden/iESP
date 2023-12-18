@@ -5,6 +5,8 @@
 #include <vector>
 #include <sys/types.h>
 
+#include "session.h"
+
 
 // These classes have a 'set' method as to have a way to return validity - an is_valid method would've worked as well.
 // Also no direct retrieval from filedescriptors to help porting to platforms without socket-api.
@@ -86,8 +88,8 @@ public:
 		o_reject        = 0x3f,  // Reject
 	};
 
-	bool set(const uint8_t *const in, const size_t n);
-	std::pair<const uint8_t *, std::size_t> get();
+	virtual bool set(session *const s, const uint8_t *const in, const size_t n);
+	virtual std::pair<const uint8_t *, std::size_t> get();
 
 	size_t           get_ahs_length()  const { return bhs.ahslen;         }
 	bool             set_ahs_segment(std::pair<const uint8_t *, std::size_t> ahs_in);
@@ -133,8 +135,8 @@ public:
 	iscsi_pdu_login_request();
 	virtual ~iscsi_pdu_login_request();
 
-	bool set(const uint8_t *const in, const size_t n);
-	std::pair<const uint8_t *, std::size_t> get();
+	bool set(session *const s, const uint8_t *const in, const size_t n) override;
+	std::pair<const uint8_t *, std::size_t> get() override;
 
 	const uint8_t *get_ISID()       const { return login_req.ISID;       }
 	      uint16_t get_CID()        const { return login_req.CID;        }
@@ -221,8 +223,8 @@ public:
 	iscsi_pdu_scsi_command();
 	virtual ~iscsi_pdu_scsi_command();
 
-	bool set(const uint8_t *const in, const size_t n);
-	std::pair<const uint8_t *, std::size_t> get();
+	bool set(session *const s, const uint8_t *const in, const size_t n) override;
+	std::pair<const uint8_t *, std::size_t> get() override;
 
 	const uint8_t * get_CDB()       const { return cdb_pdu_req.CDB;       }
 	      uint32_t  get_Itasktag()  const { return cdb_pdu_req.Itasktag;  }
