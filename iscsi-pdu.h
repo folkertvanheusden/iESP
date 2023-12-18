@@ -40,10 +40,9 @@ public:
 class iscsi_pdu_bhs  // basic header segment
 {
 protected:
-	std::vector<iscsi_pdu_ahs *> ahs_list;
-	std::pair<uint8_t *, size_t> data     { nullptr, 0 };
+	uint8_t pdu_bytes[48] { 0 };
 
-public:
+private:
 	struct __bhs__ {
 		uint8_t  opcode    :  6;
 		bool     I         :  1;
@@ -59,7 +58,11 @@ public:
 		uint8_t  ofields[28];     // opcode specific fields
 	};
 
-	__bhs__ bhs __attribute__((packed));
+	__bhs__ *bhs __attribute__((packed)) { reinterpret_cast<__bhs__ *>(pdu_bytes) };
+
+protected:
+	std::vector<iscsi_pdu_ahs *> ahs_list;
+	std::pair<uint8_t *, size_t> data     { nullptr, 0 };
 
 public:
 	iscsi_pdu_bhs();
@@ -91,11 +94,11 @@ public:
 	virtual bool set(session *const s, const uint8_t *const in, const size_t n);
 	virtual std::pair<const uint8_t *, std::size_t> get();
 
-	size_t           get_ahs_length()  const { return bhs.ahslen;         }
+	size_t           get_ahs_length()  const { return bhs->ahslen;         }
 	bool             set_ahs_segment(std::pair<const uint8_t *, std::size_t> ahs_in);
 
-	iscsi_bhs_opcode get_opcode()      const { return iscsi_bhs_opcode(bhs.opcode); }
-	size_t           get_data_length() const { return (bhs.datalenH << 16) | (bhs.datalenM << 8) | bhs.datalenL; }
+	iscsi_bhs_opcode get_opcode()      const { return iscsi_bhs_opcode(bhs->opcode); }
+	size_t           get_data_length() const { return (bhs->datalenH << 16) | (bhs->datalenM << 8) | bhs->datalenL; }
 	bool             set_data(std::pair<const uint8_t *, std::size_t> data_in);
 };
 
@@ -129,7 +132,7 @@ public:
 		uint8_t  filler3[16];
 	};
 
-	__login_req__ login_req __attribute__((packed));
+	__login_req__ *login_req __attribute__((packed)) { reinterpret_cast<__login_req__ *>(pdu_bytes) };
 
 public:
 	iscsi_pdu_login_request();
@@ -138,16 +141,16 @@ public:
 	bool set(session *const s, const uint8_t *const in, const size_t n) override;
 	std::pair<const uint8_t *, std::size_t> get() override;
 
-	const uint8_t *get_ISID()       const { return login_req.ISID;       }
-	      uint16_t get_CID()        const { return login_req.CID;        }
-	      uint32_t get_CmdSN()      const { return login_req.CmdSN;      }
-	      uint16_t get_TSIH()       const { return login_req.TSIH;       }
-	      bool     get_T()          const { return login_req.T;          }
-	      bool     get_C()          const { return login_req.C;          }
-	      uint8_t  get_CSG()        const { return login_req.CSG;        }
-	      uint8_t  get_NSG()        const { return login_req.NSG;        }
-	      uint8_t  get_versionmin() const { return login_req.versionmin; }
-	      uint32_t get_Itasktag()   const { return login_req.Itasktag;   }
+	const uint8_t *get_ISID()       const { return login_req->ISID;       }
+	      uint16_t get_CID()        const { return login_req->CID;        }
+	      uint32_t get_CmdSN()      const { return login_req->CmdSN;      }
+	      uint16_t get_TSIH()       const { return login_req->TSIH;       }
+	      bool     get_T()          const { return login_req->T;          }
+	      bool     get_C()          const { return login_req->C;          }
+	      uint8_t  get_CSG()        const { return login_req->CSG;        }
+	      uint8_t  get_NSG()        const { return login_req->NSG;        }
+	      uint8_t  get_versionmin() const { return login_req->versionmin; }
+	      uint32_t get_Itasktag()   const { return login_req->Itasktag;   }
 };
 
 class iscsi_pdu_login_reply : public iscsi_pdu_bhs
@@ -217,7 +220,7 @@ public:
 		uint8_t  CDB[16];
 	};
 
-	__cdb_pdu_req__ cdb_pdu_req __attribute__((packed));
+	__cdb_pdu_req__ *cdb_pdu_req __attribute__((packed)) { reinterpret_cast<__cdb_pdu_req__ *>(pdu_bytes) };
 
 public:
 	iscsi_pdu_scsi_command();
@@ -226,11 +229,11 @@ public:
 	bool set(session *const s, const uint8_t *const in, const size_t n) override;
 	std::pair<const uint8_t *, std::size_t> get() override;
 
-	const uint8_t * get_CDB()       const { return cdb_pdu_req.CDB;       }
-	      uint32_t  get_Itasktag()  const { return cdb_pdu_req.Itasktag;  }
-	      uint32_t  get_ExpStatSN() const { return cdb_pdu_req.ExpStatSN; }
-	      uint32_t  get_CmdSN()     const { return cdb_pdu_req.CmdSN;     }
-	const uint8_t * get_LUN()       const { return cdb_pdu_req.LUN;       }
+	const uint8_t * get_CDB()       const { return cdb_pdu_req->CDB;       }
+	      uint32_t  get_Itasktag()  const { return cdb_pdu_req->Itasktag;  }
+	      uint32_t  get_ExpStatSN() const { return cdb_pdu_req->ExpStatSN; }
+	      uint32_t  get_CmdSN()     const { return cdb_pdu_req->CmdSN;     }
+	const uint8_t * get_LUN()       const { return cdb_pdu_req->LUN;       }
 };
 
 class iscsi_pdu_scsi_response : public iscsi_pdu_bhs  // 0x21
@@ -314,7 +317,7 @@ public:
 		uint32_t ResidualCt: 32;  // residual count or reserved
 	};
 
-	__pdu_data_in__ pdu_data_in __attribute__((packed));
+	__pdu_data_in__ *pdu_data_in __attribute__((packed)) { reinterpret_cast<__pdu_data_in__ *>(pdu_bytes) };
 
 	std::pair<uint8_t *, size_t> pdu_data_in_data { nullptr, 0 };
 
