@@ -2,11 +2,45 @@
 #include <cstdint>
 #include <string>
 #include <utility>
+#include <vector>
 #include <sys/types.h>
 
 
+// These classes have a 'set' method as to have a way to return validity - an is_valid method would've worked as well.
+// Also no direct retrieval from filedescriptors to help porting to platforms without socket-api.
+
+class iscsi_pdu_ahs
+{
+private:
+	struct __ahs_header__ {
+		uint16_t length: 16;
+		uint8_t  type  :  8;
+	} __attribute__((packed));
+
+	__ahs_header__ *ahs { nullptr };
+
+public:
+	iscsi_pdu_ahs();
+	virtual ~iscsi_pdu_ahs();
+
+	enum iscsi_ahs_type {
+		t_extended_cdb = 1,
+		t_bi_data_len  = 2,  // Expected Bidirectional Read Data Length
+	};
+
+	bool set(const uint8_t *const in, const size_t n);
+	std::pair<const uint8_t *, std::size_t> get();
+
+	iscsi_ahs_type get_ahs_type() { return iscsi_ahs_type(ahs->type >> 2); }
+	void           set_ahs_type(const iscsi_ahs_type type) { ahs->type = type << 2; }
+};
+
 class iscsi_pdu_bhs  // basic header segment
 {
+protected:
+	std::vector<iscsi_pdu_ahs *> ahs_list;
+	std::pair<uint8_t *, size_t> data     { nullptr, 0 };
+
 public:
 	struct __bhs__ {
 		uint8_t  opcode    :  6;
@@ -52,43 +86,18 @@ public:
 		o_reject        = 0x3f,  // Reject
 	};
 
-	ssize_t set(const uint8_t *const in, const size_t n);
+	bool set(const uint8_t *const in, const size_t n);
 	std::pair<const uint8_t *, std::size_t> get();
 
-	iscsi_bhs_opcode get_opcode()      const { return iscsi_bhs_opcode(bhs.opcode); }
-	void             set_opcode(const iscsi_bhs_opcode opcode) { bhs.opcode = opcode; }
-
 	size_t           get_ahs_length()  const { return bhs.ahslen;         }
+	bool             set_ahs_segment(std::pair<const uint8_t *, std::size_t> ahs_in);
+
+	iscsi_bhs_opcode get_opcode()      const { return iscsi_bhs_opcode(bhs.opcode); }
 	size_t           get_data_length() const { return (bhs.datalenH << 16) | (bhs.datalenM << 8) | bhs.datalenL; }
+	bool             set_data(std::pair<const uint8_t *, std::size_t> data_in);
 };
 
 std::string pdu_opcode_to_string(const iscsi_pdu_bhs::iscsi_bhs_opcode opcode);
-
-class iscsi_pdu_ahs
-{
-private:
-	struct __ahs_header__ {
-		uint16_t length: 16;
-		uint8_t  type  :  8;
-	} __attribute__((packed));
-
-	__ahs_header__ *ahs { nullptr };
-
-public:
-	iscsi_pdu_ahs();
-	virtual ~iscsi_pdu_ahs();
-
-	enum iscsi_ahs_type {
-		t_extended_cdb = 1,
-		t_bi_data_len  = 2,  // Expected Bidirectional Read Data Length
-	};
-
-	ssize_t set(const uint8_t *const in, const size_t n);
-	std::pair<const uint8_t *, std::size_t> get();
-
-	iscsi_ahs_type get_ahs_type() { return iscsi_ahs_type(ahs->type >> 2); }
-	void           set_ahs_type(const iscsi_ahs_type type) { ahs->type = type << 2; }
-};
 
 class iscsi_pdu_login_request : public iscsi_pdu_bhs  // login request
 {
@@ -124,7 +133,7 @@ public:
 	iscsi_pdu_login_request();
 	virtual ~iscsi_pdu_login_request();
 
-	ssize_t set(const uint8_t *const in, const size_t n);
+	bool set(const uint8_t *const in, const size_t n);
 	std::pair<const uint8_t *, std::size_t> get();
 
 	const uint8_t *get_ISID()       const { return login_req.ISID;       }
@@ -178,7 +187,7 @@ public:
 	iscsi_pdu_login_reply();
 	virtual ~iscsi_pdu_login_reply();
 
-	void set(const iscsi_pdu_login_request & reply_to);
+	bool set(const iscsi_pdu_login_request & reply_to);
 	std::pair<const uint8_t *, std::size_t> get();
 };
 
@@ -212,7 +221,7 @@ public:
 	iscsi_pdu_scsi_command();
 	virtual ~iscsi_pdu_scsi_command();
 
-	ssize_t set(const uint8_t *const in, const size_t n);
+	bool set(const uint8_t *const in, const size_t n);
 	std::pair<const uint8_t *, std::size_t> get();
 
 	const uint8_t * get_CDB()       const { return cdb_pdu_req.CDB;       }
@@ -264,7 +273,7 @@ public:
 	iscsi_pdu_scsi_response();
 	virtual ~iscsi_pdu_scsi_response();
 
-	ssize_t set(const iscsi_pdu_scsi_command & reply_to, const std::tuple<iscsi_pdu_bhs::iscsi_bhs_opcode, uint8_t *, size_t> scsi_reply);
+	bool set(const iscsi_pdu_scsi_command & reply_to, const std::tuple<iscsi_pdu_bhs::iscsi_bhs_opcode, uint8_t *, size_t> scsi_reply);
 	std::pair<const uint8_t *, std::size_t> get();
 };
 
@@ -311,6 +320,6 @@ public:
 	iscsi_pdu_scsi_data_in();
 	virtual ~iscsi_pdu_scsi_data_in();
 
-	ssize_t set(const iscsi_pdu_scsi_command & reply_to, const std::tuple<iscsi_pdu_bhs::iscsi_bhs_opcode, uint8_t *, size_t> scsi_reply);
+	bool set(const iscsi_pdu_scsi_command & reply_to, const std::tuple<iscsi_pdu_bhs::iscsi_bhs_opcode, uint8_t *, size_t> scsi_reply);
 	std::pair<const uint8_t *, std::size_t> get();
 };
