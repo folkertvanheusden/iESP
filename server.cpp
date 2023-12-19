@@ -111,21 +111,23 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 bool server::push_response(const int fd, iscsi_pdu_bhs *const pdu, iscsi_response_parameters *const parameters)
 {
 	auto response_set = pdu->get_response(parameters);
+	if (response_set.has_value() == false)
+		return false;
 
-	for(auto & pdu_out: response_set.responses) {
+	bool ok = true;
+
+	for(auto & pdu_out: response_set.value().responses) {
 		auto iscsi_reply = pdu_out->get();
 		if (iscsi_reply.first == nullptr)
-			return false;
+			ok = false;
 
-		bool ok = WRITE(fd, iscsi_reply.first, iscsi_reply.second) != -1;
+		if (ok)
+			ok = WRITE(fd, iscsi_reply.first, iscsi_reply.second) != -1;
 
 		delete [] iscsi_reply.first;
-
-		if (!ok)
-			return false;
 	}
 
-	return true;
+	return ok;
 }
 
 iscsi_response_parameters *server::select_parameters(iscsi_pdu_bhs *const pdu, session *const ses, scsi *const sd)
