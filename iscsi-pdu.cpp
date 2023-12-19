@@ -199,7 +199,7 @@ std::optional<iscsi_response_set> iscsi_pdu_login_request::get_response(const is
 
 iscsi_pdu_login_reply::iscsi_pdu_login_reply()
 {
-	assert(sizeof(login_reply) == 48);
+	assert(sizeof(*login_reply) == 48);
 }
 
 iscsi_pdu_login_reply::~iscsi_pdu_login_reply()
@@ -233,23 +233,25 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 	}
 	assert(data_offset == login_reply_reply_data.second);
 
-	login_reply = { };
-	login_reply.opcode     = 0x23;
-	login_reply.T          = reply_to.get_T();
-	login_reply.C          = reply_to.get_C();
-	login_reply.CSG        = reply_to.get_CSG();
-	login_reply.NSG        = reply_to.get_NSG();
-	login_reply.versionmax = reply_to.get_versionmin();
-	login_reply.versionact = reply_to.get_versionmin();
-	login_reply.ahslen     = 0;
-	login_reply.datalenH   = login_reply_reply_data.second >> 16;
-	login_reply.datalenM   = login_reply_reply_data.second >>  8;
-	login_reply.datalenL   = login_reply_reply_data.second      ;
-	memcpy(login_reply.ISID, reply_to.get_ISID(), 6);
-	login_reply.TSIH       = reply_to.get_TSIH();
-	login_reply.Itasktag   = reply_to.get_Itasktag();
-	login_reply.ExpCmdSN   = ntohl(reply_to.get_CmdSN());
-	login_reply.MaxStatSN  = 1;
+	*login_reply = { };
+	login_reply->opcode     = o_login_resp;  // 0x23
+	login_reply->filler0    = false;
+	login_reply->filler1    = false;
+	login_reply->T          = true;
+	login_reply->C          = true;
+	login_reply->CSG        = reply_to.get_CSG();
+	login_reply->NSG        = reply_to.get_NSG();
+	login_reply->versionmax = reply_to.get_versionmin();
+	login_reply->versionact = reply_to.get_versionmin();
+	login_reply->ahslen     = 0;
+	login_reply->datalenH   = login_reply_reply_data.second >> 16;
+	login_reply->datalenM   = login_reply_reply_data.second >>  8;
+	login_reply->datalenL   = login_reply_reply_data.second      ;
+	memcpy(login_reply->ISID, reply_to.get_ISID(), 6);
+	login_reply->TSIH       = reply_to.get_TSIH();
+	login_reply->Itasktag   = reply_to.get_Itasktag();
+	login_reply->ExpCmdSN   = ntohl(reply_to.get_CmdSN());
+	login_reply->MaxStatSN  = 1;
 
 	return true;
 }
@@ -259,10 +261,10 @@ std::pair<const uint8_t *, std::size_t> iscsi_pdu_login_reply::get()
 	// round for padding
 	size_t data_size_padded = (login_reply_reply_data.second + 3) & ~3;
 
-	size_t out_size = sizeof(login_reply) + data_size_padded;
+	size_t out_size = sizeof(*login_reply) + data_size_padded;
 	uint8_t *out = new uint8_t[out_size];
-	memcpy(out, &login_reply, sizeof login_reply);
-	memcpy(&out[sizeof(login_reply)], login_reply_reply_data.first, login_reply_reply_data.second);
+	memcpy(out, login_reply, sizeof *login_reply);
+	memcpy(&out[sizeof *login_reply], login_reply_reply_data.first, login_reply_reply_data.second);
 
 	return { out, out_size };
 }
@@ -331,7 +333,7 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(const iscsi_r
 
 iscsi_pdu_scsi_response::iscsi_pdu_scsi_response()
 {
-	assert(sizeof(pdu_response) == 48);
+	assert(sizeof(*pdu_response) == 48);
 }
 
 iscsi_pdu_scsi_response::~iscsi_pdu_scsi_response()
@@ -343,18 +345,18 @@ bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std
 	size_t sense_data_size = scsi_sense_data.size();
 	size_t reply_data_plus_sense_header = 2 + sense_data_size;
 
-	pdu_response = { };
-	pdu_response.opcode     = 0x21;
-	pdu_response.set_to_1   = true;
-	pdu_response.datalenH   = reply_data_plus_sense_header >> 16;
-	pdu_response.datalenM   = reply_data_plus_sense_header >>  8;
-	pdu_response.datalenL   = reply_data_plus_sense_header      ;
-	pdu_response.Itasktag   = reply_to.get_Itasktag();
-	pdu_response.StatSN     = htonl(reply_to.get_ExpStatSN());
-	pdu_response.ExpCmdSN   = htonl(reply_to.get_CmdSN() + 1);
-	pdu_response.MaxCmdSN   = htonl(reply_to.get_CmdSN() + 1);
-	pdu_response.ExpDataSN  = htonl(1);  // TODO
-	pdu_response.ResidualCt = 0;
+	*pdu_response = { };
+	pdu_response->opcode     = 0x21;
+	pdu_response->set_to_1   = true;
+	pdu_response->datalenH   = reply_data_plus_sense_header >> 16;
+	pdu_response->datalenM   = reply_data_plus_sense_header >>  8;
+	pdu_response->datalenL   = reply_data_plus_sense_header      ;
+	pdu_response->Itasktag   = reply_to.get_Itasktag();
+	pdu_response->StatSN     = htonl(reply_to.get_ExpStatSN());
+	pdu_response->ExpCmdSN   = htonl(reply_to.get_CmdSN() + 1);
+	pdu_response->MaxCmdSN   = htonl(reply_to.get_CmdSN() + 1);
+	pdu_response->ExpDataSN  = htonl(1);  // TODO
+	pdu_response->ResidualCt = 0;
 
 	pdu_response_data.second = reply_data_plus_sense_header;
 	pdu_response_data.first  = new uint8_t[pdu_response_data.second]();
@@ -367,10 +369,10 @@ bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std
 
 std::pair<const uint8_t *, std::size_t> iscsi_pdu_scsi_response::get()
 {
-	size_t out_size = sizeof(pdu_response) + pdu_response_data.second;
+	size_t out_size = sizeof(*pdu_response) + pdu_response_data.second;
 	uint8_t *out = new uint8_t[out_size];
-	memcpy(out, &pdu_response, sizeof pdu_response);
-	memcpy(&out[sizeof pdu_response], pdu_response_data.first, pdu_response_data.second);
+	memcpy(out, pdu_response, sizeof *pdu_response);
+	memcpy(&out[sizeof *pdu_response], pdu_response_data.first, pdu_response_data.second);
 
 	return { out, out_size };
 }

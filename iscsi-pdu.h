@@ -214,11 +214,13 @@ public:
 		uint8_t  opcode    :  6;  // 0x23
 		bool     filler0   :  1;
 		bool     filler1   :  1;
-		bool     T         :  1;
-		bool     C         :  1;
-		uint8_t  filler2   :  2;
-		uint8_t  CSG       :  2;
+
 		uint8_t  NSG       :  2;
+		uint8_t  CSG       :  2;
+		uint8_t  filler2   :  2;
+		bool     C         :  1;
+		bool     T         :  1;
+
 		uint8_t  versionmax:  8;
 		uint8_t  versionact:  8;
 		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
@@ -238,7 +240,7 @@ public:
 		uint8_t  filler3[8];
 	};
 
-	__login_reply__ login_reply __attribute__((packed));
+	__login_reply__ *login_reply __attribute__((packed)) =  { reinterpret_cast<__login_reply__ *>(pdu_bytes) };
 
 	std::pair<uint8_t *, size_t> login_reply_reply_data { nullptr, 0 };
 
@@ -326,7 +328,7 @@ public:
 		uint32_t ResidualCt: 32;  // residual count or reserved
 	};
 
-	__pdu_response__ pdu_response __attribute__((packed));
+	__pdu_response__ *pdu_response __attribute__((packed)) =  { reinterpret_cast<__pdu_response__ *>(pdu_bytes) };
 
 	std::pair<uint8_t *, size_t> pdu_response_data { nullptr, 0 };
 
