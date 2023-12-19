@@ -7,6 +7,7 @@
 #include <sys/socket.h>
 
 #include "iscsi-pdu.h"
+#include "log.h"
 #include "server.h"
 #include "utils.h"
 
@@ -56,12 +57,16 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 		*s = new session();
 
 	uint8_t pdu[48] { 0 };
-	if (READ(fd, pdu, sizeof pdu) == -1)
+	if (READ(fd, pdu, sizeof pdu) == -1) {
+		DOLOG("server::receive_pdu: PDU receive error\n");
 		return nullptr;
+	}
 
 	iscsi_pdu_bhs bhs;
-	if (bhs.set(*s, pdu, sizeof pdu) == false)
+	if (bhs.set(*s, pdu, sizeof pdu) == false) {
+		DOLOG("server::receive_pdu: BHS validation error\n");
 		return nullptr;
+	}
 
 	printf("opcode: %02x / %s\n", bhs.get_opcode(), pdu_opcode_to_string(bhs.get_opcode()).c_str());
 
@@ -70,6 +75,12 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 	switch(bhs.get_opcode()) {
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_login_req:
 			pdu_obj = new iscsi_pdu_login_request();
+			break;
+		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_cmd:
+			pdu_obj = new iscsi_pdu_scsi_cmd();
+			break;
+		default:
+			DOLOG("server::receive_pdu: opcode %02x not implemented\n", bhs.get_opcode());
 			break;
 	}
 
@@ -82,20 +93,26 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 		size_t ahs_len = pdu_obj->get_ahs_length();
 		if (ahs_len) {
 			uint8_t *ahs_temp = new uint8_t[ahs_len];
-			if (READ(fd, ahs_temp, ahs_len) == -1)
+			if (READ(fd, ahs_temp, ahs_len) == -1) {
 				ok = false;
-			else
+				DOLOG("server::receive_pdu: AHS receive error\n");
+			}
+			else {
 				pdu_obj->set_ahs_segment({ ahs_temp, ahs_len });
+			}
 			delete ahs_temp;
 		}
 
 		size_t data_length = pdu_obj->get_data_length();
 		if (data_length) {
 			uint8_t *data_temp = new uint8_t[data_length];
-			if (READ(fd, data_temp, data_length) == -1)
+			if (READ(fd, data_temp, data_length) == -1) {
 				ok = false;
-			else
+				DOLOG("server::receive_pdu: data receive error\n");
+			}
+			else {
 				pdu_obj->set_data({ data_temp, data_length });
+			}
 			delete data_temp;
 		}
 		
@@ -111,18 +128,25 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 bool server::push_response(const int fd, iscsi_pdu_bhs *const pdu, iscsi_response_parameters *const parameters)
 {
 	auto response_set = pdu->get_response(parameters);
-	if (response_set.has_value() == false)
+	if (response_set.has_value() == false) {
+		DOLOG("server::push_response: no response from PDU\n");
 		return false;
+	}
 
 	bool ok = true;
 
 	for(auto & pdu_out: response_set.value().responses) {
 		auto iscsi_reply = pdu_out->get();
-		if (iscsi_reply.first == nullptr)
+		if (iscsi_reply.first == nullptr) {
 			ok = false;
+			DOLOG("server::push_response: PDU did not emit data bundle\n");
+		}
 
-		if (ok)
+		if (ok) {
 			ok = WRITE(fd, iscsi_reply.first, iscsi_reply.second) != -1;
+			if (!ok)
+				DOLOG("server::push_response: sending PDU to peer failed\n");
+		}
 
 		delete [] iscsi_reply.first;
 	}
@@ -135,6 +159,11 @@ iscsi_response_parameters *server::select_parameters(iscsi_pdu_bhs *const pdu, s
 	switch(pdu->get_opcode()) {
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_login_req:
 			return new iscsi_response_parameters_login_req(ses);
+		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_cmd:
+			return new iscsi_response_parameters_scsi_cmd(ses, sd);
+		default:
+			DOLOG("server::select_parameters: opcode %02x not implemented\n", pdu->get_opcode());
+			break;
 	}
 
 	return nullptr;
