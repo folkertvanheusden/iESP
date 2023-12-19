@@ -121,7 +121,7 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 			else {
 				pdu_obj->set_data({ data_temp, data_length });
 			}
-			delete data_temp;
+			delete [] data_temp;
 		}
 		
 		if (!ok) {
