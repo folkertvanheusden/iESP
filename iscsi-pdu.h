@@ -52,6 +52,11 @@ struct iscsi_response_parameters_login_req : public iscsi_response_parameters
 	// TODO e.g. authenticate source
 };
 
+struct iscsi_response_parameters_scsi_cmd : public iscsi_response_parameters
+{
+	scsi *sd;  // Scsi Device
+};
+
 class iscsi_pdu_bhs  // basic header segment
 {
 protected:
@@ -175,7 +180,7 @@ public:
 	      uint8_t  get_versionmin() const { return login_req->versionmin; }
 	      uint32_t get_Itasktag()   const { return login_req->Itasktag;   }
 
-	virtual iscsi_response_set get_response(const iscsi_response_parameters & parameters);
+	virtual iscsi_response_set get_response(const iscsi_response_parameters & parameters) override;
 };
 
 class iscsi_pdu_login_reply : public iscsi_pdu_bhs
@@ -259,6 +264,8 @@ public:
 	      uint32_t  get_ExpStatSN() const { return cdb_pdu_req->ExpStatSN; }
 	      uint32_t  get_CmdSN()     const { return cdb_pdu_req->CmdSN;     }
 	const uint8_t * get_LUN()       const { return cdb_pdu_req->LUN;       }
+
+	virtual iscsi_response_set get_response(const iscsi_response_parameters & parameters) override;
 };
 
 class iscsi_pdu_scsi_response : public iscsi_pdu_bhs  // 0x21

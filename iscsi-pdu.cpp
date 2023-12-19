@@ -296,6 +296,17 @@ std::pair<const uint8_t *, std::size_t> iscsi_pdu_scsi_command::get()
 	return { reinterpret_cast<const uint8_t *>(out), sizeof cdb_pdu_req };
 }
 
+iscsi_response_set iscsi_pdu_scsi_command::get_response(const iscsi_response_parameters & parameters_in)
+{
+	auto & parameters = static_cast<const iscsi_response_parameters_scsi_cmd &>(parameters_in);
+
+	iscsi_response_set response;
+
+	// TODO
+
+	return response;
+}
+
 /*--------------------------------------------------------------------------*/
 
 iscsi_pdu_scsi_response::iscsi_pdu_scsi_response()
