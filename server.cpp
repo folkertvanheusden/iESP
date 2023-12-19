@@ -90,8 +90,10 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 	if (pdu_obj) {
 		bool ok = true;
 
-		if (pdu_obj->set(*s, pdu, sizeof pdu) == false)
+		if (pdu_obj->set(*s, pdu, sizeof pdu) == false) {
 			ok = false;
+			DOLOG("server::receive_pdu: initialize PDU: validation failed\n");
+		}
 
 		size_t ahs_len = pdu_obj->get_ahs_length();
 		if (ahs_len) {
@@ -126,6 +128,7 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 		}
 		
 		if (!ok) {
+			DOLOG("server::receive_pdu: cannot return PDU\n");
 			delete pdu_obj;
 			pdu_obj = nullptr;
 		}

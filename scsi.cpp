@@ -24,17 +24,15 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 	scsi_response response { };
 
 	if (opcode == 0x00) {  // TEST UNIT READY
-		response.sense_data = { opcode, 0, 0, 0, 0, 0 };
 	}
 	else if (opcode == 0x12) {  // INQUIRY
-		response.sense_data = { opcode, 0, 0, 0, 36, 0 };
-
-		response.data.first = new uint8_t[36]();
+		response.data.second = 36;
+		response.data.first = new uint8_t[response.data.second]();
 		response.data.first[0] = 0;  // disk
 		response.data.first[1] = 0;  // not removable
 		response.data.first[2] = 4;  // VERSION
 		response.data.first[3] = 2;  // response data format
-		response.data.first[4] = 36 - 4;  // additional length
+		response.data.first[4] = response.data.second - 4;  // additional length
 		response.data.first[5] = 0;
 		response.data.first[6] = 0;
 		response.data.first[7] = 0;
