@@ -91,8 +91,9 @@ private:
 		uint8_t  opcode    :  6;
 		bool     I         :  1;
 		bool     filler    :  1;
-		uint32_t ospecf    : 23;  // opcode specific fields
-		bool     F         :  1;
+
+		uint32_t ospecf    : 24;  // opcode specific fields: TODO bit F!
+
 		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
 		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
 		uint32_t datalenM  :  8;  // data segment length (bytes, excluding padding) 15...8
@@ -156,18 +157,20 @@ struct iscsi_response_set
 
 std::string pdu_opcode_to_string(const iscsi_pdu_bhs::iscsi_bhs_opcode opcode);
 
-class iscsi_pdu_login_request : public iscsi_pdu_bhs  // login request
+class iscsi_pdu_login_request : public iscsi_pdu_bhs  // login request 0x03
 {
 public:
 	struct __login_req__ {
 		uint8_t  opcode    :  6;
 		bool     I_is_1    :  1;
 		bool     filler    :  1;
-		bool     T         :  1;
-		bool     C         :  1;
-		uint8_t  filler2   :  2;
-		uint8_t  CSG       :  2;
+
 		uint8_t  NSG       :  2;
+		uint8_t  CSG       :  2;
+		uint8_t  filler2   :  2;
+		bool     C         :  1;
+		bool     T         :  1;
+
 		uint8_t  versionmax:  8;
 		uint8_t  versionmin:  8;
 		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
@@ -212,8 +215,8 @@ class iscsi_pdu_login_reply : public iscsi_pdu_bhs
 public:
 	struct __login_reply__ {
 		uint8_t  opcode    :  6;  // 0x23
-		bool     filler0   :  1;
 		bool     filler1   :  1;
+		bool     filler0   :  1;
 
 		uint8_t  NSG       :  2;
 		uint8_t  CSG       :  2;
@@ -252,17 +255,20 @@ public:
 	std::pair<const uint8_t *, std::size_t> get() override;
 };
 
-class iscsi_pdu_scsi_cmd : public iscsi_pdu_bhs
+class iscsi_pdu_scsi_cmd : public iscsi_pdu_bhs  // 0x01
 {
 public:
 	struct __cdb_pdu_req__ {
 		uint8_t  opcode    :  6;
 		bool     I         :  1;
-		bool     F         :  1;
-		bool     R         :  1;
-		bool     W         :  1;
-		uint8_t  filler0   :  2;
+		bool     filler1   :  1;
+
 		uint8_t  ATTR      :  3;
+		uint8_t  filler2   :  2;
+		bool     W         :  1;
+		bool     R         :  1;
+		bool     F         :  1;
+
 		uint16_t reserved  : 16;
 		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
 		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
@@ -299,16 +305,15 @@ class iscsi_pdu_scsi_response : public iscsi_pdu_bhs  // 0x21
 public:
 	struct __pdu_response__ {
 		uint8_t  opcode    :  6;
-		bool     reserved0 :  1;
 		bool     reserved1 :  1;
+		bool     reserved0 :  1;
 
-		bool     reserved2 :  1;
+		bool     reserved3 :  1;
 		bool     U         :  1;
 		bool     O         :  1;
 		bool     u         :  1;
 		bool     o         :  1;
-		bool     reserved3 :  1;
-		bool     reserved4 :  1;
+		uint8_t  reserved2 :  2;
 		bool     set_to_1  :  1;  // 1
 
 		uint8_t  response  :  8;
@@ -345,15 +350,15 @@ class iscsi_pdu_scsi_data_in : public iscsi_pdu_bhs  // 0x25
 public:
 	struct __pdu_data_in__ {
 		uint8_t  opcode    :  6;
-		bool     reserved0 :  1;
 		bool     reserved1 :  1;
+		bool     reserved0 :  1;
 
 		bool     S         :  1;
 		bool     U         :  1;
 		bool     O         :  1;
-		bool     reserved3 :  1;
-		bool     reserved4 :  1;
 		bool     reserved5 :  1;
+		bool     reserved4 :  1;
+		bool     reserved3 :  1;
 		bool     A         :  1;
 		bool     F         :  1;
 
@@ -387,16 +392,18 @@ public:
 	std::pair<const uint8_t *, std::size_t> get() override;
 };
 
-class iscsi_pdu_nop_out : public iscsi_pdu_bhs  // NOP-Out
+class iscsi_pdu_nop_out : public iscsi_pdu_bhs  // NOP-Out  0x00
 {
 public:
 	struct __nop_out__ {
 		uint8_t  opcode    :  6;
 		bool     I         :  1;
 		bool     filler1   :  1;
+
 		uint8_t  filler2   :  7;  // opcode specific fields
 		bool     set_to_1  :  1;
 		uint16_t filler3   :  16;
+
 		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
 		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
 		uint32_t datalenM  :  8;  // data segment length (bytes, excluding padding) 15...8
