@@ -45,19 +45,31 @@ struct iscsi_response_parameters
 
 struct iscsi_response_parameters_bhs : public iscsi_response_parameters
 {
-	session *ses;
+	session *const ses;
+
+	iscsi_response_parameters_bhs(session *const ses) : ses(ses) {
+	}
 };
 
-struct iscsi_response_parameters_login_req : public iscsi_response_parameters
+struct iscsi_response_parameters_login_req : public iscsi_response_parameters_bhs
 {
 	// TODO e.g. authenticate source
+
+	iscsi_response_parameters_login_req(session *const ses) :
+		iscsi_response_parameters_bhs(ses) {
+	}
 };
 
 class scsi;
 
-struct iscsi_response_parameters_scsi_cmd : public iscsi_response_parameters
+struct iscsi_response_parameters_scsi_cmd : public iscsi_response_parameters_bhs
 {
-	scsi *sd;  // Scsi Device
+	scsi *const sd;  // Scsi Device
+
+	iscsi_response_parameters_scsi_cmd(session *const ses, scsi *const sd) :
+		iscsi_response_parameters_bhs(ses),
+       		sd(sd) {
+	}
 };
 
 class iscsi_pdu_bhs  // basic header segment

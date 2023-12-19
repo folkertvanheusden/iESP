@@ -128,6 +128,16 @@ bool server::push_response(const int fd, iscsi_pdu_bhs *const pdu, iscsi_respons
 	return true;
 }
 
+iscsi_response_parameters *server::select_parameters(iscsi_pdu_bhs *const pdu, session *const ses, scsi *const sd)
+{
+	switch(pdu->get_opcode()) {
+		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_login_req:
+			return new iscsi_response_parameters_login_req(ses);
+	}
+
+	return nullptr;
+}
+
 void server::handler()
 {
 	scsi scsi_dev;
@@ -146,8 +156,14 @@ void server::handler()
 			if (!pdu)
 				break;
 
-			iscsi_response_parameters parameters;
-			push_response(fd, pdu, &parameters);
+			auto parameters = select_parameters(pdu, s, &scsi_dev);
+			if (parameters) {
+				push_response(fd, pdu, parameters);
+				delete parameters;
+			}
+			else {
+				ok = false;
+			}
 
 			delete pdu;
 		}
