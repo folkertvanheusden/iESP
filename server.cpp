@@ -79,6 +79,9 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_cmd:
 			pdu_obj = new iscsi_pdu_scsi_cmd();
 			break;
+		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_nop_out:
+			pdu_obj = new iscsi_pdu_nop_out();
+			break;
 		default:
 			DOLOG("server::receive_pdu: opcode %02x not implemented\n", bhs.get_opcode());
 			break;
@@ -92,6 +95,8 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 
 		size_t ahs_len = pdu_obj->get_ahs_length();
 		if (ahs_len) {
+			DOLOG("server::receive_pdu: read %zu ahs bytes\n", ahs_len);
+
 			uint8_t *ahs_temp = new uint8_t[ahs_len];
 			if (READ(fd, ahs_temp, ahs_len) == -1) {
 				ok = false;
@@ -105,8 +110,11 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 
 		size_t data_length = pdu_obj->get_data_length();
 		if (data_length) {
-			uint8_t *data_temp = new uint8_t[data_length];
-			if (READ(fd, data_temp, data_length) == -1) {
+			DOLOG("server::receive_pdu: read %zu data bytes\n", data_length);
+
+			size_t padded_data_length = (data_length + 3) & ~3;
+			uint8_t *data_temp = new uint8_t[padded_data_length];
+			if (READ(fd, data_temp, padded_data_length) == -1) {
 				ok = false;
 				DOLOG("server::receive_pdu: data receive error\n");
 			}
@@ -161,6 +169,8 @@ iscsi_response_parameters *server::select_parameters(iscsi_pdu_bhs *const pdu, s
 			return new iscsi_response_parameters_login_req(ses);
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_cmd:
 			return new iscsi_response_parameters_scsi_cmd(ses, sd);
+		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_nop_out:
+			return new iscsi_response_parameters_nop_out(ses);
 		default:
 			DOLOG("server::select_parameters: opcode %02x not implemented\n", pdu->get_opcode());
 			break;

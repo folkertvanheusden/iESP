@@ -2,8 +2,14 @@
 #include <cstdint>
 #include <utility>
 
-
 #include "iscsi-pdu.h"
+
+
+struct scsi_response
+{
+	std::vector<uint8_t>         sense_data;
+	std::pair<uint8_t *, size_t> data;
+};
 
 class scsi
 {
@@ -19,5 +25,5 @@ public:
 		o_seek            = 0x0b,
 	};
 
-	std::tuple<iscsi_pdu_bhs::iscsi_bhs_opcode, uint8_t *, size_t> send(const uint8_t *const CDB, const size_t size);
+	std::optional<scsi_response> send(const uint8_t *const CDB, const size_t size);
 };

@@ -1,8 +1,10 @@
 #pragma once
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
+#include <arpa/inet.h>
 #include <sys/types.h>
 
 #include "session.h"
@@ -48,6 +50,13 @@ struct iscsi_response_parameters_bhs : public iscsi_response_parameters
 	session *const ses;
 
 	iscsi_response_parameters_bhs(session *const ses) : ses(ses) {
+	}
+};
+
+struct iscsi_response_parameters_nop_out : public iscsi_response_parameters_bhs
+{
+	iscsi_response_parameters_nop_out(session *const ses) :
+		iscsi_response_parameters_bhs(ses) {
 	}
 };
 
@@ -136,7 +145,7 @@ public:
 	size_t           get_data_length() const { return (bhs->datalenH << 16) | (bhs->datalenM << 8) | bhs->datalenL; }
 	bool             set_data(std::pair<const uint8_t *, std::size_t> data_in);
 
-	virtual iscsi_response_set get_response(const iscsi_response_parameters *const parameters);
+	virtual std::optional<iscsi_response_set> get_response(const iscsi_response_parameters *const parameters);
 };
 
 struct iscsi_response_set
@@ -184,18 +193,18 @@ public:
 	bool set(session *const s, const uint8_t *const in, const size_t n) override;
 	std::pair<const uint8_t *, std::size_t> get() override;
 
-	const uint8_t *get_ISID()       const { return login_req->ISID;       }
-	      uint16_t get_CID()        const { return login_req->CID;        }
-	      uint32_t get_CmdSN()      const { return login_req->CmdSN;      }
-	      uint16_t get_TSIH()       const { return login_req->TSIH;       }
-	      bool     get_T()          const { return login_req->T;          }
-	      bool     get_C()          const { return login_req->C;          }
-	      uint8_t  get_CSG()        const { return login_req->CSG;        }
-	      uint8_t  get_NSG()        const { return login_req->NSG;        }
-	      uint8_t  get_versionmin() const { return login_req->versionmin; }
-	      uint32_t get_Itasktag()   const { return login_req->Itasktag;   }
+	const uint8_t *get_ISID()       const { return login_req->ISID;         }
+	      uint16_t get_CID()        const { return login_req->CID;          }
+	      uint32_t get_CmdSN()      const { return ntohl(login_req->CmdSN); }
+	      uint16_t get_TSIH()       const { return login_req->TSIH;         }
+	      bool     get_T()          const { return login_req->T;            }
+	      bool     get_C()          const { return login_req->C;            }
+	      uint8_t  get_CSG()        const { return login_req->CSG;          }
+	      uint8_t  get_NSG()        const { return login_req->NSG;          }
+	      uint8_t  get_versionmin() const { return login_req->versionmin;   }
+	      uint32_t get_Itasktag()   const { return login_req->Itasktag;     }
 
-	virtual iscsi_response_set get_response(const iscsi_response_parameters *const parameters) override;
+	virtual std::optional<iscsi_response_set> get_response(const iscsi_response_parameters *const parameters) override;
 };
 
 class iscsi_pdu_login_reply : public iscsi_pdu_bhs
@@ -241,7 +250,7 @@ public:
 	std::pair<const uint8_t *, std::size_t> get() override;
 };
 
-class iscsi_pdu_scsi_command : public iscsi_pdu_bhs
+class iscsi_pdu_scsi_cmd : public iscsi_pdu_bhs
 {
 public:
 	struct __cdb_pdu_req__ {
@@ -268,19 +277,19 @@ public:
 	__cdb_pdu_req__ *cdb_pdu_req __attribute__((packed)) { reinterpret_cast<__cdb_pdu_req__ *>(pdu_bytes) };
 
 public:
-	iscsi_pdu_scsi_command();
-	virtual ~iscsi_pdu_scsi_command();
+	iscsi_pdu_scsi_cmd();
+	virtual ~iscsi_pdu_scsi_cmd();
 
 	bool set(session *const s, const uint8_t *const in, const size_t n) override;
 	std::pair<const uint8_t *, std::size_t> get() override;
 
-	const uint8_t * get_CDB()       const { return cdb_pdu_req->CDB;       }
-	      uint32_t  get_Itasktag()  const { return cdb_pdu_req->Itasktag;  }
-	      uint32_t  get_ExpStatSN() const { return cdb_pdu_req->ExpStatSN; }
-	      uint32_t  get_CmdSN()     const { return cdb_pdu_req->CmdSN;     }
-	const uint8_t * get_LUN()       const { return cdb_pdu_req->LUN;       }
+	const uint8_t * get_CDB()       const { return cdb_pdu_req->CDB;              }
+	      uint32_t  get_Itasktag()  const { return cdb_pdu_req->Itasktag;         }
+	      uint32_t  get_ExpStatSN() const { return ntohl(cdb_pdu_req->ExpStatSN); }
+	      uint32_t  get_CmdSN()     const { return ntohl(cdb_pdu_req->CmdSN);     }
+	const uint8_t * get_LUN()       const { return cdb_pdu_req->LUN;              }
 
-	virtual iscsi_response_set get_response(const iscsi_response_parameters *const parameters) override;
+	virtual std::optional<iscsi_response_set> get_response(const iscsi_response_parameters *const parameters) override;
 };
 
 class iscsi_pdu_scsi_response : public iscsi_pdu_bhs  // 0x21
@@ -325,7 +334,7 @@ public:
 	iscsi_pdu_scsi_response();
 	virtual ~iscsi_pdu_scsi_response();
 
-	bool set(const iscsi_pdu_scsi_command & reply_to, const std::tuple<iscsi_pdu_bhs::iscsi_bhs_opcode, uint8_t *, size_t> scsi_reply);
+	bool set(const iscsi_pdu_scsi_cmd & reply_to, const std::vector<uint8_t> & scsi_sense_data);
 	std::pair<const uint8_t *, std::size_t> get() override;
 };
 
@@ -355,7 +364,7 @@ public:
 		uint32_t datalenL  :  8;  // data segment length (bytes, excluding padding) 7...0
 		uint8_t  LUN[8];
 		uint32_t Itasktag  : 32;  // initiator task tag
-		uint32_t TTF       : 32;
+		uint32_t TTF       : 32;  // target transfer tag
 		uint32_t StatSN    : 32;
 		uint32_t ExpCmdSN  : 32;
 		uint32_t MaxCmdSN  : 32;
@@ -372,6 +381,76 @@ public:
 	iscsi_pdu_scsi_data_in();
 	virtual ~iscsi_pdu_scsi_data_in();
 
-	bool set(const iscsi_pdu_scsi_command & reply_to, const std::tuple<iscsi_pdu_bhs::iscsi_bhs_opcode, uint8_t *, size_t> scsi_reply);
+	bool set(const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data);
+	std::pair<const uint8_t *, std::size_t> get() override;
+};
+
+class iscsi_pdu_nop_out : public iscsi_pdu_bhs  // NOP-Out
+{
+public:
+	struct __nop_out__ {
+		uint8_t  opcode    :  6;
+		bool     I         :  1;
+		bool     filler1   :  1;
+		uint8_t  filler2   :  7;  // opcode specific fields
+		bool     set_to_1  :  1;
+		uint16_t filler3   :  16;
+		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
+		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
+		uint32_t datalenM  :  8;  // data segment length (bytes, excluding padding) 15...8
+		uint32_t datalenL  :  8;  // data segment length (bytes, excluding padding) 7...0
+		uint8_t  LUN[8];  // lun
+		uint32_t Itasktag  : 32;  // initiator task tag
+		uint32_t TTF       : 32;  // target transfer tag
+		uint32_t CmdSN     : 32;
+		uint32_t ExpStatSN : 32;
+		uint8_t  filler4[16];
+	};
+
+	__nop_out__ *nop_out __attribute__((packed)) { reinterpret_cast<__nop_out__ *>(pdu_bytes) };
+
+public:
+	iscsi_pdu_nop_out();
+	virtual ~iscsi_pdu_nop_out();
+
+	const uint8_t  *get_LUN()        const { return nop_out->LUN;              }
+	      uint32_t  get_Itasktag()   const { return nop_out->Itasktag;         }
+	      uint32_t  get_TTF()        const { return nop_out->TTF;              }
+	      uint32_t  get_CmdSN()      const { return ntohl(nop_out->CmdSN);     }
+	      uint32_t  get_ExpStatSN()  const { return ntohl(nop_out->ExpStatSN); }
+
+	virtual std::optional<iscsi_response_set> get_response(const iscsi_response_parameters *const parameters) override;
+};
+
+class iscsi_pdu_nop_in : public iscsi_pdu_bhs  // NOP-In
+{
+public:
+	struct __nop_in__ {
+		uint8_t  opcode    :  6;  // 0x20
+		bool     filler0   :  1;
+		bool     filler1   :  1;
+		uint8_t  filler2   :  7;  // opcode specific fields
+		bool     set_to_1  :  1;
+		uint16_t filler3   :  16;
+		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
+		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
+		uint32_t datalenM  :  8;  // data segment length (bytes, excluding padding) 15...8
+		uint32_t datalenL  :  8;  // data segment length (bytes, excluding padding) 7...0
+		uint8_t  LUN[8];  // lun
+		uint32_t Itasktag  : 32;  // initiator task tag
+		uint32_t TTF       : 32;  // target transfer tag
+		uint32_t StatSN    : 32;
+		uint32_t ExpCmdSN  : 32;
+		uint32_t MaxCmdSN  : 32;
+		uint8_t  filler4[12];
+	};
+
+	__nop_in__ *nop_in __attribute__((packed)) { reinterpret_cast<__nop_in__ *>(pdu_bytes) };
+
+public:
+	iscsi_pdu_nop_in();
+	virtual ~iscsi_pdu_nop_in();
+
+	bool set(const iscsi_pdu_nop_out & reply_to);
 	std::pair<const uint8_t *, std::size_t> get() override;
 };

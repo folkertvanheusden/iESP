@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstring>
 
+#include "log.h"
 #include "scsi.h"
 
 
@@ -13,47 +14,38 @@ scsi::~scsi()
 {
 }
 
-std::tuple<iscsi_pdu_bhs::iscsi_bhs_opcode, uint8_t *, size_t> scsi::send(const uint8_t *const CDB, const size_t size)
+std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t size)
 {
 	assert(size >= 16);
 
 	scsi_opcode opcode = scsi_opcode(CDB[0]);
 	printf("SCSI opcode: %02x\n", opcode);
 
-	uint8_t         *reply      = nullptr;
-	size_t           reply_size = 0;
-	iscsi_pdu_bhs::iscsi_bhs_opcode opcode_hint = iscsi_pdu_bhs::iscsi_bhs_opcode::o_reject;
+	scsi_response response { };
 
 	if (opcode == 0x00) {  // TEST UNIT READY
-		reply_size = 6;
-		reply = new uint8_t[reply_size]();
-		reply[0] = opcode;
-		reply[5] = 0x00;  // CONTROL
-		opcode_hint = iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_resp;
+		response.sense_data = { opcode, 0, 0, 0, 0, 0 };
 	}
 	else if (opcode == 0x12) {  // INQUIRY
-		reply_size = 6 + 36;
-		reply = new uint8_t[reply_size]();
-		reply[0] = opcode;
-		reply[1] = 0;  // no page code
-		reply[3] = 0;  // MSB...
-		reply[4] = 36;  // ...LSB
-		reply[5] = 0x00;  // CONTROL
+		response.sense_data = { opcode, 0, 0, 0, 36, 0 };
 
-		uint8_t *data = &reply[6];
-		data[0] = 0;  // disk
-		data[1] = 0;  // not removable
-		data[2] = 4;  // VERSION
-		data[3] = 2;  // response data format
-		data[4] = 36 - 4;  // additional length
-		data[5] = 0;
-		data[6] = 0;
-		data[7] = 0;
-		memcpy(&data[8],  "vanHeusden", 10);
-		memcpy(&data[16], "prodinfo", 8);  // TODO
-		memcpy(&data[32], "1.0", 3);  // TODO
-		opcode_hint = iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_data_in;
+		response.data.first = new uint8_t[36]();
+		response.data.first[0] = 0;  // disk
+		response.data.first[1] = 0;  // not removable
+		response.data.first[2] = 4;  // VERSION
+		response.data.first[3] = 2;  // response data format
+		response.data.first[4] = 36 - 4;  // additional length
+		response.data.first[5] = 0;
+		response.data.first[6] = 0;
+		response.data.first[7] = 0;
+		memcpy(&response.data.first[8],  "vanHeusden", 10);
+		memcpy(&response.data.first[16], "prodinfo", 8);  // TODO
+		memcpy(&response.data.first[32], "1.0", 3);  // TODO
+	}
+	else {
+		DOLOG("scsi::send: opcode %02x not implemented\n", opcode);
+		return { };
 	}
 
-	return { opcode_hint, reply, reply_size };
+	return response;
 }
