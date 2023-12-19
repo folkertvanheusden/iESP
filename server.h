@@ -10,7 +10,8 @@ class server
 private:
 	int listen_fd { -1 };
 
-	iscsi_pdu_bhs *receive_pdu(const int fd, session **const s);
+	iscsi_pdu_bhs *receive_pdu  (const int fd, session **const s);
+	bool           push_response(const int fd, iscsi_pdu_bhs *const pdu, iscsi_response_parameters *const parameters);
 
 public:
 	server();

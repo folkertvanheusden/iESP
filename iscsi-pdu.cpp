@@ -102,9 +102,9 @@ std::pair<const uint8_t *, std::size_t> iscsi_pdu_bhs::get()
 	return { reinterpret_cast<const uint8_t *>(out), sizeof *bhs };
 }
 
-iscsi_response_set iscsi_pdu_bhs::get_response(const iscsi_response_parameters & parameters_in)
+iscsi_response_set iscsi_pdu_bhs::get_response(const iscsi_response_parameters *const parameters_in)
 {
-	auto & parameters = static_cast<const iscsi_response_parameters_bhs &>(parameters_in);
+	auto parameters = static_cast<const iscsi_response_parameters_bhs *>(parameters_in);
 
 	iscsi_response_set response;
 
@@ -180,9 +180,9 @@ std::pair<const uint8_t *, std::size_t> iscsi_pdu_login_request::get()
 	return { reinterpret_cast<const uint8_t *>(out), sizeof *login_req };
 }
 
-iscsi_response_set iscsi_pdu_login_request::get_response(const iscsi_response_parameters & parameters_in)
+iscsi_response_set iscsi_pdu_login_request::get_response(const iscsi_response_parameters *const parameters_in)
 {
-	auto & parameters = static_cast<const iscsi_response_parameters_login_req &>(parameters_in);
+	auto parameters = static_cast<const iscsi_response_parameters_login_req *>(parameters_in);
 
 	iscsi_response_set response;
 	auto reply_pdu = new iscsi_pdu_login_reply();
@@ -296,9 +296,9 @@ std::pair<const uint8_t *, std::size_t> iscsi_pdu_scsi_command::get()
 	return { reinterpret_cast<const uint8_t *>(out), sizeof cdb_pdu_req };
 }
 
-iscsi_response_set iscsi_pdu_scsi_command::get_response(const iscsi_response_parameters & parameters_in)
+iscsi_response_set iscsi_pdu_scsi_command::get_response(const iscsi_response_parameters *const parameters_in)
 {
-	auto & parameters = static_cast<const iscsi_response_parameters_scsi_cmd &>(parameters_in);
+	auto parameters = static_cast<const iscsi_response_parameters_scsi_cmd *>(parameters_in);
 
 	iscsi_response_set response;
 

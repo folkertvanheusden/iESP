@@ -45,12 +45,15 @@ struct iscsi_response_parameters
 
 struct iscsi_response_parameters_bhs : public iscsi_response_parameters
 {
+	session *ses;
 };
 
 struct iscsi_response_parameters_login_req : public iscsi_response_parameters
 {
 	// TODO e.g. authenticate source
 };
+
+class scsi;
 
 struct iscsi_response_parameters_scsi_cmd : public iscsi_response_parameters
 {
@@ -121,7 +124,7 @@ public:
 	size_t           get_data_length() const { return (bhs->datalenH << 16) | (bhs->datalenM << 8) | bhs->datalenL; }
 	bool             set_data(std::pair<const uint8_t *, std::size_t> data_in);
 
-	virtual iscsi_response_set get_response(const iscsi_response_parameters & parameters);
+	virtual iscsi_response_set get_response(const iscsi_response_parameters *const parameters);
 };
 
 struct iscsi_response_set
@@ -180,7 +183,7 @@ public:
 	      uint8_t  get_versionmin() const { return login_req->versionmin; }
 	      uint32_t get_Itasktag()   const { return login_req->Itasktag;   }
 
-	virtual iscsi_response_set get_response(const iscsi_response_parameters & parameters) override;
+	virtual iscsi_response_set get_response(const iscsi_response_parameters *const parameters) override;
 };
 
 class iscsi_pdu_login_reply : public iscsi_pdu_bhs
@@ -265,7 +268,7 @@ public:
 	      uint32_t  get_CmdSN()     const { return cdb_pdu_req->CmdSN;     }
 	const uint8_t * get_LUN()       const { return cdb_pdu_req->LUN;       }
 
-	virtual iscsi_response_set get_response(const iscsi_response_parameters & parameters) override;
+	virtual iscsi_response_set get_response(const iscsi_response_parameters *const parameters) override;
 };
 
 class iscsi_pdu_scsi_response : public iscsi_pdu_bhs  // 0x21

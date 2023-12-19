@@ -108,6 +108,26 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 	return pdu_obj;
 }
 
+bool server::push_response(const int fd, iscsi_pdu_bhs *const pdu, iscsi_response_parameters *const parameters)
+{
+	auto response_set = pdu->get_response(parameters);
+
+	for(auto & pdu_out: response_set.responses) {
+		auto iscsi_reply = pdu_out->get();
+		if (iscsi_reply.first == nullptr)
+			return false;
+
+		bool ok = WRITE(fd, iscsi_reply.first, iscsi_reply.second) != -1;
+
+		delete [] iscsi_reply.first;
+
+		if (!ok)
+			return false;
+	}
+
+	return true;
+}
+
 void server::handler()
 {
 	scsi scsi_dev;
@@ -127,22 +147,7 @@ void server::handler()
 				break;
 
 			iscsi_response_parameters parameters;
-			auto response_set = pdu->get_response(parameters);
-
-			for(auto & pdu_out: response_set.responses) {
-				auto iscsi_reply = pdu_out->get();
-				if (iscsi_reply.first == nullptr) {
-					ok = false;
-					break;
-				}
-
-				ok = WRITE(fd, iscsi_reply.first, iscsi_reply.second) != -1;
-
-				delete [] iscsi_reply.first;
-
-				if (!ok)
-					break;
-			}
+			push_response(fd, pdu, &parameters);
 
 			delete pdu;
 		}
