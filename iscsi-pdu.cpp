@@ -238,7 +238,7 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 	login_reply->filler0    = false;
 	login_reply->filler1    = false;
 	login_reply->T          = true;
-	login_reply->C          = true;
+	login_reply->C          = false;
 	login_reply->CSG        = reply_to.get_CSG();
 	login_reply->NSG        = reply_to.get_NSG();
 	login_reply->versionmax = reply_to.get_versionmin();
