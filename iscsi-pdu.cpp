@@ -102,6 +102,15 @@ std::pair<const uint8_t *, std::size_t> iscsi_pdu_bhs::get()
 	return { reinterpret_cast<const uint8_t *>(out), sizeof *bhs };
 }
 
+iscsi_response_set iscsi_pdu_bhs::get_response(const iscsi_response_parameters & parameters_in)
+{
+	auto & parameters = static_cast<const iscsi_response_parameters_bhs &>(parameters_in);
+
+	iscsi_response_set response;
+
+	return response;
+}
+
 /*--------------------------------------------------------------------------*/
 // AHS
 
@@ -169,6 +178,21 @@ std::pair<const uint8_t *, std::size_t> iscsi_pdu_login_request::get()
 	memcpy(out, login_req, sizeof *login_req);
 
 	return { reinterpret_cast<const uint8_t *>(out), sizeof *login_req };
+}
+
+iscsi_response_set iscsi_pdu_login_request::get_response(const iscsi_response_parameters & parameters_in)
+{
+	auto & parameters = static_cast<const iscsi_response_parameters_login_req &>(parameters_in);
+
+	iscsi_response_set response;
+	auto reply_pdu = new iscsi_pdu_login_reply();
+	if (reply_pdu->set(*this) == false) {
+		delete reply_pdu;
+		return { };
+	}
+	response.responses.push_back(reply_pdu);
+
+	return response;
 }
 
 /*--------------------------------------------------------------------------*/

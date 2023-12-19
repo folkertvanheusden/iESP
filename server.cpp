@@ -118,14 +118,35 @@ void server::handler()
 			continue;
 
 		session *s  = nullptr;
+		bool     ok = true;
 
-		for(;;) {
+		// TODO: handle R2T
+		do {
 			iscsi_pdu_bhs *pdu = receive_pdu(fd, &s);
 			if (!pdu)
 				break;
 
+			iscsi_response_parameters parameters;
+			auto response_set = pdu->get_response(parameters);
+
+			for(auto & pdu_out: response_set.responses) {
+				auto iscsi_reply = pdu_out->get();
+				if (iscsi_reply.first == nullptr) {
+					ok = false;
+					break;
+				}
+
+				ok = WRITE(fd, iscsi_reply.first, iscsi_reply.second) != -1;
+
+				delete [] iscsi_reply.first;
+
+				if (!ok)
+					break;
+			}
+
 			delete pdu;
 		}
+		while(ok);
 
 		close(fd);
 

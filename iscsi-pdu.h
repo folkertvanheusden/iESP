@@ -37,6 +37,21 @@ public:
 	void           set_ahs_type(const iscsi_ahs_type type) { ahs->type = type << 2; }
 };
 
+struct iscsi_response_set;
+
+struct iscsi_response_parameters
+{
+};
+
+struct iscsi_response_parameters_bhs : public iscsi_response_parameters
+{
+};
+
+struct iscsi_response_parameters_login_req : public iscsi_response_parameters
+{
+	// TODO e.g. authenticate source
+};
+
 class iscsi_pdu_bhs  // basic header segment
 {
 protected:
@@ -100,6 +115,14 @@ public:
 	iscsi_bhs_opcode get_opcode()      const { return iscsi_bhs_opcode(bhs->opcode); }
 	size_t           get_data_length() const { return (bhs->datalenH << 16) | (bhs->datalenM << 8) | bhs->datalenL; }
 	bool             set_data(std::pair<const uint8_t *, std::size_t> data_in);
+
+	virtual iscsi_response_set get_response(const iscsi_response_parameters & parameters);
+};
+
+struct iscsi_response_set
+{
+	std::vector<iscsi_pdu_bhs *> responses;
+	bool r2t { false };
 };
 
 std::string pdu_opcode_to_string(const iscsi_pdu_bhs::iscsi_bhs_opcode opcode);
@@ -151,6 +174,8 @@ public:
 	      uint8_t  get_NSG()        const { return login_req->NSG;        }
 	      uint8_t  get_versionmin() const { return login_req->versionmin; }
 	      uint32_t get_Itasktag()   const { return login_req->Itasktag;   }
+
+	virtual iscsi_response_set get_response(const iscsi_response_parameters & parameters);
 };
 
 class iscsi_pdu_login_reply : public iscsi_pdu_bhs
