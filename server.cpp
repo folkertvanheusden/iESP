@@ -110,9 +110,10 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 
 		size_t data_length = pdu_obj->get_data_length();
 		if (data_length) {
-			DOLOG("server::receive_pdu: read %zu data bytes\n", data_length);
-
 			size_t padded_data_length = (data_length + 3) & ~3;
+
+			DOLOG("server::receive_pdu: read %zu data bytes (%zu with padding)\n", data_length, padded_data_length);
+
 			uint8_t *data_temp = new uint8_t[padded_data_length];
 			if (READ(fd, data_temp, padded_data_length) == -1) {
 				ok = false;
