@@ -312,13 +312,15 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(const iscsi_r
 	iscsi_response_set response;
 	bool               ok       { true };
 
-	auto pdu_data_in = new iscsi_pdu_scsi_data_in();
-	DOLOG("iscsi_pdu_scsi_cmd::get_response: sending SCSI DATA-IN with %zu payload bytes\n", scsi_reply.value().data.second);
-	if (pdu_data_in->set(*this, scsi_reply.value().data) == false) {
-		ok = false;
-		DOLOG("iscsi_pdu_scsi_cmd::get_response: iscsi_pdu_scsi_data_in::set returned error state\n");
+	if (scsi_reply.value().data.second) {
+		auto pdu_data_in = new iscsi_pdu_scsi_data_in();
+		DOLOG("iscsi_pdu_scsi_cmd::get_response: sending SCSI DATA-IN with %zu payload bytes\n", scsi_reply.value().data.second);
+		if (pdu_data_in->set(*this, scsi_reply.value().data) == false) {
+			ok = false;
+			DOLOG("iscsi_pdu_scsi_cmd::get_response: iscsi_pdu_scsi_data_in::set returned error state\n");
+		}
+		response.responses.push_back(pdu_data_in);
 	}
-	response.responses.push_back(pdu_data_in);
 
 	// TODO only do when sense data is available?
 	auto pdu_scsi_response = new iscsi_pdu_scsi_response();
@@ -355,10 +357,10 @@ iscsi_pdu_scsi_response::~iscsi_pdu_scsi_response()
 bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std::vector<uint8_t> & scsi_sense_data)
 {
 	size_t sense_data_size = scsi_sense_data.size();
-	size_t reply_data_plus_sense_header = 2 + sense_data_size;
+	size_t reply_data_plus_sense_header = sense_data_size > 0 ? 2 + sense_data_size : 0;
 
 	*pdu_response = { };
-	pdu_response->opcode     = 0x21;
+	pdu_response->opcode     = o_scsi_resp;  // 0x21
 	pdu_response->set_to_1   = true;
 	pdu_response->datalenH   = reply_data_plus_sense_header >> 16;
 	pdu_response->datalenM   = reply_data_plus_sense_header >>  8;
@@ -371,10 +373,12 @@ bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std
 	pdu_response->ResidualCt = 0;
 
 	pdu_response_data.second = reply_data_plus_sense_header;
-	pdu_response_data.first  = new uint8_t[pdu_response_data.second]();
-	pdu_response_data.first[0] = sense_data_size >> 8;
-	pdu_response_data.first[1] = sense_data_size;
-	memcpy(pdu_response_data.first + 2, scsi_sense_data.data(), sense_data_size);
+	if (pdu_response_data.second) {
+		pdu_response_data.first  = new uint8_t[pdu_response_data.second]();
+		pdu_response_data.first[0] = sense_data_size >> 8;
+		pdu_response_data.first[1] = sense_data_size;
+		memcpy(pdu_response_data.first + 2, scsi_sense_data.data(), sense_data_size);
+	}
 
 	return true;
 }
