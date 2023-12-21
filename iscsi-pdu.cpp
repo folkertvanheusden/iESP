@@ -219,6 +219,14 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 		"MaxRecvDataSegmentLength=512",
 		"MaxBurstLength=512",
 		"FirstBurstLength=512",
+		"TargetPortalGroupTag=1",
+		"InitialR2T=Yes",
+		"MaxOutstandingR2T=1",
+		"DefaultTime2Wait=1",
+		"DefaultTime2Retain=0",
+		"IFMarker=No",
+		"OFMarker=No",
+		"ErrorRecoveryLevel=0"
 	};
 	// determine total length
 	login_reply_reply_data.second = 0;
