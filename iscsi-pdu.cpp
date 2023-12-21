@@ -260,6 +260,7 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 	memcpy(login_reply->ISID, reply_to.get_ISID(), 6);
 	login_reply->TSIH       = reply_to.get_TSIH();
 	login_reply->Itasktag   = reply_to.get_Itasktag();
+	login_reply->StatSN     = htonl(reply_to.get_ExpStatSN());
 	login_reply->ExpCmdSN   = htonl(reply_to.get_CmdSN());
 	login_reply->MaxStatSN  = htonl(reply_to.get_CmdSN());
 
