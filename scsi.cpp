@@ -36,8 +36,8 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		response.data.first[5] = 0;
 		response.data.first[6] = 0;
 		response.data.first[7] = 0;
-		memcpy(&response.data.first[8],  "vanHeusden", 10);
-		memcpy(&response.data.first[16], "prodinfo", 8);  // TODO
+		memcpy(&response.data.first[8],  "vnHeusdn", 8);
+		memcpy(&response.data.first[16], "iESP", 4);  // TODO
 		memcpy(&response.data.first[32], "1.0", 3);  // TODO
 	}
 	else {
