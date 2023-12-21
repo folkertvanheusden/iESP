@@ -216,9 +216,9 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 		"TargetAlias=Bob-s disk",  // TODO
 		"TargetPortalGroupTag=1",
 		"ImmediateData=Yes",
-		"MaxRecvDataSegmentLength=512",
-		"MaxBurstLength=512",
-		"FirstBurstLength=512",
+		"MaxRecvDataSegmentLength=4096",
+		"MaxBurstLength=4096",
+		"FirstBurstLength=4096",
 		"TargetPortalGroupTag=1",
 		"InitialR2T=Yes",
 		"MaxOutstandingR2T=1",
@@ -226,7 +226,9 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 		"DefaultTime2Retain=0",
 		"IFMarker=No",
 		"OFMarker=No",
-		"ErrorRecoveryLevel=0"
+		"ErrorRecoveryLevel=0",
+		"DataPDUInOrder=Yes",
+		"DataSequenceInOrder=Yes",
 	};
 	// determine total length
 	login_reply_reply_data.second = 0;
