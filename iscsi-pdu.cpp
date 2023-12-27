@@ -372,6 +372,7 @@ bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std
 
 	*pdu_response = { };
 	pdu_response->opcode     = o_scsi_resp;  // 0x21
+//	pdu_response->U          = true;
 	pdu_response->set_to_1   = true;
 	pdu_response->datalenH   = reply_data_plus_sense_header >> 16;
 	pdu_response->datalenM   = reply_data_plus_sense_header >>  8;
@@ -385,7 +386,9 @@ bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std
 
 	pdu_response_data.second = reply_data_plus_sense_header;
 	if (pdu_response_data.second) {
-		pdu_response_data.first  = new uint8_t[pdu_response_data.second]();
+		pdu_response->status       = 2;  // check condition
+
+		pdu_response_data.first    = new uint8_t[pdu_response_data.second]();
 		pdu_response_data.first[0] = sense_data_size >> 8;
 		pdu_response_data.first[1] = sense_data_size;
 		memcpy(pdu_response_data.first + 2, scsi_sense_data.data(), sense_data_size);

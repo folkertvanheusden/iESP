@@ -40,14 +40,12 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		memcpy(&response.data.first[16], "iESP", 4);  // TODO
 		memcpy(&response.data.first[32], "1.0", 3);  // TODO
 	}
-	else if (opcode == 0x5E) {  //  PERSISTENT RESERVE IN
-		printf("service action: %d\n", CDB[1] & 0x1f);
-		return { };  // TODO
-	}
 	else {
 		DOLOG("scsi::send: opcode %02x not implemented\n", opcode);
-		return { };
+		response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00 };
 	}
+
+	printf("-> returning %zu bytes of sense data\n", response.sense_data.size());
 
 	return response;
 }
