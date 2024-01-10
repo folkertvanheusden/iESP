@@ -25,6 +25,7 @@ public:
 		o_seek            = 0x0b,
 		o_inquiry         = 0x12,
 		o_read_capacity   = 0x25,
+		o_write_16        = 0x8a,
 	};
 
 	std::optional<scsi_response> send(const uint8_t *const CDB, const size_t size);
