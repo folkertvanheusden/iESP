@@ -23,7 +23,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 
 	scsi_response response { };
 
-	if (opcode == 0x00) {  // TEST UNIT READY
+	if (opcode == o_test_unit_ready) {  // TEST UNIT READY
 	}
 	else if (opcode == 0x12) {  // INQUIRY
 		response.data.second = 36;
@@ -39,6 +39,18 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		memcpy(&response.data.first[8],  "vnHeusdn", 8);
 		memcpy(&response.data.first[16], "iESP", 4);  // TODO
 		memcpy(&response.data.first[32], "1.0", 3);  // TODO
+	}
+	else if (opcode == o_read_capacity) {
+		response.data.second = 8;
+		response.data.first = new uint8_t[response.data.second]();
+		response.data.first[0] = 0;  // 256 sectors
+		response.data.first[1] = 0;
+		response.data.first[2] = 1;
+		response.data.first[3] = 0;
+		response.data.first[4] = 0;  // sector size of 512 bytes
+		response.data.first[5] = 0;
+		response.data.first[6] = 0x02;
+		response.data.first[7] = 0x00;
 	}
 	else {
 		DOLOG("scsi::send: opcode %02x not implemented\n", opcode);
