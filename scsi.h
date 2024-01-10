@@ -23,6 +23,7 @@ public:
 		o_read            = 0x08,
 		o_write           = 0x0a,
 		o_seek            = 0x0b,
+		o_inquiry         = 0x12,
 		o_read_capacity   = 0x25,
 	};
 

@@ -23,9 +23,9 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 
 	scsi_response response { };
 
-	if (opcode == o_test_unit_ready) {  // TEST UNIT READY
+	if (opcode == o_test_unit_ready) {
 	}
-	else if (opcode == 0x12) {  // INQUIRY
+	else if (opcode == o_inquiry) {
 		response.data.second = 36;
 		response.data.first = new uint8_t[response.data.second]();
 		response.data.first[0] = 0;  // disk
