@@ -26,6 +26,7 @@ public:
 		o_inquiry         = 0x12,
 		o_read_capacity   = 0x25,
 		o_write_16        = 0x8a,
+		o_get_lba_status  = 0x9e,
 	};
 
 	std::optional<scsi_response> send(const uint8_t *const CDB, const size_t size);
