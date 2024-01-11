@@ -19,7 +19,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 	assert(size >= 16);
 
 	scsi_opcode opcode = scsi_opcode(CDB[0]);
-	printf("SCSI opcode: %02x\n", opcode);
+	printf("SCSI opcode: %02xh\n", opcode);
 
 	scsi_response response { };
 
@@ -59,7 +59,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		DOLOG("scsi::send: write_16(CDB size: %zu), offset %llu, %u sectors\n", size, lba, transfer_length);
 	}
 	else {
-		DOLOG("scsi::send: opcode %02x not implemented\n", opcode);
+		DOLOG("scsi::send: opcode %02xh not implemented\n", opcode);
 		response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00 };
 	}
 
