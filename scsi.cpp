@@ -53,7 +53,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		response.data.first[7] = 0x00;
 	}
 	else if (opcode == o_write_16) {
-		uint64_t lba = (CDB[2] << 56) | (CDB[3] << 48) | (CDB[4] << 40) | (CDB[5] << 32) | (CDB[6] << 24) | (CDB[7] << 16) | (CDB[8] << 8) | CDB[9];
+		uint64_t lba = (uint64_t(CDB[2]) << 56) | (uint64_t(CDB[3]) << 48) | (uint64_t(CDB[4]) << 40) | (uint64_t(CDB[5]) << 32) | (CDB[6] << 24) | (CDB[7] << 16) | (CDB[8] << 8) | CDB[9];
 		uint32_t transfer_length = (CDB[10] << 24) | (CDB[11] << 16) | (CDB[12] << 8) | CDB[13];
 
 		DOLOG("scsi::send: write_16(CDB size: %zu), offset %llu, %u sectors\n", size, lba, transfer_length);
