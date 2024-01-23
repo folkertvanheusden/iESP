@@ -234,8 +234,8 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 		"MaxBurstLength=4096",
 		"FirstBurstLength=4096",
 		"TargetPortalGroupTag=1",
-		"InitialR2T=No",
-		"MaxOutstandingR2T=0",
+		"InitialR2T=No",  // required for open-scsi?
+		"MaxOutstandingR2T=0",  // ^ (1)
 		"DefaultTime2Wait=1",
 		"DefaultTime2Retain=0",
 		"IFMarker=No",
