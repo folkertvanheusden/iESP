@@ -277,7 +277,7 @@ std::pair<const uint8_t *, std::size_t> iscsi_pdu_login_reply::get()
 	size_t data_size_padded = (login_reply_reply_data.second + 3) & ~3;
 
 	size_t out_size = sizeof(*login_reply) + data_size_padded;
-	uint8_t *out = new uint8_t[out_size];
+	uint8_t *out = new uint8_t[out_size]();
 	memcpy(out, login_reply, sizeof *login_reply);
 	memcpy(&out[sizeof *login_reply], login_reply_reply_data.first, login_reply_reply_data.second);
 
@@ -412,6 +412,8 @@ bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std
 	pdu_response_data.second = reply_data_plus_sense_header;
 	if (pdu_response_data.second) {
 		pdu_response->status       = 2;  // check condition
+		pdu_response->response     = 1;  // target failure
+		DOLOG("---------------- CHECK CONDITION\n");
 
 		pdu_response_data.first    = new uint8_t[pdu_response_data.second]();
 		pdu_response_data.first[0] = sense_data_size >> 8;
