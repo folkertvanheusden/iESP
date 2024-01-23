@@ -68,3 +68,32 @@ std::vector<std::string> split(std::string in, const std::string & splitter)
 
 	return out;
 }
+
+#ifdef linux
+std::string to_hex(const uint8_t *const in, const size_t n)
+{
+	std::string out;
+	out.resize(n * 3);
+
+	for(size_t i=0, o = 0; i<n; i++) {
+		uint8_t v = in[i];
+		uint8_t nh = v >> 4;
+		uint8_t nl = v & 15;
+
+		if (i)
+			out.at(o++) = ' ';
+
+		if (nh > 9)
+			out.at(o++) = 'a' + nh - 10;
+		else
+			out.at(o++) = '0' + nh;
+
+		if (nl > 9)
+			out.at(o++) = 'a' + nl - 10;
+		else
+			out.at(o++) = '0' + nl;
+	}
+
+	return out;
+}
+#endif
