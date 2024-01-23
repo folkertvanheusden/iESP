@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 add_executable(
 	iesp
+	iscsi.cpp
 	iscsi-pdu.cpp
 	main.cpp
 	random.cpp

@@ -3,9 +3,11 @@
 #include <vector>
 #include <arpa/inet.h>
 
+#include "iscsi.h"
 #include "iscsi-pdu.h"
 #include "log.h"
 #include "scsi.h"
+#include "utils.h"
 
 
 std::string pdu_opcode_to_string(const iscsi_pdu_bhs::iscsi_bhs_opcode opcode)
@@ -96,7 +98,7 @@ bool iscsi_pdu_bhs::set_data(std::pair<const uint8_t *, std::size_t> data_in)
 	return true;
 }
 
-std::optional<std::pair<uint8_t *, size_t> > iscsi_pdu_bhs::get_data()
+std::optional<std::pair<uint8_t *, size_t> > iscsi_pdu_bhs::get_data() const
 {
 	if (data.second == 0)
 		return { };
@@ -241,18 +243,9 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 		"DataPDUInOrder=Yes",
 		"DataSequenceInOrder=Yes",
 	};
-	// determine total length
-	login_reply_reply_data.second = 0;
-	for(const auto & kv: kvs)
-		login_reply_reply_data.second += kv.size() + 1;
-
-	login_reply_reply_data.first = new uint8_t[login_reply_reply_data.second + 4/*padding*/]();
-	size_t data_offset = 0;
-	for(const auto & kv: kvs) {
-		memcpy(&login_reply_reply_data.first[data_offset], kv.c_str(), kv.size());
-		data_offset += kv.size() + 1;  // for 0x00
-	}
-	assert(data_offset == login_reply_reply_data.second);
+	auto temp = text_array_to_data(kvs);
+	login_reply_reply_data.first  = temp.first;
+	login_reply_reply_data.second = temp.second;
 
 	*login_reply = { };
 	login_reply->opcode     = o_login_resp;  // 0x23
@@ -585,3 +578,119 @@ std::pair<const uint8_t *, std::size_t> iscsi_pdu_scsi_r2t::get()
 
 	return { out, out_size };
 }
+
+/*--------------------------------------------------------------------------*/
+
+iscsi_pdu_text_request::iscsi_pdu_text_request()
+{
+	assert(sizeof(*text_req) == 48);
+
+	*text_req = { };
+}
+
+iscsi_pdu_text_request::~iscsi_pdu_text_request()
+{
+}
+
+bool iscsi_pdu_text_request::set(session *const s, const uint8_t *const in, const size_t n)
+{
+	if (iscsi_pdu_bhs::set(s, in, n) == false)
+		return false;
+
+	// TODO further validation
+
+	return true;
+}
+
+std::pair<const uint8_t *, std::size_t> iscsi_pdu_text_request::get()
+{
+	void *out = new uint8_t[sizeof *text_req];
+	memcpy(out, text_req, sizeof *text_req);
+
+	return { reinterpret_cast<const uint8_t *>(out), sizeof *text_req };
+}
+
+std::optional<iscsi_response_set> iscsi_pdu_text_request::get_response(const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
+{
+	auto parameters = static_cast<const iscsi_response_parameters_text_req *>(parameters_in);
+
+	iscsi_response_set response;
+	auto reply_pdu = new iscsi_pdu_text_reply();
+	if (reply_pdu->set(*this) == false) {
+		delete reply_pdu;
+		return { };
+	}
+	response.responses.push_back(reply_pdu);
+
+	return response;
+}
+
+/*--------------------------------------------------------------------------*/
+
+iscsi_pdu_text_reply::iscsi_pdu_text_reply()
+{
+	assert(sizeof(*text_reply) == 48);
+}
+
+iscsi_pdu_text_reply::~iscsi_pdu_text_reply()
+{
+}
+
+bool iscsi_pdu_text_reply::set(const iscsi_pdu_text_request & reply_to)
+{
+	const auto data = reply_to.get_data();
+	if (data.has_value() == false)
+		return false;
+	auto kvs_in = data_to_text_array(data.value().first, data.value().second);
+	delete [] data.value().first;
+
+	bool send_targets = false;
+
+	for(auto & kv: kvs_in) {
+		auto parts = split(kv, "=");
+		if (parts.size() < 2)
+			return false;
+
+		if (parts[0] == "SendTargets")
+			send_targets = true;
+
+		DOLOG(" text request, responding to: %s\n", kv.c_str());
+	}
+
+	const std::vector<std::string> kvs {
+		"TargetName=iqn.1993-11.com.vanheusden:test",
+		"TargetAddress=localhost",  // FIXME
+	};
+	auto temp = text_array_to_data(kvs);
+	text_reply_reply_data.first  = temp.first;
+	text_reply_reply_data.second = temp.second;
+
+	*text_reply = { };
+	text_reply->opcode     = o_text_resp;  // 0x24
+	text_reply->F          = true;
+	text_reply->ahslen     = 0;
+	text_reply->datalenH   = text_reply_reply_data.second >> 16;
+	text_reply->datalenM   = text_reply_reply_data.second >>  8;
+	text_reply->datalenL   = text_reply_reply_data.second      ;
+	memcpy(text_reply->LUN, reply_to.get_LUN(), sizeof text_reply->LUN);
+	text_reply->TTF        = reply_to.get_TTF();
+	text_reply->Itasktag   = reply_to.get_Itasktag();
+	text_reply->StatSN     = htonl(reply_to.get_ExpStatSN());
+	text_reply->ExpCmdSN   = htonl(reply_to.get_CmdSN());
+
+	return true;
+}
+
+std::pair<const uint8_t *, std::size_t> iscsi_pdu_text_reply::get()
+{
+	// round for padding
+	size_t data_size_padded = (text_reply_reply_data.second + 3) & ~3;
+
+	size_t out_size = sizeof(*text_reply) + data_size_padded;
+	uint8_t *out = new uint8_t[out_size];
+	memcpy(out, text_reply, sizeof *text_reply);
+	memcpy(&out[sizeof *text_reply], text_reply_reply_data.first, text_reply_reply_data.second);
+
+	return { out, out_size };
+}
+
