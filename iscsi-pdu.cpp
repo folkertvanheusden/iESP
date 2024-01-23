@@ -251,7 +251,7 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 	login_reply->TSIH       = reply_to.get_TSIH();
 	login_reply->Itasktag   = reply_to.get_Itasktag();
 	login_reply->ExpCmdSN   = ntohl(reply_to.get_CmdSN());
-	login_reply->MaxStatSN  = 1;
+	login_reply->MaxStatSN  = ntohl(1);
 
 	return true;
 }
@@ -346,7 +346,7 @@ bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std
 	size_t reply_data_plus_sense_header = 2 + sense_data_size;
 
 	*pdu_response = { };
-	pdu_response->opcode     = 0x21;
+	pdu_response->opcode     = o_scsi_resp;
 	pdu_response->set_to_1   = true;
 	pdu_response->datalenH   = reply_data_plus_sense_header >> 16;
 	pdu_response->datalenM   = reply_data_plus_sense_header >>  8;
@@ -391,7 +391,7 @@ iscsi_pdu_scsi_data_in::~iscsi_pdu_scsi_data_in()
 bool iscsi_pdu_scsi_data_in::set(const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data)
 {
 	*pdu_data_in = { };
-	pdu_data_in->opcode     = 0x25;
+	pdu_data_in->opcode     = o_scsi_data_in;
 	pdu_data_in->datalenH   = scsi_reply_data.second >> 16;
 	pdu_data_in->datalenM   = scsi_reply_data.second >>  8;
 	pdu_data_in->datalenL   = scsi_reply_data.second      ;
@@ -460,7 +460,7 @@ iscsi_pdu_nop_in::~iscsi_pdu_nop_in()
 bool iscsi_pdu_nop_in::set(const iscsi_pdu_nop_out & reply_to)
 {
 	*nop_in = { };
-	nop_in->opcode     = 0x20;
+	nop_in->opcode     = o_nop_in;
 	nop_in->datalenH   = 0;
 	nop_in->datalenM   = 0;
 	nop_in->datalenL   = 0;
