@@ -223,7 +223,7 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 		"HeaderDigest=None",
 		"DataDigest=None",
 		"MaxConnections=1",
-		"TargetName=test",  // TODO
+//		"TargetName=test",  // TODO  fails with "iscsiadm --mode discovery -t sendtargets --portal localhost"
 		"TargetAlias=Bob-s disk",  // TODO
 		"TargetPortalGroupTag=1",
 		"ImmediateData=Yes",
