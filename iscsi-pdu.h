@@ -206,6 +206,7 @@ public:
 	      uint8_t  get_NSG()        const { return login_req->NSG;          }
 	      uint8_t  get_versionmin() const { return login_req->versionmin;   }
 	      uint32_t get_Itasktag()   const { return login_req->Itasktag;     }
+	      uint32_t get_ExpStatSN()  const { return ntohl(login_req->ExpStatSN); }
 
 	virtual std::optional<iscsi_response_set> get_response(const iscsi_response_parameters *const parameters) override;
 };

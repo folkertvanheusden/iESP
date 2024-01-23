@@ -68,7 +68,7 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 		return nullptr;
 	}
 
-	printf("opcode: %02x / %s\n", bhs.get_opcode(), pdu_opcode_to_string(bhs.get_opcode()).c_str());
+	printf("opcode: %02xh / %s\n", bhs.get_opcode(), pdu_opcode_to_string(bhs.get_opcode()).c_str());
 
 	iscsi_pdu_bhs *pdu_obj = nullptr;
 
@@ -83,15 +83,17 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 			pdu_obj = new iscsi_pdu_nop_out();
 			break;
 		default:
-			DOLOG("server::receive_pdu: opcode %02x not implemented\n", bhs.get_opcode());
+			DOLOG("server::receive_pdu: opcode %02xh not implemented\n", bhs.get_opcode());
 			break;
 	}
 
 	if (pdu_obj) {
 		bool ok = true;
 
-		if (pdu_obj->set(*s, pdu, sizeof pdu) == false)
+		if (pdu_obj->set(*s, pdu, sizeof pdu) == false) {
 			ok = false;
+			DOLOG("server::receive_pdu: initialize PDU: validation failed\n");
+		}
 
 		size_t ahs_len = pdu_obj->get_ahs_length();
 		if (ahs_len) {
@@ -126,6 +128,7 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 		}
 		
 		if (!ok) {
+			DOLOG("server::receive_pdu: cannot return PDU\n");
 			delete pdu_obj;
 			pdu_obj = nullptr;
 		}
@@ -173,7 +176,7 @@ iscsi_response_parameters *server::select_parameters(iscsi_pdu_bhs *const pdu, s
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_nop_out:
 			return new iscsi_response_parameters_nop_out(ses);
 		default:
-			DOLOG("server::select_parameters: opcode %02x not implemented\n", pdu->get_opcode());
+			DOLOG("server::select_parameters: opcode %02xh not implemented\n", pdu->get_opcode());
 			break;
 	}
 
