@@ -144,9 +144,10 @@ public:
 
 	iscsi_bhs_opcode get_opcode()      const { return iscsi_bhs_opcode(bhs->opcode); }
 	size_t           get_data_length() const { return (bhs->datalenH << 16) | (bhs->datalenM << 8) | bhs->datalenL; }
+	std::optional<std::pair<uint8_t *, size_t> > get_data();
 	bool             set_data(std::pair<const uint8_t *, std::size_t> data_in);
 
-	virtual std::optional<iscsi_response_set> get_response(const iscsi_response_parameters *const parameters);
+	virtual std::optional<iscsi_response_set> get_response(const iscsi_response_parameters *const parameters, std::optional<std::pair<uint8_t *, size_t> > data);
 };
 
 struct iscsi_response_set
@@ -208,7 +209,7 @@ public:
 	      uint32_t get_Itasktag()   const { return login_req->Itasktag;     }
 	      uint32_t get_ExpStatSN()  const { return ntohl(login_req->ExpStatSN); }
 
-	virtual std::optional<iscsi_response_set> get_response(const iscsi_response_parameters *const parameters) override;
+	virtual std::optional<iscsi_response_set> get_response(const iscsi_response_parameters *const parameters, std::optional<std::pair<uint8_t *, size_t> > data) override;
 };
 
 class iscsi_pdu_login_reply : public iscsi_pdu_bhs
@@ -298,7 +299,7 @@ public:
 	      uint32_t  get_CmdSN()     const { return ntohl(cdb_pdu_req->CmdSN);     }
 	const uint8_t * get_LUN()       const { return cdb_pdu_req->LUN;              }
 
-	virtual std::optional<iscsi_response_set> get_response(const iscsi_response_parameters *const parameters) override;
+	virtual std::optional<iscsi_response_set> get_response(const iscsi_response_parameters *const parameters, std::optional<std::pair<uint8_t *, size_t> > data) override;
 };
 
 class iscsi_pdu_scsi_response : public iscsi_pdu_bhs  // 0x21
@@ -391,6 +392,7 @@ public:
 
 	bool set(const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data);
 	std::pair<const uint8_t *, std::size_t> get() override;
+        uint32_t get_TTF() const { return pdu_data_in->TTF; }
 };
 
 class iscsi_pdu_nop_out : public iscsi_pdu_bhs  // NOP-Out  0x00
@@ -429,7 +431,7 @@ public:
 	      uint32_t  get_CmdSN()      const { return ntohl(nop_out->CmdSN);     }
 	      uint32_t  get_ExpStatSN()  const { return ntohl(nop_out->ExpStatSN); }
 
-	virtual std::optional<iscsi_response_set> get_response(const iscsi_response_parameters *const parameters) override;
+	virtual std::optional<iscsi_response_set> get_response(const iscsi_response_parameters *const parameters, std::optional<std::pair<uint8_t *, size_t> > data) override;
 };
 
 class iscsi_pdu_nop_in : public iscsi_pdu_bhs  // NOP-In
@@ -462,5 +464,42 @@ public:
 	virtual ~iscsi_pdu_nop_in();
 
 	bool set(const iscsi_pdu_nop_out & reply_to);
+	std::pair<const uint8_t *, std::size_t> get() override;
+};
+
+class iscsi_pdu_scsi_r2t : public iscsi_pdu_bhs  // 0x31
+{
+public:
+	struct __pdu_scsi_r2t__ {
+		uint8_t  opcode    :  6;
+		bool     reserved1 :  1;
+		bool     reserved0 :  1;
+
+		uint32_t filler3   :  24;
+
+		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
+		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
+		uint32_t datalenM  :  8;  // data segment length (bytes, excluding padding) 15...8
+		uint32_t datalenL  :  8;  // data segment length (bytes, excluding padding) 7...0
+		uint8_t  LUN[8];
+		uint32_t Itasktag  : 32;  // initiator task tag
+		uint32_t TTF       : 32;  // target transfer tag
+		uint32_t StatSN    : 32;
+		uint32_t ExpCmdSN  : 32;
+		uint32_t MaxCmdSN  : 32;
+		uint32_t R2TSN     : 32;
+		uint32_t bufferoff : 32;
+		uint32_t DDTF      : 32;  // desired data transfer length
+	};
+
+	__pdu_scsi_r2t__ *pdu_scsi_r2t __attribute__((packed)) { reinterpret_cast<__pdu_scsi_r2t__ *>(pdu_bytes) };
+
+	std::pair<uint8_t *, size_t> pdu_scsi_r2t_data { nullptr, 0 };
+
+public:
+	iscsi_pdu_scsi_r2t();
+	virtual ~iscsi_pdu_scsi_r2t();
+
+	bool set(const iscsi_pdu_scsi_cmd & reply_to, const uint32_t buffer_offset, const uint32_t data_length);
 	std::pair<const uint8_t *, std::size_t> get() override;
 };

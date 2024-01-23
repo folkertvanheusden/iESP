@@ -96,6 +96,17 @@ bool iscsi_pdu_bhs::set_data(std::pair<const uint8_t *, std::size_t> data_in)
 	return true;
 }
 
+std::optional<std::pair<uint8_t *, size_t> > iscsi_pdu_bhs::get_data()
+{
+	if (data.second == 0)
+		return { };
+
+	uint8_t *out = new uint8_t[data.second];
+	memcpy(out, data.first, data.second);
+
+	return { { out, data.second } };
+}
+
 std::pair<const uint8_t *, std::size_t> iscsi_pdu_bhs::get()
 {
 	void *out = new uint8_t[sizeof *bhs];
@@ -104,7 +115,7 @@ std::pair<const uint8_t *, std::size_t> iscsi_pdu_bhs::get()
 	return { reinterpret_cast<const uint8_t *>(out), sizeof *bhs };
 }
 
-std::optional<iscsi_response_set> iscsi_pdu_bhs::get_response(const iscsi_response_parameters *const parameters_in)
+std::optional<iscsi_response_set> iscsi_pdu_bhs::get_response(const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
 {
 	DOLOG("iscsi_pdu_bhs::get_response invoked!\n");
 	assert(0);
@@ -180,7 +191,7 @@ std::pair<const uint8_t *, std::size_t> iscsi_pdu_login_request::get()
 	return { reinterpret_cast<const uint8_t *>(out), sizeof *login_req };
 }
 
-std::optional<iscsi_response_set> iscsi_pdu_login_request::get_response(const iscsi_response_parameters *const parameters_in)
+std::optional<iscsi_response_set> iscsi_pdu_login_request::get_response(const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
 {
 	auto parameters = static_cast<const iscsi_response_parameters_login_req *>(parameters_in);
 
@@ -311,10 +322,10 @@ std::pair<const uint8_t *, std::size_t> iscsi_pdu_scsi_cmd::get()
 	return { reinterpret_cast<const uint8_t *>(out), sizeof cdb_pdu_req };
 }
 
-std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(const iscsi_response_parameters *const parameters_in)
+std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
 {
 	auto parameters = static_cast<const iscsi_response_parameters_scsi_cmd *>(parameters_in);
-	auto scsi_reply = parameters->sd->send(get_CDB(), 16);
+	auto scsi_reply = parameters->sd->send(get_CDB(), 16, data);
 	if (scsi_reply.has_value() == false) {
 		DOLOG("iscsi_pdu_scsi_cmd::get_response: scsi::send returned nothing\n");
 		return { };
@@ -324,7 +335,7 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(const iscsi_r
 	bool               ok       { true };
 
 	if (scsi_reply.value().data.second) {
-		auto pdu_data_in = new iscsi_pdu_scsi_data_in();
+		auto pdu_data_in = new iscsi_pdu_scsi_data_in();  // 0x25
 		DOLOG("iscsi_pdu_scsi_cmd::get_response: sending SCSI DATA-IN with %zu payload bytes\n", scsi_reply.value().data.second);
 		if (pdu_data_in->set(*this, scsi_reply.value().data) == false) {
 			ok = false;
@@ -332,13 +343,34 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(const iscsi_r
 		}
 		response.responses.push_back(pdu_data_in);
 	}
+	else {
+		assert(scsi_reply.value().data.first == nullptr);
+	}
 
-	// TODO only do when sense data is available?
-	auto pdu_scsi_response = new iscsi_pdu_scsi_response();
-	DOLOG("iscsi_pdu_scsi_cmd::get_response: sending SCSI response with %zu sense bytes\n", scsi_reply.value().sense_data.size());
-	if (pdu_scsi_response->set(*this, scsi_reply.value().sense_data) == false) {
+	iscsi_pdu_bhs *pdu_scsi_response = nullptr;
+	if (scsi_reply.value().type == ir_as_is) {
+		auto *temp = new iscsi_pdu_scsi_response() /* 0x21 */;
+		DOLOG("iscsi_pdu_scsi_cmd::get_response: sending SCSI response with %zu sense bytes\n", scsi_reply.value().sense_data.size());
+
+		if (temp->set(*this, scsi_reply.value().sense_data) == false) {
+			ok = false;
+			DOLOG("iscsi_pdu_scsi_cmd::get_response: iscsi_pdu_scsi_response::set returned error\n");
+		}
+		pdu_scsi_response = temp;
+	}
+	else if (scsi_reply.value().type == ir_r2t) {
+		auto *temp = new iscsi_pdu_scsi_r2t() /* 0x31 */;
+		DOLOG("iscsi_pdu_scsi_cmd::get_response: sending R2T with %zu sense bytes\n", scsi_reply.value().sense_data.size());
+
+		if (temp->set(*this, scsi_reply.value().buffer_offset, scsi_reply.value().buffer_segment_length) == false) {
+			ok = false;
+			DOLOG("iscsi_pdu_scsi_cmd::get_response: iscsi_pdu_scsi_response::set returned error\n");
+		}
+		pdu_scsi_response = temp;
+	}
+	else {
+		DOLOG("iscsi_pdu_scsi_cmd::get_response: internal error\n");
 		ok = false;
-		DOLOG("iscsi_pdu_scsi_cmd::get_response: iscsi_pdu_scsi_response::set returned error\n");
 	}
 	response.responses.push_back(pdu_scsi_response);
 
@@ -463,7 +495,7 @@ iscsi_pdu_nop_out::~iscsi_pdu_nop_out()
 {
 }
 
-std::optional<iscsi_response_set> iscsi_pdu_nop_out::get_response(const iscsi_response_parameters *const parameters_in)
+std::optional<iscsi_response_set> iscsi_pdu_nop_out::get_response(const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
 {
 	DOLOG("invoking iscsi_pdu_nop_out::get_response\n");
 
@@ -511,6 +543,45 @@ std::pair<const uint8_t *, std::size_t> iscsi_pdu_nop_in::get()
 	size_t out_size = sizeof *nop_in;
 	uint8_t *out = new uint8_t[out_size];
 	memcpy(out, nop_in, sizeof *nop_in);
+
+	return { out, out_size };
+}
+
+/*--------------------------------------------------------------------------*/
+
+iscsi_pdu_scsi_r2t::iscsi_pdu_scsi_r2t()
+{
+	assert(sizeof(*pdu_scsi_r2t) == 48);
+}
+
+iscsi_pdu_scsi_r2t::~iscsi_pdu_scsi_r2t()
+{
+}
+
+bool iscsi_pdu_scsi_r2t::set(const iscsi_pdu_scsi_cmd & reply_to, const uint32_t buffer_offset, const uint32_t data_length)
+{
+	*pdu_scsi_r2t = { };
+	pdu_scsi_r2t->opcode     = o_r2t;
+	pdu_scsi_r2t->datalenH   = 0;
+	pdu_scsi_r2t->datalenM   = 0;
+	pdu_scsi_r2t->datalenL   = 0;
+	memcpy(pdu_scsi_r2t->LUN, reply_to.get_LUN(), sizeof pdu_scsi_r2t->LUN);
+	pdu_scsi_r2t->Itasktag   = reply_to.get_Itasktag();
+	// TODO pdu_scsi_r2t->TTF        = reply_to.get_TTF();
+	pdu_scsi_r2t->StatSN     = htonl(reply_to.get_ExpStatSN());
+	pdu_scsi_r2t->ExpCmdSN   = htonl(reply_to.get_CmdSN() + 1);
+	pdu_scsi_r2t->MaxCmdSN   = htonl(reply_to.get_CmdSN() + 1);
+	pdu_scsi_r2t->bufferoff  = buffer_offset;
+	pdu_scsi_r2t->DDTF       = data_length;
+
+	return true;
+}
+
+std::pair<const uint8_t *, std::size_t> iscsi_pdu_scsi_r2t::get()
+{
+	size_t out_size = sizeof *pdu_scsi_r2t;
+	uint8_t *out = new uint8_t[out_size];
+	memcpy(out, pdu_scsi_r2t, sizeof *pdu_scsi_r2t);
 
 	return { out, out_size };
 }

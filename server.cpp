@@ -68,7 +68,7 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 		return nullptr;
 	}
 
-	printf("opcode: %02xh / %s\n", bhs.get_opcode(), pdu_opcode_to_string(bhs.get_opcode()).c_str());
+	DOLOG("opcode: %02xh / %s\n", bhs.get_opcode(), pdu_opcode_to_string(bhs.get_opcode()).c_str());
 
 	iscsi_pdu_bhs *pdu_obj = nullptr;
 
@@ -99,7 +99,7 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 		if (ahs_len) {
 			DOLOG("server::receive_pdu: read %zu ahs bytes\n", ahs_len);
 
-			uint8_t *ahs_temp = new uint8_t[ahs_len];
+			uint8_t *ahs_temp = new uint8_t[ahs_len]();
 			if (READ(fd, ahs_temp, ahs_len) == -1) {
 				ok = false;
 				DOLOG("server::receive_pdu: AHS receive error\n");
@@ -116,7 +116,7 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 
 			DOLOG("server::receive_pdu: read %zu data bytes (%zu with padding)\n", data_length, padded_data_length);
 
-			uint8_t *data_temp = new uint8_t[padded_data_length];
+			uint8_t *data_temp = new uint8_t[padded_data_length]();
 			if (READ(fd, data_temp, padded_data_length) == -1) {
 				ok = false;
 				DOLOG("server::receive_pdu: data receive error\n");
@@ -139,7 +139,7 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 
 bool server::push_response(const int fd, iscsi_pdu_bhs *const pdu, iscsi_response_parameters *const parameters)
 {
-	auto response_set = pdu->get_response(parameters);
+	auto response_set = pdu->get_response(parameters, pdu->get_data());
 	if (response_set.has_value() == false) {
 		DOLOG("server::push_response: no response from PDU\n");
 		return false;
@@ -161,6 +161,8 @@ bool server::push_response(const int fd, iscsi_pdu_bhs *const pdu, iscsi_respons
 		}
 
 		delete [] iscsi_reply.first;
+
+		DOLOG(" ---\n");
 	}
 
 	return ok;
