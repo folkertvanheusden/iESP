@@ -16,5 +16,5 @@
                 printf(fmt, ##__VA_ARGS__); \
         } while(0)
 #else
-#define DOLOG(ll, fmt, ...) do { } while(0)
+#define DOLOG(fmt, ...) do { } while(0)
 #endif

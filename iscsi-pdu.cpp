@@ -217,6 +217,7 @@ iscsi_pdu_login_reply::iscsi_pdu_login_reply()
 
 iscsi_pdu_login_reply::~iscsi_pdu_login_reply()
 {
+	delete [] login_reply_reply_data.first;
 }
 
 bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
@@ -233,8 +234,8 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 		"MaxBurstLength=4096",
 		"FirstBurstLength=4096",
 		"TargetPortalGroupTag=1",
-		"InitialR2T=Yes",
-		"MaxOutstandingR2T=1",
+		"InitialR2T=No",
+		"MaxOutstandingR2T=0",
 		"DefaultTime2Wait=1",
 		"DefaultTime2Retain=0",
 		"IFMarker=No",
@@ -335,6 +336,7 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(const iscsi_r
 			DOLOG("iscsi_pdu_scsi_cmd::get_response: iscsi_pdu_scsi_data_in::set returned error state\n");
 		}
 		response.responses.push_back(pdu_data_in);
+		delete [] scsi_reply.value().data.first;
 	}
 	else {
 		assert(scsi_reply.value().data.first == nullptr);
@@ -388,6 +390,7 @@ iscsi_pdu_scsi_response::iscsi_pdu_scsi_response()
 
 iscsi_pdu_scsi_response::~iscsi_pdu_scsi_response()
 {
+	delete [] pdu_response_data.first;
 }
 
 bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std::vector<uint8_t> & scsi_sense_data)
@@ -444,6 +447,7 @@ iscsi_pdu_scsi_data_in::iscsi_pdu_scsi_data_in()
 
 iscsi_pdu_scsi_data_in::~iscsi_pdu_scsi_data_in()
 {
+	delete [] pdu_data_in_data.first;
 }
 
 bool iscsi_pdu_scsi_data_in::set(const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data)
@@ -552,6 +556,7 @@ iscsi_pdu_scsi_r2t::iscsi_pdu_scsi_r2t()
 
 iscsi_pdu_scsi_r2t::~iscsi_pdu_scsi_r2t()
 {
+	delete [] pdu_scsi_r2t_data.first;
 }
 
 bool iscsi_pdu_scsi_r2t::set(const iscsi_pdu_scsi_cmd & reply_to, const uint32_t buffer_offset, const uint32_t data_length)
@@ -637,6 +642,7 @@ iscsi_pdu_text_reply::iscsi_pdu_text_reply()
 
 iscsi_pdu_text_reply::~iscsi_pdu_text_reply()
 {
+	delete [] text_reply_reply_data.first;
 }
 
 bool iscsi_pdu_text_reply::set(const iscsi_pdu_text_request & reply_to)

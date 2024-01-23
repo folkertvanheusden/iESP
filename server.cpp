@@ -165,6 +165,8 @@ bool server::push_response(const int fd, iscsi_pdu_bhs *const pdu, iscsi_respons
 
 		delete [] iscsi_reply.first;
 
+		delete pdu_out;
+
 		DOLOG(" ---\n");
 	}
 

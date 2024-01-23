@@ -117,19 +117,21 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 			response.type = ir_r2t;  // allow R2T packets to come in
 		}
 	}
+	else if (opcode == o_read_16) {  // 0x88
+		uint64_t lba = (uint64_t(CDB[2]) << 56) | (uint64_t(CDB[3]) << 48) | (uint64_t(CDB[4]) << 40) | (uint64_t(CDB[5]) << 32) | (CDB[6] << 24) | (CDB[7] << 16) | (CDB[8] << 8) | CDB[9];
+		uint32_t transfer_length = (CDB[10] << 24) | (CDB[11] << 16) | (CDB[12] << 8) | CDB[13];
+
+		DOLOG("scsi::send: READ_16, offset %llu, %u sectors\n", lba, transfer_length);
+
+		response.data.second = transfer_length * 512;  // TODO: 512 = block length
+		response.data.first = new uint8_t[response.data.second]();
+		memcpy(response.data.first, "Hallo!", 6);
+	}
 	else if (opcode == o_write_16) {
 		uint64_t lba = (uint64_t(CDB[2]) << 56) | (uint64_t(CDB[3]) << 48) | (uint64_t(CDB[4]) << 40) | (uint64_t(CDB[5]) << 32) | (CDB[6] << 24) | (CDB[7] << 16) | (CDB[8] << 8) | CDB[9];
 		uint32_t transfer_length = (CDB[10] << 24) | (CDB[11] << 16) | (CDB[12] << 8) | CDB[13];
 
 		DOLOG("scsi::send: WRITE_16, offset %llu, %u sectors\n", lba, transfer_length);
-
-		if (data.has_value()) {
-			DOLOG("scsi::send: write command includes data\n");
-			// TODO write data
-		}
-		else {
-			response.type = ir_r2t;  // allow R2T packets to come in
-		}
 	}
 	else {
 		DOLOG("scsi::send: opcode %02xh not implemented\n", opcode);

@@ -31,6 +31,7 @@ public:
 		o_inquiry          = 0x12,
 		o_read_capacity_10 = 0x25,
 		o_write_10         = 0x2a,
+		o_read_16          = 0x88,
 		o_write_16         = 0x8a,
 		o_get_lba_status   = 0x9e,
 	};
