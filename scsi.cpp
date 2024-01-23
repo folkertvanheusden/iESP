@@ -80,23 +80,28 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		response.data.first[7] = 0x00;
 	}
 	else if (opcode == o_get_lba_status) {
-		uint64_t starting_lba = (uint64_t(CDB[2]) << 56) | (uint64_t(CDB[3]) << 48) | (uint64_t(CDB[4]) << 40) | (uint64_t(CDB[5]) << 32) | (CDB[6] << 24) | (CDB[7] << 16) | (CDB[8] << 8) | CDB[9];
-		uint32_t allocation_length = (CDB[10] << 24) | (CDB[11] << 16) | (CDB[12] << 8) | CDB[13];
-		DOLOG("scsi::send: GET_LBA_STATUS, starting lba %llu, allocation length: %u\n", starting_lba, allocation_length);
+		DOLOG("  ServiceAction: %02xh\n", CDB[1] & 31);
 
-		response.data.second = 24;
-		response.data.first = new uint8_t[response.data.second]();
-		response.data.first[0] = 0;  // parameter length
-		response.data.first[1] = 0;
-		response.data.first[2] = 0;
-		response.data.first[3] = 16;
-		for(int i=2; i<10; i++)  // LBA status logical block address
-			response.data.first[i - 2 + 8] = CDB[i];
-		int blocks_required = (allocation_length + 4095) / 4096;
-		response.data.first[16] = blocks_required >> 24;
-		response.data.first[17] = blocks_required >> 16;
-		response.data.first[18] = blocks_required >>  8;
-		response.data.first[19] = blocks_required;
+		if ((CDB[1] & 31) == 0x10) {  // READ CAPACITY
+			DOLOG("scsi::send: READ_CAPACITY(16)\n");
+
+			response.data.second = 32;
+			response.data.first = new uint8_t[response.data.second]();
+			response.data.first[0] = 0;  // parameter length
+			response.data.first[1] = 0;
+			response.data.first[2] = 0;
+			response.data.first[3] = 0;
+			response.data.first[4] = 0;
+			response.data.first[5] = 0;
+			response.data.first[6] = 0;
+			response.data.first[7] = 16;
+			uint32_t block_size = 512;
+			response.data.first[8] = block_size >> 24;
+			response.data.first[9] = block_size >> 16;
+			response.data.first[10] = block_size >>  8;
+			response.data.first[11] = block_size;
+			response.data.first[12] = 1 << 4;  // RC BASIS: "The RETURNED LOGICAL BLOCK ADDRESS field indicates the LBA of the last logical block on the logical unit."
+		}
 	}
 	else if (opcode == o_write_10) {
 		uint64_t lba = (CDB[2] << 24) | (CDB[3] << 16) | (CDB[4] << 8) | CDB[5];

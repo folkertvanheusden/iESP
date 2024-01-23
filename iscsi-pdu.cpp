@@ -411,8 +411,9 @@ bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std
 
 	pdu_response_data.second = reply_data_plus_sense_header;
 	if (pdu_response_data.second) {
-		pdu_response->status       = 2;  // check condition
-		pdu_response->response     = 1;  // target failure
+		pdu_response->status       = 0x02;  // check condition
+		pdu_response->response     = 0x01;  // target failure
+		pdu_response->ExpDataSN    = 0;
 		DOLOG("---------------- CHECK CONDITION\n");
 
 		pdu_response_data.first    = new uint8_t[pdu_response_data.second]();
