@@ -45,7 +45,7 @@ bool server::begin()
         if (bind(listen_fd, reinterpret_cast<sockaddr *>(&server_addr), sizeof server_addr) == -1)
 		return false;
 
-        if (listen(listen_fd, q_size) == -1)
+        if (listen(listen_fd, 4) == -1)
                 return false;
 
 	return true;
