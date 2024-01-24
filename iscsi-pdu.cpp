@@ -230,7 +230,7 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 		"DefaultTime2Retain=0",
 		"IFMarker=No",
 		"OFMarker=No",
-		"AuthMethod=None",
+//		"AuthMethod=None",
 		"ErrorRecoveryLevel=0",
 		"MaxConnections=1",
 //		"TargetName=iqn.1993-11.com.vanheusden:test",
@@ -256,7 +256,7 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 	login_reply->T          = true;
 	login_reply->C          = false;
 	login_reply->CSG        = reply_to.get_CSG();
-	login_reply->NSG        = reply_to.get_NSG();
+	login_reply->NSG        = 3;
 	login_reply->versionmax = reply_to.get_versionmin();
 	login_reply->versionact = reply_to.get_versionmin();
 	login_reply->ahslen     = 0;
