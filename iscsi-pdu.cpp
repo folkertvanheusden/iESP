@@ -230,10 +230,11 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 		"DefaultTime2Retain=0",
 		"IFMarker=No",
 		"OFMarker=No",
+		"AuthMethod=None",
 		"ErrorRecoveryLevel=0",
 		"MaxConnections=1",
-//		"TargetName=test",  // TODO  fails with "iscsiadm --mode discovery -t sendtargets --portal localhost"
-		"TargetAlias=Bob-s disk",  // TODO
+//		"TargetName=iqn.1993-11.com.vanheusden:test",
+//		"TargetAlias=Bob-s disk",  // TODO
 		"ImmediateData=Yes",
 		"MaxRecvDataSegmentLength=4096",
 		"MaxBurstLength=4096",
@@ -262,12 +263,12 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 	login_reply->datalenH   = login_reply_reply_data.second >> 16;
 	login_reply->datalenM   = login_reply_reply_data.second >>  8;
 	login_reply->datalenL   = login_reply_reply_data.second      ;
-	memcpy(login_reply->ISID, reply_to.get_ISID(), 6);
+	memcpy(login_reply->ISID, reply_to.get_ISID(), sizeof *login_reply->ISID);
 	login_reply->TSIH       = reply_to.get_TSIH();
 	login_reply->Itasktag   = reply_to.get_Itasktag();
 	login_reply->StatSN     = htonl(reply_to.get_ExpStatSN());
 	login_reply->ExpCmdSN   = htonl(reply_to.get_CmdSN());
-	login_reply->MaxStatSN  = htonl(reply_to.get_CmdSN());
+	login_reply->MaxStatSN  = htonl(reply_to.get_ExpStatSN() + 1);
 
 	return true;
 }
@@ -282,6 +283,7 @@ std::pair<const uint8_t *, std::size_t> iscsi_pdu_login_reply::get()
 	memcpy(out, login_reply, sizeof *login_reply);
 	memcpy(&out[sizeof *login_reply], login_reply_reply_data.first, login_reply_reply_data.second);
 
+	assert((out_size & ~3) == out_size);
 	return { out, out_size };
 }
 
@@ -667,7 +669,7 @@ bool iscsi_pdu_text_reply::set(const iscsi_pdu_text_request & reply_to, const is
 	auto *temp_parameters = reinterpret_cast<const iscsi_response_parameters_text_req *>(parameters);
 	const std::vector<std::string> kvs {
 		"TargetName=iqn.1993-11.com.vanheusden:test",  // FIXME
-		"TargetAddress=" + temp_parameters->listen_ip,
+		"TargetAddress=" + temp_parameters->listen_ip + ":3260",
 	};
 	auto temp = text_array_to_data(kvs);
 	text_reply_reply_data.first  = temp.first;
