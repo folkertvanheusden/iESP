@@ -702,3 +702,83 @@ std::pair<const uint8_t *, std::size_t> iscsi_pdu_text_reply::get()
 	return { out, out_size };
 }
 
+/*--------------------------------------------------------------------------*/
+
+iscsi_pdu_logout_request::iscsi_pdu_logout_request()
+{
+	assert(sizeof(*logout_req) == 48);
+
+	*logout_req = { };
+}
+
+iscsi_pdu_logout_request::~iscsi_pdu_logout_request()
+{
+}
+
+bool iscsi_pdu_logout_request::set(session *const s, const uint8_t *const in, const size_t n)
+{
+	if (iscsi_pdu_bhs::set(s, in, n) == false)
+		return false;
+
+	// TODO further validation
+
+	return true;
+}
+
+std::pair<const uint8_t *, std::size_t> iscsi_pdu_logout_request::get()
+{
+	void *out = new uint8_t[sizeof *logout_req];
+	memcpy(out, logout_req, sizeof *logout_req);
+
+	return { reinterpret_cast<const uint8_t *>(out), sizeof *logout_req };
+}
+
+std::optional<iscsi_response_set> iscsi_pdu_logout_request::get_response(const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
+{
+	auto parameters = static_cast<const iscsi_response_parameters_logout_req *>(parameters_in);
+
+	iscsi_response_set response;
+	auto reply_pdu = new iscsi_pdu_logout_reply();
+	if (reply_pdu->set(*this) == false) {
+		delete reply_pdu;
+		return { };
+	}
+	response.responses.push_back(reply_pdu);
+
+	return response;
+}
+
+/*--------------------------------------------------------------------------*/
+
+iscsi_pdu_logout_reply::iscsi_pdu_logout_reply()
+{
+	assert(sizeof(*logout_reply) == 48);
+}
+
+iscsi_pdu_logout_reply::~iscsi_pdu_logout_reply()
+{
+	delete [] logout_reply_reply_data.first;
+}
+
+bool iscsi_pdu_logout_reply::set(const iscsi_pdu_logout_request & reply_to)
+{
+	*logout_reply = { };
+	logout_reply->opcode   = o_logout_resp;  // 0x26
+	logout_reply->set_to_1 = true;
+	logout_reply->Itasktag = reply_to.get_Itasktag();
+	logout_reply->StatSN   = htonl(reply_to.get_ExpStatSN());
+	logout_reply->ExpCmdSN = htonl(reply_to.get_CmdSN());
+	logout_reply->MaxCmdSN = htonl(reply_to.get_CmdSN());
+
+	return true;
+}
+
+std::pair<const uint8_t *, std::size_t> iscsi_pdu_logout_reply::get()
+{
+	size_t   out_size = sizeof(*logout_reply);
+	uint8_t *out      = new uint8_t[out_size]();
+	memcpy(out, logout_reply, sizeof *logout_reply);
+
+	return { out, out_size };
+}
+

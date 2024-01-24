@@ -80,6 +80,13 @@ struct iscsi_response_parameters_text_req : public iscsi_response_parameters_bhs
 	}
 };
 
+struct iscsi_response_parameters_logout_req : public iscsi_response_parameters_bhs
+{
+	iscsi_response_parameters_logout_req(session *const ses) :
+		iscsi_response_parameters_bhs(ses) {
+	}
+};
+
 class scsi;
 
 struct iscsi_response_parameters_scsi_cmd : public iscsi_response_parameters_bhs
@@ -592,5 +599,86 @@ public:
 	virtual ~iscsi_pdu_text_reply();
 
 	bool set(const iscsi_pdu_text_request & reply_to, const iscsi_response_parameters *const parameters);
+	std::pair<const uint8_t *, std::size_t> get() override;
+};
+
+class iscsi_pdu_logout_request : public iscsi_pdu_bhs  // logout request 0x06
+{
+public:
+	struct __logout_req__ {
+		uint8_t  opcode    :  6;  // 0x06
+		bool     filler1   :  1;
+		bool     filler0   :  1;
+
+		uint8_t  reasoncode:  7;
+		bool     set_to_1  :  1;
+		uint16_t filler2   :  16;
+
+		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
+		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
+		uint32_t datalenM  :  8;  // data segment length (bytes, excluding padding) 15...8
+		uint32_t datalenL  :  8;  // data segment length (bytes, excluding padding) 7...0
+		uint8_t  filler3[8];
+		uint32_t Itasktag  : 32;  // initiator task tag
+		uint32_t reserved  : 32;
+		uint32_t CmdSN     : 32;
+		uint32_t ExpStatSN : 32;
+		uint8_t  filler4[16];
+	};
+
+	__logout_req__ *logout_req __attribute__((packed)) { reinterpret_cast<__logout_req__ *>(pdu_bytes) };
+
+public:
+	iscsi_pdu_logout_request();
+	virtual ~iscsi_pdu_logout_request();
+
+	bool set(session *const s, const uint8_t *const in, const size_t n) override;
+	std::pair<const uint8_t *, std::size_t> get() override;
+
+	uint32_t get_CmdSN()      const { return ntohl(logout_req->CmdSN); }
+	uint32_t get_Itasktag()   const { return logout_req->Itasktag;     }
+	uint32_t get_ExpStatSN()  const { return ntohl(logout_req->ExpStatSN); }
+
+	virtual std::optional<iscsi_response_set> get_response(const iscsi_response_parameters *const parameters, std::optional<std::pair<uint8_t *, size_t> > data) override;
+};
+
+class iscsi_pdu_logout_reply : public iscsi_pdu_bhs
+{
+public:
+	struct __logout_reply__ {
+		uint8_t  opcode    :  6;  // 0x26
+		bool     filler1   :  1;
+		bool     filler0   :  1;
+
+		uint8_t  filler2a  :  7;
+		bool     set_to_1  :  1;
+		uint8_t  response  :  8;
+		uint8_t  filler2b  :  8;
+
+		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
+		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
+		uint32_t datalenM  :  8;  // data segment length (bytes, excluding padding) 15...8
+		uint32_t datalenL  :  8;  // data segment length (bytes, excluding padding) 7...0
+		uint8_t  filler3[8];
+		uint32_t Itasktag  : 32;  // initiator task tag
+		uint32_t filler4   : 32;
+		uint32_t StatSN    : 32;
+		uint32_t ExpCmdSN  : 32;
+		uint32_t MaxCmdSN  : 32;
+		uint32_t filler5   : 32;
+		uint16_t Time2Wait : 16;
+		uint16_t Time2Ret  : 16;
+		uint32_t filler6   : 32;
+	};
+
+	__logout_reply__ *logout_reply __attribute__((packed)) =  { reinterpret_cast<__logout_reply__ *>(pdu_bytes) };
+
+	std::pair<uint8_t *, size_t> logout_reply_reply_data { nullptr, 0 };
+
+public:
+	iscsi_pdu_logout_reply();
+	virtual ~iscsi_pdu_logout_reply();
+
+	bool set(const iscsi_pdu_logout_request & reply_to);
 	std::pair<const uint8_t *, std::size_t> get() override;
 };

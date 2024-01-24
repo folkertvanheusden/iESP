@@ -89,6 +89,9 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_text_req:
 			pdu_obj = new iscsi_pdu_text_request();
 			break;
+		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_logout_req:
+			pdu_obj = new iscsi_pdu_logout_request();
+			break;
 		default:
 			DOLOG("server::receive_pdu: opcode %02xh not implemented\n", bhs.get_opcode());
 			break;
@@ -188,6 +191,8 @@ iscsi_response_parameters *server::select_parameters(iscsi_pdu_bhs *const pdu, s
 			return new iscsi_response_parameters_nop_out(ses);
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_text_req:
 			return new iscsi_response_parameters_text_req(ses, listen_ip, listen_port);
+		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_logout_req:
+			return new iscsi_response_parameters_logout_req(ses);
 		default:
 			DOLOG("server::select_parameters: opcode %02xh not implemented\n", pdu->get_opcode());
 			break;
