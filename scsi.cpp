@@ -56,11 +56,20 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 			memcpy(&response.data.first[32], "1.0", 3);  // TODO
 		}
 		else {
-			if (CDB[2] == 0xb0) {
+			if (CDB[2] == 0x83) {
+				response.data.second = 4 + 5;
+				response.data.first = new uint8_t[response.data.second]();
+				response.data.first[0] = 0;  // TODO
+				response.data.first[1] = CDB[2];
+				response.data.first[3] = 1;
+				response.data.first[4 + 3] = 1;
+				response.data.first[4 + 4] = 1;
+			}
+			else if (CDB[2] == 0xb0) {
 				response.data.second = 64;
 				response.data.first = new uint8_t[response.data.second]();
 				response.data.first[0] = 0;  // TODO
-				response.data.first[1] = 0xb0;
+				response.data.first[1] = CDB[2];
 				response.data.first[2] = response.data.second >> 8;  // page length
 				response.data.first[3] = response.data.second;
 				response.data.first[4] = 0;  // WSNZ bit
@@ -73,7 +82,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 				response.data.second = 64;
 				response.data.first = new uint8_t[response.data.second]();
 				response.data.first[0] = 0;  // TODO
-				response.data.first[1] = 0xb1;
+				response.data.first[1] = CDB[2];
 				response.data.first[2] = response.data.second >> 8;  // page length
 				response.data.first[3] = response.data.second;
 				response.data.first[4] = 0x1c;  // device has an RPM of 7200 (fake!)

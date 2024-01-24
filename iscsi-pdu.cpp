@@ -223,12 +223,17 @@ iscsi_pdu_login_reply::~iscsi_pdu_login_reply()
 bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 {
 	const std::vector<std::string> kvs {
+		"TargetPortalGroupTag=1",
 		"HeaderDigest=None",
 		"DataDigest=None",
+		"DefaultTime2Wait=1",
+		"DefaultTime2Retain=0",
+		"IFMarker=No",
+		"OFMarker=No",
+		"ErrorRecoveryLevel=0",
 		"MaxConnections=1",
 //		"TargetName=test",  // TODO  fails with "iscsiadm --mode discovery -t sendtargets --portal localhost"
 		"TargetAlias=Bob-s disk",  // TODO
-		"TargetPortalGroupTag=1",
 		"ImmediateData=Yes",
 		"MaxRecvDataSegmentLength=4096",
 		"MaxBurstLength=4096",
@@ -236,11 +241,6 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 		"TargetPortalGroupTag=1",
 		"InitialR2T=No",  // required for open-scsi?
 		"MaxOutstandingR2T=0",  // ^ (1)
-		"DefaultTime2Wait=1",
-		"DefaultTime2Retain=0",
-		"IFMarker=No",
-		"OFMarker=No",
-		"ErrorRecoveryLevel=0",
 		"DataPDUInOrder=Yes",
 		"DataSequenceInOrder=Yes",
 	};
@@ -695,7 +695,7 @@ std::pair<const uint8_t *, std::size_t> iscsi_pdu_text_reply::get()
 	size_t data_size_padded = (text_reply_reply_data.second + 3) & ~3;
 
 	size_t out_size = sizeof(*text_reply) + data_size_padded;
-	uint8_t *out = new uint8_t[out_size];
+	uint8_t *out = new uint8_t[out_size]();
 	memcpy(out, text_reply, sizeof *text_reply);
 	memcpy(&out[sizeof *text_reply], text_reply_reply_data.first, text_reply_reply_data.second);
 
