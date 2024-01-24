@@ -1,3 +1,6 @@
+#ifdef ESP32
+#include <Arduino.h>
+#endif
 #include <cstdint>
 #include <cstdio>
 #include <unistd.h>
@@ -72,7 +75,13 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 		return nullptr;
 	}
 
+#ifdef ESP32
+	Serial.print(millis());
+	Serial.print(' ');
+	Serial.println(pdu_opcode_to_string(bhs.get_opcode()).c_str());
+#else
 	DOLOG("opcode: %02xh / %s\n", bhs.get_opcode(), pdu_opcode_to_string(bhs.get_opcode()).c_str());
+#endif
 
 	iscsi_pdu_bhs *pdu_obj = nullptr;
 
