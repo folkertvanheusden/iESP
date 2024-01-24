@@ -2,13 +2,15 @@
 #include <utility>
 
 
+#include "backend.h"
 #include "scsi.h"
 #include "session.h"
 
 class server
 {
 private:
-	int listen_fd { -1 };
+	backend *const b         { nullptr };
+	int            listen_fd { -1      };
 
 	iscsi_pdu_bhs *receive_pdu  (const int fd, session **const s);
 	bool           push_response(const int fd, iscsi_pdu_bhs *const pdu, iscsi_response_parameters *const parameters);
@@ -16,7 +18,7 @@ private:
 	iscsi_response_parameters *select_parameters(iscsi_pdu_bhs *const pdu, session *const ses, scsi *const sd);
 
 public:
-	server();
+	server(backend *const b);
 	virtual ~server();
 
 	bool begin();

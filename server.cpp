@@ -12,7 +12,7 @@
 #include "utils.h"
 
 
-server::server()
+server::server(backend *const b) : b(b)
 {
 }
 
@@ -194,7 +194,7 @@ iscsi_response_parameters *server::select_parameters(iscsi_pdu_bhs *const pdu, s
 
 void server::handler()
 {
-	scsi scsi_dev;
+	scsi scsi_dev(b);
 
 	for(;;) {
 		int fd = accept(listen_fd, nullptr, nullptr);

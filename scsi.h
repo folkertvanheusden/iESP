@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <utility>
 
+#include "backend.h"
 #include "iscsi.h"
 #include "iscsi-pdu.h"
 
@@ -18,8 +19,11 @@ struct scsi_response
 
 class scsi
 {
+private:
+	backend *const b { nullptr };
+
 public:
-	scsi();
+	scsi(backend *const b);
 	virtual ~scsi();
 
 	enum scsi_opcode {

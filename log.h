@@ -1,5 +1,6 @@
 #ifdef linux
-#include <time.h>
+#include <cstdio>
+#include <ctime>
 #include <sys/time.h>
 #define DOLOG(fmt, ...) do {                \
 		FILE *fh = fopen("log.dat", "a+"); \

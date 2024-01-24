@@ -7,7 +7,7 @@
 #include "utils.h"
 
 
-scsi::scsi()
+scsi::scsi(backend *const b) : b(b)
 {
 }
 
@@ -96,14 +96,16 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		DOLOG("scsi::send: READ_CAPACITY\n");
 		response.data.second = 8;
 		response.data.first = new uint8_t[response.data.second]();
-		response.data.first[0] = 0;  // 256 sectors
-		response.data.first[1] = 0;
-		response.data.first[2] = 1;
-		response.data.first[3] = 0;
-		response.data.first[4] = 0;  // sector size of 512 bytes
-		response.data.first[5] = 0;
-		response.data.first[6] = 0x02;
-		response.data.first[7] = 0x00;
+		auto device_size = b->get_size_in_blocks();
+		response.data.first[0] = device_size >> 24;  // sector count
+		response.data.first[1] = device_size >> 16;
+		response.data.first[2] = device_size >>  8;
+		response.data.first[3] = device_size;
+		auto block_size = b->get_block_size();
+		response.data.first[4] = block_size >> 24;  // sector size
+		response.data.first[5] = block_size >> 16;
+		response.data.first[6] = block_size >>  8;
+		response.data.first[7] = block_size;
 	}
 	else if (opcode == o_get_lba_status) {
 		DOLOG("  ServiceAction: %02xh\n", CDB[1] & 31);
@@ -113,15 +115,16 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 
 			response.data.second = 32;
 			response.data.first = new uint8_t[response.data.second]();
-			response.data.first[0] = 0;  // parameter length
-			response.data.first[1] = 0;
-			response.data.first[2] = 0;
-			response.data.first[3] = 0;
-			response.data.first[4] = 0;
-			response.data.first[5] = 0;
-			response.data.first[6] = 0;
-			response.data.first[7] = 16;
-			uint32_t block_size = 512;
+			auto device_size = b->get_size_in_blocks();
+			response.data.first[0] = device_size >> 56;
+			response.data.first[1] = device_size >> 48;
+			response.data.first[2] = device_size >> 40;
+			response.data.first[3] = device_size >> 32;
+			response.data.first[4] = device_size >> 24;
+			response.data.first[5] = device_size >> 16;
+			response.data.first[6] = device_size >>  8;
+			response.data.first[7] = device_size;
+			uint32_t block_size = b->get_block_size();
 			response.data.first[8] = block_size >> 24;
 			response.data.first[9] = block_size >> 16;
 			response.data.first[10] = block_size >>  8;
@@ -129,15 +132,31 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 			response.data.first[12] = 1 << 4;  // RC BASIS: "The RETURNED LOGICAL BLOCK ADDRESS field indicates the LBA of the last logical block on the logical unit."
 		}
 	}
-	else if (opcode == o_write_10) {
-		uint64_t lba = (CDB[2] << 24) | (CDB[3] << 16) | (CDB[4] << 8) | CDB[5];
-		uint32_t transfer_length = (CDB[6] << 8) | CDB[7];
+	else if (opcode == o_write_10 || opcode == o_write_16) {
+		uint64_t lba             = 0;
+		uint32_t transfer_length = 0;
 
-		DOLOG("scsi::send: WRITE_10, offset %llu, %u sectors\n", lba, transfer_length);
+		if (opcode == o_write_10) {
+			lba             = (CDB[2] << 24) | (CDB[3] << 16) | (CDB[4] << 8) | CDB[5];
+			transfer_length = (CDB[6] << 8) | CDB[7];
+		}
+		else if (opcode == o_write_16) {
+			lba             = (uint64_t(CDB[2]) << 56) | (uint64_t(CDB[3]) << 48) | (uint64_t(CDB[4]) << 40) | (uint64_t(CDB[5]) << 32) | (CDB[6] << 24) | (CDB[7] << 16) | (CDB[8] << 8) | CDB[9];
+			transfer_length = (CDB[10] << 24) | (CDB[11] << 16) | (CDB[12] << 8) | CDB[13];
+		}
+		else {
+			DOLOG("scsi::send: WRITE_1x internal error\n");
+		}
+
+		DOLOG("scsi::send: WRITE_1%c, offset %llu, %u sectors\n", opcode == o_write_10 ? '0' : '6', lba, transfer_length);
 
 		if (data.has_value()) {
 			DOLOG("scsi::send: write command includes data\n");
-			// TODO write data
+
+			if (transfer_length * b->get_block_size() == data.value().second)
+				b->write(lba, transfer_length, data.value().first);
+			else
+				DOLOG("scsi::send: write did not receive all/more data\n");
 		}
 		else {
 			response.type = ir_r2t;  // allow R2T packets to come in
@@ -149,15 +168,9 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 
 		DOLOG("scsi::send: READ_16, offset %llu, %u sectors\n", lba, transfer_length);
 
-		response.data.second = transfer_length * 512;  // TODO: 512 = block length
+		response.data.second = transfer_length * b->get_block_size();
 		response.data.first = new uint8_t[response.data.second]();
-		memcpy(response.data.first, "Hallo!", 6);
-	}
-	else if (opcode == o_write_16) {
-		uint64_t lba = (uint64_t(CDB[2]) << 56) | (uint64_t(CDB[3]) << 48) | (uint64_t(CDB[4]) << 40) | (uint64_t(CDB[5]) << 32) | (CDB[6] << 24) | (CDB[7] << 16) | (CDB[8] << 8) | CDB[9];
-		uint32_t transfer_length = (CDB[10] << 24) | (CDB[11] << 16) | (CDB[12] << 8) | CDB[13];
-
-		DOLOG("scsi::send: WRITE_16, offset %llu, %u sectors\n", lba, transfer_length);
+		b->read(lba, transfer_length, response.data.first);
 	}
 	else {
 		DOLOG("scsi::send: opcode %02xh not implemented\n", opcode);

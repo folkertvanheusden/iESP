@@ -8,6 +8,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 add_executable(
 	iesp
+	backend.cpp
+	backend-file.cpp
 	iscsi.cpp
 	iscsi-pdu.cpp
 	main.cpp
