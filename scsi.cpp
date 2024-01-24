@@ -69,6 +69,17 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 				response.data.first[7] = 0;
 				// ... set all to 'not set'
 			}
+			else if (CDB[2] == 0xb1) {
+				response.data.second = 64;
+				response.data.first = new uint8_t[response.data.second]();
+				response.data.first[0] = 0;  // TODO
+				response.data.first[1] = 0xb1;
+				response.data.first[2] = response.data.second >> 8;  // page length
+				response.data.first[3] = response.data.second;
+				response.data.first[4] = 0x1c;  // device has an RPM of 7200 (fake!)
+				response.data.first[5] = 0x20;
+				// ... set all to 'not set'
+			}
 			else {  // PageCode not supported
 				response.sense_data = {
 					0x72,  // current errors
