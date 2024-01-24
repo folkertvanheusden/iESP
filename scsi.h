@@ -10,9 +10,10 @@
 struct scsi_response
 {
 	iscsi_reacion_t              type;
-	std::vector<uint8_t>         sense_data;
-	std::pair<uint8_t *, size_t> data;
-	
+	std::vector<uint8_t>         sense_data;  // error data
+	std::pair<uint8_t *, size_t> data;  // meta data or disk-data
+	bool                         data_is_meta;  // scsi command reply data
+
 	uint32_t buffer_offset;
 	uint32_t buffer_segment_length;
 };

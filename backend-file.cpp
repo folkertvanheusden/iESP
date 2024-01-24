@@ -29,7 +29,7 @@ uint64_t backend_file::get_size_in_blocks() const
 
 uint64_t backend_file::get_block_size() const
 {
-	return 512;
+	return 4096;
 }
 
 bool backend_file::write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data)

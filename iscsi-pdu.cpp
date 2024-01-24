@@ -6,6 +6,7 @@
 #include "iscsi.h"
 #include "iscsi-pdu.h"
 #include "log.h"
+#include "random.h"
 #include "scsi.h"
 #include "utils.h"
 
@@ -240,8 +241,8 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 		"MaxBurstLength=4096",
 		"FirstBurstLength=4096",
 		"TargetPortalGroupTag=1",
-		"InitialR2T=No",  // required for open-scsi?
-		"MaxOutstandingR2T=0",  // ^ (1)
+		"InitialR2T=Yes",  // required for (at least) open-scsi
+		"MaxOutstandingR2T=1",  // ^ (1)
 		"DataPDUInOrder=Yes",
 		"DataSequenceInOrder=Yes",
 	};
@@ -263,12 +264,15 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 	login_reply->datalenH   = login_reply_reply_data.second >> 16;
 	login_reply->datalenM   = login_reply_reply_data.second >>  8;
 	login_reply->datalenL   = login_reply_reply_data.second      ;
-	memcpy(login_reply->ISID, reply_to.get_ISID(), sizeof *login_reply->ISID);
-	login_reply->TSIH       = reply_to.get_TSIH();
+	memcpy(login_reply->ISID, reply_to.get_ISID(), 6);
+	do {
+		my_getrandom(&login_reply->TSIH, sizeof login_reply->TSIH);
+	}
+	while(login_reply->TSIH == 0);
 	login_reply->Itasktag   = reply_to.get_Itasktag();
 	login_reply->StatSN     = htonl(reply_to.get_ExpStatSN());
 	login_reply->ExpCmdSN   = htonl(reply_to.get_CmdSN());
-	login_reply->MaxStatSN  = htonl(reply_to.get_ExpStatSN() + 1);
+	login_reply->MaxStatSN  = htonl(reply_to.get_ExpStatSN());
 
 	return true;
 }
@@ -333,7 +337,7 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(const iscsi_r
 	if (scsi_reply.value().data.second) {
 		auto pdu_data_in = new iscsi_pdu_scsi_data_in();  // 0x25
 		DOLOG("iscsi_pdu_scsi_cmd::get_response: sending SCSI DATA-IN with %zu payload bytes\n", scsi_reply.value().data.second);
-		if (pdu_data_in->set(*this, scsi_reply.value().data) == false) {
+		if (pdu_data_in->set(*this, scsi_reply.value().data, scsi_reply.value().data_is_meta) == false) {
 			ok = false;
 			DOLOG("iscsi_pdu_scsi_cmd::get_response: iscsi_pdu_scsi_data_in::set returned error state\n");
 		}
@@ -346,14 +350,16 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(const iscsi_r
 
 	iscsi_pdu_bhs *pdu_scsi_response = nullptr;
 	if (scsi_reply.value().type == ir_as_is) {
-		auto *temp = new iscsi_pdu_scsi_response() /* 0x21 */;
-		DOLOG("iscsi_pdu_scsi_cmd::get_response: sending SCSI response with %zu sense bytes\n", scsi_reply.value().sense_data.size());
+		if (scsi_reply.value().sense_data.empty() == false) {
+			auto *temp = new iscsi_pdu_scsi_response() /* 0x21 */;
+			DOLOG("iscsi_pdu_scsi_cmd::get_response: sending SCSI response with %zu sense bytes\n", scsi_reply.value().sense_data.size());
 
-		if (temp->set(*this, scsi_reply.value().sense_data) == false) {
-			ok = false;
-			DOLOG("iscsi_pdu_scsi_cmd::get_response: iscsi_pdu_scsi_response::set returned error\n");
+			if (temp->set(*this, scsi_reply.value().sense_data) == false) {
+				ok = false;
+				DOLOG("iscsi_pdu_scsi_cmd::get_response: iscsi_pdu_scsi_response::set returned error\n");
+			}
+			pdu_scsi_response = temp;
 		}
-		pdu_scsi_response = temp;
 	}
 	else if (scsi_reply.value().type == ir_r2t) {
 		auto *temp = new iscsi_pdu_scsi_r2t() /* 0x31 */;
@@ -369,7 +375,8 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(const iscsi_r
 		DOLOG("iscsi_pdu_scsi_cmd::get_response: internal error\n");
 		ok = false;
 	}
-	response.responses.push_back(pdu_scsi_response);
+	if (pdu_scsi_response)
+		response.responses.push_back(pdu_scsi_response);
 
 	if (!ok) {
 		for(auto & r: response.responses)
@@ -452,12 +459,14 @@ iscsi_pdu_scsi_data_in::~iscsi_pdu_scsi_data_in()
 	delete [] pdu_data_in_data.first;
 }
 
-bool iscsi_pdu_scsi_data_in::set(const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data)
+bool iscsi_pdu_scsi_data_in::set(const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data, const bool is_meta)
 {
 	DOLOG("iscsi_pdu_scsi_data_in::set: with %zu payload bytes\n", scsi_reply_data.second);
 
 	*pdu_data_in = { };
 	pdu_data_in->opcode     = o_scsi_data_in;  // 0x25
+	pdu_data_in->F          = true;
+	pdu_data_in->S          = is_meta;
 	pdu_data_in->datalenH   = scsi_reply_data.second >> 16;
 	pdu_data_in->datalenM   = scsi_reply_data.second >>  8;
 	pdu_data_in->datalenL   = scsi_reply_data.second      ;
@@ -465,8 +474,8 @@ bool iscsi_pdu_scsi_data_in::set(const iscsi_pdu_scsi_cmd & reply_to, const std:
 	pdu_data_in->Itasktag   = reply_to.get_Itasktag();
 	pdu_data_in->StatSN     = htonl(reply_to.get_ExpStatSN());
 	pdu_data_in->ExpCmdSN   = htonl(reply_to.get_CmdSN() + 1);
-	pdu_data_in->MaxCmdSN   = htonl(reply_to.get_CmdSN() + 1);
-	pdu_data_in->DataSN     = htonl(1);
+	pdu_data_in->MaxCmdSN   = htonl(reply_to.get_CmdSN() + 128);
+	pdu_data_in->DataSN     = htonl(0);  // TODO
 	pdu_data_in->ResidualCt = 0;
 
 	pdu_data_in_data.second = scsi_reply_data.second;

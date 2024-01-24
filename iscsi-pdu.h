@@ -408,7 +408,7 @@ public:
 	iscsi_pdu_scsi_data_in();
 	virtual ~iscsi_pdu_scsi_data_in();
 
-	bool set(const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data);
+	bool set(const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data, const bool is_meta);
 	std::pair<const uint8_t *, std::size_t> get() override;
         uint32_t get_TTF() const { return pdu_data_in->TTF; }
 };
