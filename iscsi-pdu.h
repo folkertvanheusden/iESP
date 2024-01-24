@@ -565,9 +565,10 @@ public:
 		bool     filler0   :  1;
 		bool     filler1   :  1;
 
-		uint32_t filler2   :  22;
+		uint8_t  filler2a  :  6;
 		bool     C         :  1;
 		bool     F         :  1;
+		uint16_t  filler2b :  16;
 
 		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
 		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
