@@ -7,7 +7,8 @@
 #include <LittleFS.h>
 #include <WiFiManager.h>
 
-#include "../server.h"
+#include "backend-sdcard.h"
+#include "server.h"
 
 
 WiFiManager wifiManager;
@@ -26,7 +27,13 @@ void setup()
 
 void loop()
 {
-	server s;
+	backend_sdcard bs;
+
+	auto ip = WiFi.localIP();
+	char buffer[16];
+	snprintf(buffer, sizeof buffer, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+
+	server s(&bs, buffer, 3260);
 	s.begin();
 
 	s.handler();
