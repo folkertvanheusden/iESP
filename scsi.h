@@ -38,6 +38,7 @@ public:
 		o_read_16          = 0x88,
 		o_write_16         = 0x8a,
 		o_get_lba_status   = 0x9e,
+		o_report_luns      = 0xa0,
 	};
 
 	std::optional<scsi_response> send(const uint8_t *const CDB, const size_t size, std::optional<std::pair<uint8_t *, size_t> > & data);

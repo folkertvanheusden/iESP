@@ -172,6 +172,13 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		response.data.first = new uint8_t[response.data.second]();
 		b->read(lba, transfer_length, response.data.first);
 	}
+	else if (opcode == o_report_luns) {  // 0xA0
+		DOLOG("scsi::send: REPORT_LUNS, report: %02xh\n", CDB[2]);
+
+		response.data.second = 16;
+		response.data.first = new uint8_t[response.data.second]();
+		response.data.first[3] = 1;  // lun list length of 1
+	}
 	else {
 		DOLOG("scsi::send: opcode %02xh not implemented\n", opcode);
 		response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00 };
