@@ -55,15 +55,30 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 			memcpy(&response.data.first[16], "iESP", 4);  // TODO
 			memcpy(&response.data.first[32], "1.0", 3);  // TODO
 		}
-		else {  // PageCode not supported
-			response.sense_data = {
-				0x72,  // current errors
-				0x05,  // key: illegal request
-				0x24,  // ASC: invalid field in cdb
-				0x00,  // ASQ: -
-				0x00, 0x00, 0x00,  // reserved
-				0x00  // additional sense length
-			};
+		else {
+			if (CDB[2] == 0xb0) {
+				response.data.second = 64;
+				response.data.first = new uint8_t[response.data.second]();
+				response.data.first[0] = 0;  // TODO
+				response.data.first[1] = 0xb0;
+				response.data.first[2] = response.data.second >> 8;  // page length
+				response.data.first[3] = response.data.second;
+				response.data.first[4] = 0;  // WSNZ bit
+				response.data.first[5] = 0;  // compare and write not supported
+				response.data.first[6] = 0;  // OPTIMAL TRANSFER LENGTH GRANULARITY
+				response.data.first[7] = 0;
+				// ... set all to 'not set'
+			}
+			else {  // PageCode not supported
+				response.sense_data = {
+					0x72,  // current errors
+					0x05,  // key: illegal request
+					0x24,  // ASC: invalid field in cdb
+					0x00,  // ASQ: -
+					0x00, 0x00, 0x00,  // reserved
+					0x00  // additional sense length
+				};
+			}
 		}
 	}
 	else if (opcode == o_read_capacity_10) {
