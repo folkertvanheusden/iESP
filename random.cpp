@@ -13,9 +13,10 @@ void my_getrandom(void *const tgt, const size_t n)
 		if (rc == -1) {
 			// TODO
 		}
-
-		workp += rc;
-		todo  -= rc;
+		else {
+			workp += rc;
+			todo  -= rc;
+		}
 	}
 }
 #else
