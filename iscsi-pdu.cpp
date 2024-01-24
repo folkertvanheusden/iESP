@@ -620,11 +620,9 @@ std::pair<const uint8_t *, std::size_t> iscsi_pdu_text_request::get()
 
 std::optional<iscsi_response_set> iscsi_pdu_text_request::get_response(const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
 {
-	auto parameters = static_cast<const iscsi_response_parameters_text_req *>(parameters_in);
-
 	iscsi_response_set response;
 	auto reply_pdu = new iscsi_pdu_text_reply();
-	if (reply_pdu->set(*this) == false) {
+	if (reply_pdu->set(*this, parameters_in) == false) {
 		delete reply_pdu;
 		return { };
 	}
@@ -645,7 +643,7 @@ iscsi_pdu_text_reply::~iscsi_pdu_text_reply()
 	delete [] text_reply_reply_data.first;
 }
 
-bool iscsi_pdu_text_reply::set(const iscsi_pdu_text_request & reply_to)
+bool iscsi_pdu_text_reply::set(const iscsi_pdu_text_request & reply_to, const iscsi_response_parameters *const parameters)
 {
 	const auto data = reply_to.get_data();
 	if (data.has_value() == false)
@@ -666,9 +664,10 @@ bool iscsi_pdu_text_reply::set(const iscsi_pdu_text_request & reply_to)
 		DOLOG(" text request, responding to: %s\n", kv.c_str());
 	}
 
+	auto *temp_parameters = reinterpret_cast<const iscsi_response_parameters_text_req *>(parameters);
 	const std::vector<std::string> kvs {
-		"TargetName=iqn.1993-11.com.vanheusden:test",
-		"TargetAddress=localhost",  // FIXME
+		"TargetName=iqn.1993-11.com.vanheusden:test",  // FIXME
+		"TargetAddress=" + temp_parameters->listen_ip,
 	};
 	auto temp = text_array_to_data(kvs);
 	text_reply_reply_data.first  = temp.first;

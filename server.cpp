@@ -12,7 +12,9 @@
 #include "utils.h"
 
 
-server::server(backend *const b) : b(b)
+server::server(backend *const b, const std::string & listen_ip, const int listen_port):
+	b(b),
+	listen_ip(listen_ip), listen_port(listen_port)
 {
 }
 
@@ -40,8 +42,10 @@ bool server::begin()
 
         sockaddr_in server_addr { };
         server_addr.sin_family = AF_INET;
-        server_addr.sin_port = htons(3260);
-	server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+        server_addr.sin_port = htons(listen_port);
+	if (inet_aton(listen_ip.c_str(), &reinterpret_cast<sockaddr_in *>(&server_addr)->sin_addr) == 0)
+		return false;
+
         if (bind(listen_fd, reinterpret_cast<sockaddr *>(&server_addr), sizeof server_addr) == -1)
 		return false;
 
@@ -183,7 +187,7 @@ iscsi_response_parameters *server::select_parameters(iscsi_pdu_bhs *const pdu, s
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_nop_out:
 			return new iscsi_response_parameters_nop_out(ses);
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_text_req:
-			return new iscsi_response_parameters_text_req(ses);
+			return new iscsi_response_parameters_text_req(ses, listen_ip, listen_port);
 		default:
 			DOLOG("server::select_parameters: opcode %02xh not implemented\n", pdu->get_opcode());
 			break;

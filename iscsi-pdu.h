@@ -71,8 +71,12 @@ struct iscsi_response_parameters_login_req : public iscsi_response_parameters_bh
 
 struct iscsi_response_parameters_text_req : public iscsi_response_parameters_bhs
 {
-	iscsi_response_parameters_text_req(session *const ses) :
-		iscsi_response_parameters_bhs(ses) {
+	const std::string listen_ip;
+	const int         listen_port;
+
+	iscsi_response_parameters_text_req(session *const ses, const std::string & listen_ip, const int listen_port) :
+		iscsi_response_parameters_bhs(ses),
+		listen_ip(listen_ip), listen_port(listen_port) {
 	}
 };
 
@@ -586,6 +590,6 @@ public:
 	iscsi_pdu_text_reply();
 	virtual ~iscsi_pdu_text_reply();
 
-	bool set(const iscsi_pdu_text_request & reply_to);
+	bool set(const iscsi_pdu_text_request & reply_to, const iscsi_response_parameters *const parameters);
 	std::pair<const uint8_t *, std::size_t> get() override;
 };
