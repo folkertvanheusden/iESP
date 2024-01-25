@@ -463,7 +463,7 @@ bool iscsi_pdu_scsi_data_in::set(const iscsi_pdu_scsi_cmd & reply_to, const std:
 	*pdu_data_in = { };
 	pdu_data_in->opcode     = o_scsi_data_in;  // 0x25
 	pdu_data_in->F          = true;
-	pdu_data_in->S          = true;  // TODO: 'is_meta'?
+	pdu_data_in->S          = is_meta;
 	pdu_data_in->datalenH   = scsi_reply_data.second >> 16;
 	pdu_data_in->datalenM   = scsi_reply_data.second >>  8;
 	pdu_data_in->datalenL   = scsi_reply_data.second      ;
