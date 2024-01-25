@@ -349,8 +349,8 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(const iscsi_r
 	}
 
 	iscsi_pdu_bhs *pdu_scsi_response = nullptr;
-	if (scsi_reply.value().type == ir_as_is) {
-		if (scsi_reply.value().sense_data.empty() == false) {
+	if (scsi_reply.value().type == ir_as_is || scsi_reply.value().type == ir_empty_sense) {
+		if (scsi_reply.value().sense_data.empty() == false || scsi_reply.value().type == ir_empty_sense) {
 			auto *temp = new iscsi_pdu_scsi_response() /* 0x21 */;
 			DOLOG("iscsi_pdu_scsi_cmd::get_response: sending SCSI response with %zu sense bytes\n", scsi_reply.value().sense_data.size());
 
@@ -370,10 +370,6 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(const iscsi_r
 			DOLOG("iscsi_pdu_scsi_cmd::get_response: iscsi_pdu_scsi_response::set returned error\n");
 		}
 		pdu_scsi_response = temp;
-	}
-	else {
-		DOLOG("iscsi_pdu_scsi_cmd::get_response: internal error\n");
-		ok = false;
 	}
 	if (pdu_scsi_response)
 		response.responses.push_back(pdu_scsi_response);
@@ -431,7 +427,8 @@ bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std
 		pdu_response_data.first    = new uint8_t[pdu_response_data.second]();
 		pdu_response_data.first[0] = sense_data_size >> 8;
 		pdu_response_data.first[1] = sense_data_size;
-		memcpy(pdu_response_data.first + 2, scsi_sense_data.data(), sense_data_size);
+		if (sense_data_size)
+			memcpy(pdu_response_data.first + 2, scsi_sense_data.data(), sense_data_size);
 	}
 
 	return true;
@@ -479,8 +476,10 @@ bool iscsi_pdu_scsi_data_in::set(const iscsi_pdu_scsi_cmd & reply_to, const std:
 	pdu_data_in->ResidualCt = 0;
 
 	pdu_data_in_data.second = scsi_reply_data.second;
-	pdu_data_in_data.first  = new uint8_t[pdu_data_in_data.second]();
-	memcpy(pdu_data_in_data.first, scsi_reply_data.first, pdu_data_in_data.second);
+	if (pdu_data_in_data.second) {
+		pdu_data_in_data.first  = new uint8_t[pdu_data_in_data.second]();
+		memcpy(pdu_data_in_data.first, scsi_reply_data.first, pdu_data_in_data.second);
+	}
 
 	return true;
 }
@@ -490,7 +489,8 @@ std::pair<const uint8_t *, std::size_t> iscsi_pdu_scsi_data_in::get()
 	size_t out_size = sizeof(*pdu_data_in) + pdu_data_in_data.second;
 	uint8_t *out = new uint8_t[out_size];
 	memcpy(out, pdu_data_in, sizeof *pdu_data_in);
-	memcpy(&out[sizeof(*pdu_data_in)], pdu_data_in_data.first, pdu_data_in_data.second);
+	if (pdu_data_in_data.second)
+		memcpy(&out[sizeof(*pdu_data_in)], pdu_data_in_data.first, pdu_data_in_data.second);
 
 	return { out, out_size };
 }

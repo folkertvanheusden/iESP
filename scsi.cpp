@@ -30,6 +30,8 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 	response.data_is_meta = true;
 
 	if (opcode == o_test_unit_ready) {
+		DOLOG("scsi::send: TEST UNIT READY\n");
+		response.type = ir_empty_sense;
 	}
 	else if (opcode == o_inquiry) {  // 0x12
 		DOLOG("scsi::send: INQUIRY\n");
