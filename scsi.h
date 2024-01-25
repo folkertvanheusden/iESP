@@ -34,6 +34,7 @@ public:
 		o_write            = 0x0a,
 		o_seek             = 0x0b,
 		o_inquiry          = 0x12,
+		o_mode_sense_6     = 0x1a,
 		o_read_capacity_10 = 0x25,
 		o_write_10         = 0x2a,
 		o_read_16          = 0x88,

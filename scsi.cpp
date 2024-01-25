@@ -33,6 +33,22 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		DOLOG("scsi::send: TEST UNIT READY\n");
 		response.type = ir_empty_sense;
 	}
+	else if (opcode == o_mode_sense_6) {  // 0x1a
+		DOLOG("scsi::send: MODE SENSE 6\n");
+		if (CDB[1] & 8)
+			DOLOG(" MODE SENSE 6: DBD\n");
+		int pc = CDB[2] >> 6;
+		const char *const pagecodes[] { "current values", "changeable values", "default values", "saved values " };
+		DOLOG(" MODE SENSE 6: PAGE CODE %s\n", pagecodes[pc]);
+		DOLOG(" MODE SENSE 6: SUBPAGE CODE %02xh\n", CDB[3]);
+		DOLOG(" MODE SENSE 6: AllocationLength: %d\n", CDB[4]);
+		response.data.second = 4;
+		response.data.first = new uint8_t[response.data.second]();
+		response.data.first[0] = 0;
+		response.data.first[1] = 0;  // SUBPAGE
+		response.data.first[2] = 0;  // PAGE LENGTH
+		response.data.first[3] = 0;
+	}
 	else if (opcode == o_inquiry) {  // 0x12
 		DOLOG("scsi::send: INQUIRY\n");
 		if (CDB[1] & 1) {
