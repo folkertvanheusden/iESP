@@ -199,15 +199,26 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 			response.type = ir_r2t;  // allow R2T packets to come in
 		}
 	}
-	else if (opcode == o_read_16) {  // 0x88
-		uint64_t lba = (uint64_t(CDB[2]) << 56) | (uint64_t(CDB[3]) << 48) | (uint64_t(CDB[4]) << 40) | (uint64_t(CDB[5]) << 32) | (CDB[6] << 24) | (CDB[7] << 16) | (CDB[8] << 8) | CDB[9];
-		uint32_t transfer_length = (CDB[10] << 24) | (CDB[11] << 16) | (CDB[12] << 8) | CDB[13];
+	else if (opcode == o_read_16 || opcode == o_read_6) {  // 0x88, 0x08
+		uint64_t lba             = 0;
+		uint32_t transfer_length = 0;
 
-		DOLOG("scsi::send: READ_16, offset %llu, %u sectors\n", lba, transfer_length);
+		if (opcode == o_read_16) {
+			lba             = (uint64_t(CDB[2]) << 56) | (uint64_t(CDB[3]) << 48) | (uint64_t(CDB[4]) << 40) | (uint64_t(CDB[5]) << 32) | (CDB[6] << 24) | (CDB[7] << 16) | (CDB[8] << 8) | CDB[9];
+			transfer_length = (CDB[10] << 24) | (CDB[11] << 16) | (CDB[12] << 8) | CDB[13];
+			DOLOG("scsi::send: READ_16, offset %llu, %u sectors\n", lba, transfer_length);
+		}
+		else {
+			lba             = ((CDB[1] & 31) << 16) | (CDB[2] << 8) | CDB[3];
+			transfer_length = CDB[4];
+			DOLOG("scsi::send: READ_6, offset %llu, %u sectors\n", lba, transfer_length);
+		}
 
 		response.data.second = transfer_length * b->get_block_size();
-		response.data.first = new uint8_t[response.data.second]();
-		b->read(lba, transfer_length, response.data.first);
+		if (response.data.second) {
+			response.data.first = new uint8_t[response.data.second]();
+			b->read(lba, transfer_length, response.data.first);
+		}
 		response.data_is_meta = false;
 	}
 	else if (opcode == o_report_luns) {  // 0xA0

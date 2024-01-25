@@ -30,7 +30,7 @@ public:
 	enum scsi_opcode {
 		o_test_unit_ready  = 0x00,
 		o_request_sense    = 0x02,
-		o_read             = 0x08,
+		o_read_6           = 0x08,
 		o_write            = 0x0a,
 		o_seek             = 0x0b,
 		o_inquiry          = 0x12,

@@ -336,7 +336,7 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(const iscsi_r
 
 	if (scsi_reply.value().data.second) {
 		auto pdu_data_in = new iscsi_pdu_scsi_data_in();  // 0x25
-		DOLOG("iscsi_pdu_scsi_cmd::get_response: sending SCSI DATA-IN with %zu payload bytes\n", scsi_reply.value().data.second);
+		DOLOG("iscsi_pdu_scsi_cmd::get_response: sending SCSI DATA-IN with %zu payload bytes, is meta: %d\n", scsi_reply.value().data.second, scsi_reply.value().data_is_meta);
 		if (pdu_data_in->set(*this, scsi_reply.value().data, scsi_reply.value().data_is_meta) == false) {
 			ok = false;
 			DOLOG("iscsi_pdu_scsi_cmd::get_response: iscsi_pdu_scsi_data_in::set returned error state\n");
@@ -463,7 +463,7 @@ bool iscsi_pdu_scsi_data_in::set(const iscsi_pdu_scsi_cmd & reply_to, const std:
 	*pdu_data_in = { };
 	pdu_data_in->opcode     = o_scsi_data_in;  // 0x25
 	pdu_data_in->F          = true;
-	pdu_data_in->S          = is_meta;
+	pdu_data_in->S          = true;  // TODO: 'is_meta'?
 	pdu_data_in->datalenH   = scsi_reply_data.second >> 16;
 	pdu_data_in->datalenM   = scsi_reply_data.second >>  8;
 	pdu_data_in->datalenL   = scsi_reply_data.second      ;
