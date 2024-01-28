@@ -43,3 +43,17 @@ std::pair<uint8_t *, size_t> text_array_to_data(const std::vector<std::string> &
 
 	return { p, len };
 }
+
+void set_bits(uint8_t *const target, const int bit_nr, const int length, const uint8_t value)
+{
+	uint16_t max_value = (1 << length) - 1;
+	assert(value <= max_value);
+	(*target) &= ~(max_value << bit_nr);
+	(*target) |= value << bit_nr;
+}
+
+uint8_t get_bits(const uint8_t from, const int bit_nr, const int length)
+{
+	uint16_t mask = (1 << length) - 1;
+	return (from >> bit_nr) & mask; 
+}

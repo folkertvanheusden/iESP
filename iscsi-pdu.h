@@ -7,6 +7,7 @@
 #include <arpa/inet.h>
 #include <sys/types.h>
 
+#include "iscsi.h"
 #include "session.h"
 
 
@@ -106,9 +107,10 @@ protected:
 
 private:
 	struct __bhs__ {
-		uint8_t  opcode    :  6;
-		bool     I         :  1;
-		bool     filler    :  1;
+		uint8_t  b1;
+		// uint8_t  opcode    :  6;
+		// bool     I         :  1;
+		// bool     filler    :  1;
 
 		uint32_t ospecf    : 24;  // opcode specific fields: TODO bit F!
 
@@ -160,7 +162,7 @@ public:
 	size_t           get_ahs_length()  const { return bhs->ahslen;         }
 	bool             set_ahs_segment(std::pair<const uint8_t *, std::size_t> ahs_in);
 
-	iscsi_bhs_opcode get_opcode()      const { return iscsi_bhs_opcode(bhs->opcode); }
+	iscsi_bhs_opcode get_opcode()      const { return iscsi_bhs_opcode(get_bits(bhs->b1, 0, 6)); }
 	size_t           get_data_length() const { return (bhs->datalenH << 16) | (bhs->datalenM << 8) | bhs->datalenL; }
 	std::optional<std::pair<uint8_t *, size_t> > get_data() const;
 	bool             set_data(std::pair<const uint8_t *, std::size_t> data_in);
@@ -180,15 +182,17 @@ class iscsi_pdu_login_request : public iscsi_pdu_bhs  // login request 0x03
 {
 public:
 	struct __login_req__ {
-		uint8_t  opcode    :  6;
-		bool     I_is_1    :  1;
-		bool     filler    :  1;
+		uint8_t  b1;
+		// uint8_t  opcode    :  6;
+		// bool     I_is_1    :  1;
+		// bool     filler    :  1;  // bit 7
 
-		uint8_t  NSG       :  2;
-		uint8_t  CSG       :  2;
-		uint8_t  filler2   :  2;
-		bool     C         :  1;
-		bool     T         :  1;
+		uint8_t  b2;
+		// uint8_t  NSG       :  2;
+		// uint8_t  CSG       :  2;
+		// uint8_t  filler2   :  2;
+		// bool     C         :  1;
+		// bool     T         :  1;  // bit 7
 
 		uint8_t  versionmax:  8;
 		uint8_t  versionmin:  8;
@@ -219,10 +223,10 @@ public:
 	      uint16_t get_CID()        const { return login_req->CID;          }
 	      uint32_t get_CmdSN()      const { return ntohl(login_req->CmdSN); }
 	      uint16_t get_TSIH()       const { return login_req->TSIH;         }
-	      bool     get_T()          const { return login_req->T;            }
-	      bool     get_C()          const { return login_req->C;            }
-	      uint8_t  get_CSG()        const { return login_req->CSG;          }
-	      uint8_t  get_NSG()        const { return login_req->NSG;          }
+	      bool     get_T()          const { return get_bits(login_req->b2, 7, 1); }
+	      bool     get_C()          const { return get_bits(login_req->b2, 6, 1); }
+	      uint8_t  get_CSG()        const { return get_bits(login_req->b2, 2, 2); }
+	      uint8_t  get_NSG()        const { return get_bits(login_req->b2, 0, 2); }
 	      uint8_t  get_versionmin() const { return login_req->versionmin;   }
 	      uint32_t get_Itasktag()   const { return login_req->Itasktag;     }
 	      uint32_t get_ExpStatSN()  const { return ntohl(login_req->ExpStatSN); }
@@ -234,15 +238,17 @@ class iscsi_pdu_login_reply : public iscsi_pdu_bhs
 {
 public:
 	struct __login_reply__ {
-		uint8_t  opcode    :  6;  // 0x23
-		bool     filler1   :  1;
-		bool     filler0   :  1;
+		uint8_t  b1;
+		// uint8_t  opcode    :  6;  // 0x21
+		// bool     filler1   :  1;
+		// bool     filler0   :  1;  // bit 7
 
-		uint8_t  NSG       :  2;
-		uint8_t  CSG       :  2;
-		uint8_t  filler2   :  2;
-		bool     C         :  1;
-		bool     T         :  1;
+		uint8_t  b2;
+		// uint8_t  NSG       :  2;
+		// uint8_t  CSG       :  2;
+		// uint8_t  filler2   :  2;
+		// bool     C         :  1;
+		// bool     T         :  1;  // bit 7
 
 		uint8_t  versionmax:  8;
 		uint8_t  versionact:  8;
@@ -279,15 +285,17 @@ class iscsi_pdu_scsi_cmd : public iscsi_pdu_bhs  // 0x01
 {
 public:
 	struct __cdb_pdu_req__ {
-		uint8_t  opcode    :  6;
-		bool     I         :  1;
-		bool     filler1   :  1;
+		uint8_t  b1;
+		// uint8_t  opcode    :  6;
+		// bool     I         :  1;
+		// bool     filler1   :  1;  // bit 7
 
-		uint8_t  ATTR      :  3;
-		uint8_t  filler2   :  2;
-		bool     W         :  1;
-		bool     R         :  1;
-		bool     F         :  1;
+		uint8_t  b2;
+		// uint8_t  ATTR      :  3;
+		// uint8_t  filler2   :  2;
+		// bool     W         :  1;
+		// bool     R         :  1;
+		// bool     F         :  1;  // bit 7
 
 		uint16_t reserved  : 16;
 		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
@@ -324,17 +332,19 @@ class iscsi_pdu_scsi_response : public iscsi_pdu_bhs  // 0x21
 {
 public:
 	struct __pdu_response__ {
-		uint8_t  opcode    :  6;
-		bool     reserved1 :  1;
-		bool     reserved0 :  1;
+		uint8_t  b1;
+		// uint8_t  opcode    :  6;
+		// bool     reserved1 :  1;
+		// bool     reserved0 :  1;  // bit 7
 
-		bool     reserved3 :  1;
-		bool     U         :  1;
-		bool     O         :  1;
-		bool     u         :  1;
-		bool     o         :  1;
-		uint8_t  reserved2 :  2;
-		bool     set_to_1  :  1;  // 1
+		uint8_t  b2;
+		// bool     reserved3 :  1;
+		// bool     U         :  1;
+		// bool     O         :  1;
+		// bool     u         :  1;
+		// bool     o         :  1;
+		// uint8_t  reserved2 :  2;
+		// bool     set_to_1  :  1;  // 1, bit 7
 
 		uint8_t  response  :  8;
 		uint8_t  status    :  8;
@@ -369,18 +379,20 @@ class iscsi_pdu_scsi_data_in : public iscsi_pdu_bhs  // 0x25
 {
 public:
 	struct __pdu_data_in__ {
-		uint8_t  opcode    :  6;
-		bool     reserved1 :  1;
-		bool     reserved0 :  1;
+		uint8_t  b1;
+		// uint8_t  opcode    :  6;
+		// bool     reserved1 :  1;
+		// bool     reserved0 :  1;  // bit 7
 
-		bool     S         :  1;
-		bool     U         :  1;
-		bool     O         :  1;
-		bool     reserved5 :  1;
-		bool     reserved4 :  1;
-		bool     reserved3 :  1;
-		bool     A         :  1;
-		bool     F         :  1;
+		uint8_t  b2;
+		// bool     S         :  1;
+		// bool     U         :  1;
+		// bool     O         :  1;
+		// bool     reserved5 :  1;
+		// bool     reserved4 :  1;
+		// bool     reserved3 :  1;
+		// bool     A         :  1;
+		// bool     F         :  1;  // bit 7
 
 		uint8_t  reserved6 :  8;
 		uint8_t  status    :  8;
@@ -417,12 +429,12 @@ class iscsi_pdu_nop_out : public iscsi_pdu_bhs  // NOP-Out  0x00
 {
 public:
 	struct __nop_out__ {
-		uint8_t  opcode    :  6;
-		bool     I         :  1;
-		bool     filler1   :  1;
+		uint8_t  b1;
+		// uint8_t  opcode    :  6;
+		// bool     I         :  1;
+		// bool     filler1   :  1;  // bit 7
 
-		uint8_t  filler2   :  7;  // opcode specific fields
-		bool     set_to_1  :  1;
+		uint8_t  b2;  // bit7 is 1
 		uint16_t filler3   :  16;
 
 		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
@@ -456,12 +468,12 @@ class iscsi_pdu_nop_in : public iscsi_pdu_bhs  // NOP-In
 {
 public:
 	struct __nop_in__ {
-		uint8_t  opcode    :  6;  // 0x20
-		bool     filler0   :  1;
-		bool     filler1   :  1;
-		uint8_t  filler2   :  7;  // opcode specific fields
-		bool     set_to_1  :  1;
-		uint16_t filler3   :  16;
+		uint8_t  b1;
+		// uint8_t  opcode    :  6;
+		// bool     reserved1 :  1;
+		// bool     reserved0 :  1;  // bit 7
+		uint8_t  b2;  // bit 7 is 1
+		uint16_t filler3;
 		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
 		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
 		uint32_t datalenM  :  8;  // data segment length (bytes, excluding padding) 15...8
@@ -489,11 +501,13 @@ class iscsi_pdu_scsi_r2t : public iscsi_pdu_bhs  // 0x31
 {
 public:
 	struct __pdu_scsi_r2t__ {
-		uint8_t  opcode    :  6;
-		bool     reserved1 :  1;
-		bool     reserved0 :  1;
+		uint8_t  b1;
+		// uint8_t  opcode    :  6;
+		// bool     reserved1 :  1;
+		// bool     reserved0 :  1;  // bit 7
 
-		uint32_t filler3   :  24;
+		uint8_t  b2;  // bit 7 is 1
+		uint16_t filler3;
 
 		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
 		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
@@ -526,13 +540,16 @@ class iscsi_pdu_text_request : public iscsi_pdu_bhs  // text request 0x04
 {
 public:
 	struct __text_req__ {
-		uint8_t  opcode    :  6;
-		bool     I_is_1    :  1;
-		bool     filler    :  1;
+		uint8_t  b1;
+		// uint8_t  opcode    :  6;
+		// bool     I_is_1    :  1;
+		// bool     filler    :  1;  // bit 7
 
-		uint32_t filler2   :  22;
-		bool     C         :  1;
-		bool     F         :  1;
+		uint8_t  b2;
+		// 6 bit filler
+		// bool     C         :  1;
+		// bool     F         :  1;  // bit 7
+		uint16_t filler2   :  16;
 
 		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
 		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
@@ -568,14 +585,15 @@ class iscsi_pdu_text_reply : public iscsi_pdu_bhs  // 0x24
 {
 public:
 	struct __text_reply__ {
-		uint8_t  opcode    :  6;
-		bool     filler0   :  1;
-		bool     filler1   :  1;
+		uint8_t  b1;
+		// uint8_t  opcode    :  6;
+		// bool     filler    :  2;  // bit 7
 
-		uint8_t  filler2a  :  6;
-		bool     C         :  1;
-		bool     F         :  1;
-		uint16_t  filler2b :  16;
+		uint8_t  b2;
+		// 6 bit filler
+		// bool     C         :  1;
+		// bool     F         :  1;  // bit 7
+		uint16_t filler2   :  16;
 
 		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
 		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
@@ -606,13 +624,13 @@ class iscsi_pdu_logout_request : public iscsi_pdu_bhs  // logout request 0x06
 {
 public:
 	struct __logout_req__ {
-		uint8_t  opcode    :  6;  // 0x06
-		bool     filler1   :  1;
-		bool     filler0   :  1;
+		uint8_t  b1;
+		// uint8_t  opcode    :  6;  // 0x06
+		// bool     filler1   :  1;
+		// bool     filler0   :  1;  // bit 7
 
-		uint8_t  reasoncode:  7;
-		bool     set_to_1  :  1;
-		uint16_t filler2   :  16;
+		uint8_t  b2;  // bit 7 is 1, 6...0 is reason code
+		uint16_t filler1_2;
 
 		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
 		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
@@ -646,15 +664,14 @@ class iscsi_pdu_logout_reply : public iscsi_pdu_bhs
 {
 public:
 	struct __logout_reply__ {
-		uint8_t  opcode    :  6;  // 0x26
-		bool     filler1   :  1;
-		bool     filler0   :  1;
+		uint8_t  b1;
+		// uint8_t  opcode    :  6;  // 0x26
+		// bool     filler1   :  1;
+		// bool     filler0   :  1;  // bit 7
 
-		uint8_t  filler2a  :  7;
-		bool     set_to_1  :  1;
-		uint8_t  response  :  8;
-		uint8_t  filler2b  :  8;
-
+		uint8_t  b2;  // bit 7 is 1
+		uint8_t  response;
+		uint8_t  filler2;
 		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
 		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
 		uint32_t datalenM  :  8;  // data segment length (bytes, excluding padding) 15...8
