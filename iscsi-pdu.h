@@ -423,7 +423,9 @@ public:
 	__pdu_data_in__ *pdu_data_in __attribute__((packed)) { reinterpret_cast<__pdu_data_in__ *>(pdu_bytes) };
 	std::pair<uint8_t *, size_t> pdu_data_in_data { nullptr, 0 };
 
+private:
 	iscsi_pdu_scsi_cmd reply_to_copy;
+	session           *s { nullptr };
 
 public:
 	iscsi_pdu_scsi_data_in();

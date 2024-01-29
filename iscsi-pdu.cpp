@@ -484,6 +484,8 @@ bool iscsi_pdu_scsi_data_in::set(session *const s, const iscsi_pdu_scsi_cmd & re
 {
 	DOLOG("iscsi_pdu_scsi_data_in::set: with %zu payload bytes, has_sense: %d\n", scsi_reply_data.second, has_sense);
 
+	this->s = s;
+
 	auto temp = reply_to.get_raw();
 	reply_to_copy.set(s, temp.data, temp.n);
 	delete [] temp.data;
@@ -507,8 +509,9 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get()
 	for(size_t i=0, count=0; i<pdu_data_in_data.second; i += 4096, count++) {  // 4kB blocks
 		*pdu_data_in = { };
 		set_bits(&pdu_data_in->b1, 0, 6, o_scsi_data_in);  // 0x25
-		set_bits(&pdu_data_in->b2, 7, 1, count == n_to_do - 1);  // F
-		set_bits(&pdu_data_in->b2, 0, 1, count == n_to_do - 1);  // S
+		bool last_block = count == n_to_do - 1;
+		set_bits(&pdu_data_in->b2, 7, 1, last_block);  // F
+		set_bits(&pdu_data_in->b2, 0, 1, last_block);  // S
 		size_t cur_len = std::min(pdu_data_in_data.second - i, size_t(4096));
 		pdu_data_in->datalenH   = cur_len >> 16;
 		pdu_data_in->datalenM   = cur_len >>  8;
@@ -518,7 +521,7 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get()
 		pdu_data_in->StatSN     = htonl(reply_to_copy.get_ExpStatSN());
 		pdu_data_in->ExpCmdSN   = htonl(reply_to_copy.get_CmdSN() + 1);
 		pdu_data_in->MaxCmdSN   = htonl(reply_to_copy.get_CmdSN() + 128);
-		pdu_data_in->DataSN     = htonl(count++);  // TODO
+		pdu_data_in->DataSN     = htonl(s->get_inc_datasn(reply_to_copy.get_Itasktag()));
 		pdu_data_in->ResidualCt = 0;
 
 		size_t out_size = sizeof(*pdu_data_in) + pdu_data_in_data.second;
