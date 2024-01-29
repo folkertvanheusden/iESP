@@ -63,7 +63,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		if ((CDB[1] & 1) == 0) {
 			response.data.second = 66;
 			response.data.first = new uint8_t[response.data.second]();
-			response.data.first[0] = 0x0c;  // Peripheral: 0x0c, Qualifier: Device type is connected to logical unit, Device Type: Storage Array
+			response.data.first[0] = 0x00;  // "Direct access block device"
 			response.data.first[1] = 0;  // not removable
 			response.data.first[2] = 5;  // VERSION
 			response.data.first[3] = 2;  // response data format
