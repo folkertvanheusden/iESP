@@ -1,6 +1,7 @@
 #ifdef ESP32
 #include <Arduino.h>
 #endif
+#include <cassert>
 #include <cstdint>
 #include <cstdio>
 #include <unistd.h>
@@ -173,7 +174,10 @@ bool server::push_response(const int fd, iscsi_pdu_bhs *const pdu, iscsi_respons
 			DOLOG("server::push_response: PDU did not emit data bundle\n");
 		}
 
+		assert((iscsi_reply.second & 3) == 0);
+
 		if (ok) {
+			printf("SENDING %zu bytes\n", iscsi_reply.second);
 			ok = WRITE(fd, iscsi_reply.first, iscsi_reply.second) != -1;
 			if (!ok)
 				DOLOG("server::push_response: sending PDU to peer failed\n");

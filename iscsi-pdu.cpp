@@ -403,7 +403,9 @@ iscsi_pdu_scsi_response::~iscsi_pdu_scsi_response()
 bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std::vector<uint8_t> & scsi_sense_data)
 {
 	size_t sense_data_size = scsi_sense_data.size();
+	printf("sense_data_size: %zu\n", sense_data_size);
 	size_t reply_data_plus_sense_header = sense_data_size > 0 ? 2 + sense_data_size : 0;
+	printf("reply_data_plus_sense_header: %zu\n", reply_data_plus_sense_header);
 
 	*pdu_response = { };
 	set_bits(&pdu_response->b1, 0, 6, o_scsi_resp);  // 0x21
@@ -424,16 +426,15 @@ bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std
 
 	pdu_response_data.second = reply_data_plus_sense_header;
 	if (pdu_response_data.second) {
+		DOLOG("---------------- CHECK CONDITION\n");
 		pdu_response->status       = 0x02;  // check condition
 		pdu_response->response     = 0x01;  // target failure
 		pdu_response->ExpDataSN    = 0;
-		DOLOG("---------------- CHECK CONDITION\n");
 
 		pdu_response_data.first    = new uint8_t[pdu_response_data.second]();
 		pdu_response_data.first[0] = sense_data_size >> 8;
 		pdu_response_data.first[1] = sense_data_size;
-		if (sense_data_size)
-			memcpy(pdu_response_data.first + 2, scsi_sense_data.data(), sense_data_size);
+		memcpy(pdu_response_data.first + 2, scsi_sense_data.data(), sense_data_size);
 	}
 
 	return true;
@@ -442,6 +443,7 @@ bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std
 std::pair<const uint8_t *, std::size_t> iscsi_pdu_scsi_response::get()
 {
 	size_t out_size = sizeof(*pdu_response) + pdu_response_data.second;
+	out_size = (out_size + 3) & ~3;
 	uint8_t *out = new uint8_t[out_size]();
 	memcpy(out, pdu_response, sizeof *pdu_response);
 	memcpy(&out[sizeof *pdu_response], pdu_response_data.first, pdu_response_data.second);
@@ -463,7 +465,7 @@ iscsi_pdu_scsi_data_in::~iscsi_pdu_scsi_data_in()
 
 bool iscsi_pdu_scsi_data_in::set(const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data, const bool is_meta)
 {
-	DOLOG("iscsi_pdu_scsi_data_in::set: with %zu payload bytes\n", scsi_reply_data.second);
+	DOLOG("iscsi_pdu_scsi_data_in::set: with %zu payload bytes, is_meta: %d\n", scsi_reply_data.second, is_meta);
 
 	*pdu_data_in = { };
 	set_bits(&pdu_data_in->b1, 0, 6, o_scsi_data_in);  // 0x25
@@ -492,6 +494,7 @@ bool iscsi_pdu_scsi_data_in::set(const iscsi_pdu_scsi_cmd & reply_to, const std:
 std::pair<const uint8_t *, std::size_t> iscsi_pdu_scsi_data_in::get()
 {
 	size_t out_size = sizeof(*pdu_data_in) + pdu_data_in_data.second;
+	out_size = (out_size + 3) & ~3;
 	uint8_t *out = new uint8_t[out_size]();
 	memcpy(out, pdu_data_in, sizeof *pdu_data_in);
 	if (pdu_data_in_data.second)
