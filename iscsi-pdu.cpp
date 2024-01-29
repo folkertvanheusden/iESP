@@ -53,6 +53,13 @@ iscsi_pdu_bhs::~iscsi_pdu_bhs()
 		delete ahs;
 }
 
+std::vector<blob_t> iscsi_pdu_bhs::return_helper(void *const data, size_t n)
+{
+	std::vector<blob_t> out;
+	out.push_back({ reinterpret_cast<uint8_t *>(data), n });
+	return out;
+}
+
 bool iscsi_pdu_bhs::set(session *const s, const uint8_t *const in, const size_t n)
 {
 	if (n != 48)
@@ -110,12 +117,12 @@ std::optional<std::pair<uint8_t *, size_t> > iscsi_pdu_bhs::get_data() const
 	return { { out, data.second } };
 }
 
-std::pair<const uint8_t *, std::size_t> iscsi_pdu_bhs::get()
+std::vector<blob_t> iscsi_pdu_bhs::get()
 {
 	void *out = new uint8_t[sizeof *bhs]();
 	memcpy(out, &bhs, sizeof *bhs);
 
-	return { reinterpret_cast<const uint8_t *>(out), sizeof *bhs };
+	return return_helper(out, sizeof *bhs);
 }
 
 std::optional<iscsi_response_set> iscsi_pdu_bhs::get_response(const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
@@ -153,14 +160,14 @@ bool iscsi_pdu_ahs::set(const uint8_t *const in, const size_t n)
 	return true;
 }
 
-std::pair<const uint8_t *, std::size_t> iscsi_pdu_ahs::get()
+blob_t iscsi_pdu_ahs::get()
 {
 	uint16_t expected_size = ntohs(reinterpret_cast<const __ahs_header__ *>(ahs)->length);
 	uint32_t out_size      = sizeof(__ahs_header__) + expected_size;
-	void *out = new uint8_t[out_size]();
+	uint8_t *out = new uint8_t[out_size]();
 	memcpy(out, ahs, out_size);
 
-	return { reinterpret_cast<const uint8_t *>(out), out_size };
+	return { out, out_size };
 }
 
 /*--------------------------------------------------------------------------*/
@@ -186,12 +193,12 @@ bool iscsi_pdu_login_request::set(session *const s, const uint8_t *const in, con
 	return true;
 }
 
-std::pair<const uint8_t *, std::size_t> iscsi_pdu_login_request::get()
+std::vector<blob_t> iscsi_pdu_login_request::get()
 {
 	void *out = new uint8_t[sizeof *login_req]();
 	memcpy(out, login_req, sizeof *login_req);
 
-	return { reinterpret_cast<const uint8_t *>(out), sizeof *login_req };
+	return return_helper(out, sizeof *login_req);
 }
 
 std::optional<iscsi_response_set> iscsi_pdu_login_request::get_response(const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
@@ -279,7 +286,7 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 	return true;
 }
 
-std::pair<const uint8_t *, std::size_t> iscsi_pdu_login_reply::get()
+std::vector<blob_t> iscsi_pdu_login_reply::get()
 {
 	// round for padding
 	size_t data_size_padded = (login_reply_reply_data.second + 3) & ~3;
@@ -290,7 +297,7 @@ std::pair<const uint8_t *, std::size_t> iscsi_pdu_login_reply::get()
 	memcpy(&out[sizeof *login_reply], login_reply_reply_data.first, login_reply_reply_data.second);
 
 	assert((out_size & ~3) == out_size);
-	return { out, out_size };
+	return return_helper(out, out_size);
 }
 
 /*--------------------------------------------------------------------------*/
@@ -316,12 +323,13 @@ bool iscsi_pdu_scsi_cmd::set(session *const s, const uint8_t *const in, const si
 	return true;
 }
 
-std::pair<const uint8_t *, std::size_t> iscsi_pdu_scsi_cmd::get()
+std::vector<blob_t> iscsi_pdu_scsi_cmd::get()
 {
-	void *out = new uint8_t[sizeof cdb_pdu_req]();
+	size_t out_size = sizeof cdb_pdu_req;
+	void *out = new uint8_t[out_size]();
 	memcpy(out, &cdb_pdu_req, sizeof cdb_pdu_req);
 
-	return { reinterpret_cast<const uint8_t *>(out), sizeof cdb_pdu_req };
+	return return_helper(out, out_size);
 }
 
 std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
@@ -440,7 +448,7 @@ bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std
 	return true;
 }
 
-std::pair<const uint8_t *, std::size_t> iscsi_pdu_scsi_response::get()
+std::vector<blob_t> iscsi_pdu_scsi_response::get()
 {
 	size_t out_size = sizeof(*pdu_response) + pdu_response_data.second;
 	out_size = (out_size + 3) & ~3;
@@ -448,7 +456,7 @@ std::pair<const uint8_t *, std::size_t> iscsi_pdu_scsi_response::get()
 	memcpy(out, pdu_response, sizeof *pdu_response);
 	memcpy(&out[sizeof *pdu_response], pdu_response_data.first, pdu_response_data.second);
 
-	return { out, out_size };
+	return return_helper(out, out_size);
 }
 
 /*--------------------------------------------------------------------------*/
@@ -463,14 +471,14 @@ iscsi_pdu_scsi_data_in::~iscsi_pdu_scsi_data_in()
 	delete [] pdu_data_in_data.first;
 }
 
-bool iscsi_pdu_scsi_data_in::set(const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data, const bool is_meta)
+bool iscsi_pdu_scsi_data_in::set(const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data, const bool has_sense)
 {
-	DOLOG("iscsi_pdu_scsi_data_in::set: with %zu payload bytes, is_meta: %d\n", scsi_reply_data.second, is_meta);
+	DOLOG("iscsi_pdu_scsi_data_in::set: with %zu payload bytes, has_sense: %d\n", scsi_reply_data.second, has_sense);
 
 	*pdu_data_in = { };
 	set_bits(&pdu_data_in->b1, 0, 6, o_scsi_data_in);  // 0x25
 	set_bits(&pdu_data_in->b2, 7, 1, true);  // F
-	set_bits(&pdu_data_in->b2, 0, 1, is_meta);  // S
+	set_bits(&pdu_data_in->b2, 0, 1, true); //has_sense);  // S
 	pdu_data_in->datalenH   = scsi_reply_data.second >> 16;
 	pdu_data_in->datalenM   = scsi_reply_data.second >>  8;
 	pdu_data_in->datalenL   = scsi_reply_data.second      ;
@@ -491,7 +499,8 @@ bool iscsi_pdu_scsi_data_in::set(const iscsi_pdu_scsi_cmd & reply_to, const std:
 	return true;
 }
 
-std::pair<const uint8_t *, std::size_t> iscsi_pdu_scsi_data_in::get()
+// TODO: vector so that a reply can be consisting of multiple PDUs
+std::vector<blob_t> iscsi_pdu_scsi_data_in::get()
 {
 	size_t out_size = sizeof(*pdu_data_in) + pdu_data_in_data.second;
 	out_size = (out_size + 3) & ~3;
@@ -500,7 +509,7 @@ std::pair<const uint8_t *, std::size_t> iscsi_pdu_scsi_data_in::get()
 	if (pdu_data_in_data.second)
 		memcpy(&out[sizeof(*pdu_data_in)], pdu_data_in_data.first, pdu_data_in_data.second);
 
-	return { out, out_size };
+	return return_helper(out, out_size);
 }
 
 /*--------------------------------------------------------------------------*/
@@ -558,13 +567,13 @@ bool iscsi_pdu_nop_in::set(const iscsi_pdu_nop_out & reply_to)
 	return true;
 }
 
-std::pair<const uint8_t *, std::size_t> iscsi_pdu_nop_in::get()
+std::vector<blob_t> iscsi_pdu_nop_in::get()
 {
 	size_t out_size = sizeof *nop_in;
 	uint8_t *out = new uint8_t[out_size]();
 	memcpy(out, nop_in, sizeof *nop_in);
 
-	return { out, out_size };
+	return return_helper(out, out_size);
 }
 
 /*--------------------------------------------------------------------------*/
@@ -598,13 +607,13 @@ bool iscsi_pdu_scsi_r2t::set(const iscsi_pdu_scsi_cmd & reply_to, const uint32_t
 	return true;
 }
 
-std::pair<const uint8_t *, std::size_t> iscsi_pdu_scsi_r2t::get()
+std::vector<blob_t> iscsi_pdu_scsi_r2t::get()
 {
 	size_t out_size = sizeof *pdu_scsi_r2t;
 	uint8_t *out = new uint8_t[out_size]();
 	memcpy(out, pdu_scsi_r2t, sizeof *pdu_scsi_r2t);
 
-	return { out, out_size };
+	return return_helper(out, out_size);
 }
 
 /*--------------------------------------------------------------------------*/
@@ -630,12 +639,13 @@ bool iscsi_pdu_text_request::set(session *const s, const uint8_t *const in, cons
 	return true;
 }
 
-std::pair<const uint8_t *, std::size_t> iscsi_pdu_text_request::get()
+std::vector<blob_t> iscsi_pdu_text_request::get()
 {
-	void *out = new uint8_t[sizeof *text_req]();
+	size_t out_size = sizeof *text_req;
+	void *out = new uint8_t[out_size]();
 	memcpy(out, text_req, sizeof *text_req);
 
-	return { reinterpret_cast<const uint8_t *>(out), sizeof *text_req };
+	return return_helper(out, out_size);
 }
 
 std::optional<iscsi_response_set> iscsi_pdu_text_request::get_response(const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
@@ -709,7 +719,7 @@ bool iscsi_pdu_text_reply::set(const iscsi_pdu_text_request & reply_to, const is
 	return true;
 }
 
-std::pair<const uint8_t *, std::size_t> iscsi_pdu_text_reply::get()
+std::vector<blob_t> iscsi_pdu_text_reply::get()
 {
 	// round for padding
 	size_t data_size_padded = (text_reply_reply_data.second + 3) & ~3;
@@ -719,7 +729,7 @@ std::pair<const uint8_t *, std::size_t> iscsi_pdu_text_reply::get()
 	memcpy(out, text_reply, sizeof *text_reply);
 	memcpy(&out[sizeof *text_reply], text_reply_reply_data.first, text_reply_reply_data.second);
 
-	return { out, out_size };
+	return { { out, out_size } };
 }
 
 /*--------------------------------------------------------------------------*/
@@ -745,12 +755,13 @@ bool iscsi_pdu_logout_request::set(session *const s, const uint8_t *const in, co
 	return true;
 }
 
-std::pair<const uint8_t *, std::size_t> iscsi_pdu_logout_request::get()
+std::vector<blob_t> iscsi_pdu_logout_request::get()
 {
-	void *out = new uint8_t[sizeof *logout_req]();
+	size_t out_size = sizeof *logout_req;
+	void *out = new uint8_t[out_size]();
 	memcpy(out, logout_req, sizeof *logout_req);
 
-	return { reinterpret_cast<const uint8_t *>(out), sizeof *logout_req };
+	return return_helper(out, out_size);
 }
 
 std::optional<iscsi_response_set> iscsi_pdu_logout_request::get_response(const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
@@ -793,12 +804,12 @@ bool iscsi_pdu_logout_reply::set(const iscsi_pdu_logout_request & reply_to)
 	return true;
 }
 
-std::pair<const uint8_t *, std::size_t> iscsi_pdu_logout_reply::get()
+std::vector<blob_t> iscsi_pdu_logout_reply::get()
 {
 	size_t   out_size = sizeof(*logout_reply);
 	uint8_t *out      = new uint8_t[out_size]();
 	memcpy(out, logout_reply, sizeof *logout_reply);
 
-	return { out, out_size };
+	return { { out, out_size } };
 }
 

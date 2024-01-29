@@ -168,26 +168,27 @@ bool server::push_response(const int fd, iscsi_pdu_bhs *const pdu, iscsi_respons
 	bool ok = true;
 
 	for(auto & pdu_out: response_set.value().responses) {
-		auto iscsi_reply = pdu_out->get();
-		if (iscsi_reply.first == nullptr) {
-			ok = false;
-			DOLOG("server::push_response: PDU did not emit data bundle\n");
+		for(auto & blobs: pdu_out->get()) {
+			if (blobs.data == nullptr) {
+				ok = false;
+				DOLOG("server::push_response: PDU did not emit data bundle\n");
+			}
+
+			assert((blobs.n & 3) == 0);
+
+			if (ok) {
+				printf("SENDING %zu bytes\n", blobs.n);
+				ok = WRITE(fd, blobs.data, blobs.n) != -1;
+				if (!ok)
+					DOLOG("server::push_response: sending PDU to peer failed\n");
+			}
+
+			delete [] blobs.data;
+
+			delete pdu_out;
+
+			DOLOG(" ---\n");
 		}
-
-		assert((iscsi_reply.second & 3) == 0);
-
-		if (ok) {
-			printf("SENDING %zu bytes\n", iscsi_reply.second);
-			ok = WRITE(fd, iscsi_reply.first, iscsi_reply.second) != -1;
-			if (!ok)
-				DOLOG("server::push_response: sending PDU to peer failed\n");
-		}
-
-		delete [] iscsi_reply.first;
-
-		delete pdu_out;
-
-		DOLOG(" ---\n");
 	}
 
 	return ok;
