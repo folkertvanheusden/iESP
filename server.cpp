@@ -157,9 +157,9 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 	return pdu_obj;
 }
 
-bool server::push_response(const int fd, iscsi_pdu_bhs *const pdu, iscsi_response_parameters *const parameters)
+bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const pdu, iscsi_response_parameters *const parameters)
 {
-	auto response_set = pdu->get_response(parameters, pdu->get_data());
+	auto response_set = pdu->get_response(s, parameters, pdu->get_data());
 	if (response_set.has_value() == false) {
 		DOLOG("server::push_response: no response from PDU\n");
 		return false;
@@ -235,7 +235,7 @@ void server::handler()
 
 			auto parameters = select_parameters(pdu, s, &scsi_dev);
 			if (parameters) {
-				push_response(fd, pdu, parameters);
+				push_response(fd, s, pdu, parameters);
 				delete parameters;
 			}
 			else {

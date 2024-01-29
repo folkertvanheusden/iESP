@@ -125,7 +125,7 @@ std::vector<blob_t> iscsi_pdu_bhs::get()
 	return return_helper(out, sizeof *bhs);
 }
 
-std::optional<iscsi_response_set> iscsi_pdu_bhs::get_response(const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
+std::optional<iscsi_response_set> iscsi_pdu_bhs::get_response(session *const s, const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
 {
 	DOLOG("iscsi_pdu_bhs::get_response invoked!\n");
 	assert(0);
@@ -201,7 +201,7 @@ std::vector<blob_t> iscsi_pdu_login_request::get()
 	return return_helper(out, sizeof *login_req);
 }
 
-std::optional<iscsi_response_set> iscsi_pdu_login_request::get_response(const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
+std::optional<iscsi_response_set> iscsi_pdu_login_request::get_response(session *const s, const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
 {
 	auto parameters = static_cast<const iscsi_response_parameters_login_req *>(parameters_in);
 
@@ -332,7 +332,7 @@ std::vector<blob_t> iscsi_pdu_scsi_cmd::get()
 	return return_helper(out, out_size);
 }
 
-std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
+std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *const s, const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
 {
 	auto parameters = static_cast<const iscsi_response_parameters_scsi_cmd *>(parameters_in);
 	auto scsi_reply = parameters->sd->send(get_CDB(), 16, data);
@@ -347,7 +347,7 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(const iscsi_r
 	if (scsi_reply.value().data.second) {
 		auto pdu_data_in = new iscsi_pdu_scsi_data_in();  // 0x25
 		DOLOG("iscsi_pdu_scsi_cmd::get_response: sending SCSI DATA-IN with %zu payload bytes, is meta: %d\n", scsi_reply.value().data.second, scsi_reply.value().data_is_meta);
-		if (pdu_data_in->set(*this, scsi_reply.value().data, scsi_reply.value().data_is_meta) == false) {
+		if (pdu_data_in->set(s, *this, scsi_reply.value().data, scsi_reply.value().data_is_meta) == false) {
 			ok = false;
 			DOLOG("iscsi_pdu_scsi_cmd::get_response: iscsi_pdu_scsi_data_in::set returned error state\n");
 		}
@@ -394,6 +394,15 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(const iscsi_r
 	}
 
 	return response;
+}
+
+blob_t iscsi_pdu_scsi_cmd::get_raw() const
+{
+	size_t copy_len = sizeof *cdb_pdu_req;
+	uint8_t *copy_data = new uint8_t[copy_len]();
+	memcpy(copy_data, cdb_pdu_req, sizeof *cdb_pdu_req);
+
+	return { copy_data, copy_len };
 }
 
 /*--------------------------------------------------------------------------*/
@@ -471,28 +480,17 @@ iscsi_pdu_scsi_data_in::~iscsi_pdu_scsi_data_in()
 	delete [] pdu_data_in_data.first;
 }
 
-bool iscsi_pdu_scsi_data_in::set(const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data, const bool has_sense)
+bool iscsi_pdu_scsi_data_in::set(session *const s, const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data, const bool has_sense)
 {
 	DOLOG("iscsi_pdu_scsi_data_in::set: with %zu payload bytes, has_sense: %d\n", scsi_reply_data.second, has_sense);
 
-	*pdu_data_in = { };
-	set_bits(&pdu_data_in->b1, 0, 6, o_scsi_data_in);  // 0x25
-	set_bits(&pdu_data_in->b2, 7, 1, true);  // F
-	set_bits(&pdu_data_in->b2, 0, 1, true); //has_sense);  // S
-	pdu_data_in->datalenH   = scsi_reply_data.second >> 16;
-	pdu_data_in->datalenM   = scsi_reply_data.second >>  8;
-	pdu_data_in->datalenL   = scsi_reply_data.second      ;
-	memcpy(pdu_data_in->LUN, reply_to.get_LUN(), sizeof pdu_data_in->LUN);
-	pdu_data_in->Itasktag   = reply_to.get_Itasktag();
-	pdu_data_in->StatSN     = htonl(reply_to.get_ExpStatSN());
-	pdu_data_in->ExpCmdSN   = htonl(reply_to.get_CmdSN() + 1);
-	pdu_data_in->MaxCmdSN   = htonl(reply_to.get_CmdSN() + 128);
-	pdu_data_in->DataSN     = htonl(0);  // TODO
-	pdu_data_in->ResidualCt = 0;
+	auto temp = reply_to.get_raw();
+	reply_to_copy.set(s, temp.data, temp.n);
+	delete [] temp.data;
 
 	pdu_data_in_data.second = scsi_reply_data.second;
 	if (pdu_data_in_data.second) {
-		pdu_data_in_data.first  = new uint8_t[pdu_data_in_data.second]();
+		pdu_data_in_data.first = new uint8_t[pdu_data_in_data.second]();
 		memcpy(pdu_data_in_data.first, scsi_reply_data.first, pdu_data_in_data.second);
 	}
 
@@ -502,14 +500,38 @@ bool iscsi_pdu_scsi_data_in::set(const iscsi_pdu_scsi_cmd & reply_to, const std:
 // TODO: vector so that a reply can be consisting of multiple PDUs
 std::vector<blob_t> iscsi_pdu_scsi_data_in::get()
 {
-	size_t out_size = sizeof(*pdu_data_in) + pdu_data_in_data.second;
-	out_size = (out_size + 3) & ~3;
-	uint8_t *out = new uint8_t[out_size]();
-	memcpy(out, pdu_data_in, sizeof *pdu_data_in);
-	if (pdu_data_in_data.second)
-		memcpy(&out[sizeof(*pdu_data_in)], pdu_data_in_data.first, pdu_data_in_data.second);
+	std::vector<blob_t> v_out;
 
-	return return_helper(out, out_size);
+	size_t n_to_do = (pdu_data_in_data.second + 4095) / 4096;
+
+	for(size_t i=0, count=0; i<pdu_data_in_data.second; i += 4096, count++) {  // 4kB blocks
+		*pdu_data_in = { };
+		set_bits(&pdu_data_in->b1, 0, 6, o_scsi_data_in);  // 0x25
+		set_bits(&pdu_data_in->b2, 7, 1, count == n_to_do - 1);  // F
+		set_bits(&pdu_data_in->b2, 0, 1, count == n_to_do - 1);  // S
+		size_t cur_len = std::min(pdu_data_in_data.second - i, size_t(4096));
+		pdu_data_in->datalenH   = cur_len >> 16;
+		pdu_data_in->datalenM   = cur_len >>  8;
+		pdu_data_in->datalenL   = cur_len      ;
+		memcpy(pdu_data_in->LUN, reply_to_copy.get_LUN(), sizeof pdu_data_in->LUN);
+		pdu_data_in->Itasktag   = reply_to_copy.get_Itasktag();
+		pdu_data_in->StatSN     = htonl(reply_to_copy.get_ExpStatSN());
+		pdu_data_in->ExpCmdSN   = htonl(reply_to_copy.get_CmdSN() + 1);
+		pdu_data_in->MaxCmdSN   = htonl(reply_to_copy.get_CmdSN() + 128);
+		pdu_data_in->DataSN     = htonl(count++);  // TODO
+		pdu_data_in->ResidualCt = 0;
+
+		size_t out_size = sizeof(*pdu_data_in) + pdu_data_in_data.second;
+		out_size = (out_size + 3) & ~3;
+		uint8_t *out = new uint8_t[out_size]();
+		memcpy(out, pdu_data_in, sizeof *pdu_data_in);
+		if (pdu_data_in_data.second)
+			memcpy(&out[sizeof(*pdu_data_in)], pdu_data_in_data.first, pdu_data_in_data.second);
+
+		v_out.push_back({ out, out_size });
+	}
+
+	return v_out;
 }
 
 /*--------------------------------------------------------------------------*/
@@ -523,7 +545,7 @@ iscsi_pdu_nop_out::~iscsi_pdu_nop_out()
 {
 }
 
-std::optional<iscsi_response_set> iscsi_pdu_nop_out::get_response(const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
+std::optional<iscsi_response_set> iscsi_pdu_nop_out::get_response(session *const s, const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
 {
 	DOLOG("invoking iscsi_pdu_nop_out::get_response\n");
 
@@ -648,7 +670,7 @@ std::vector<blob_t> iscsi_pdu_text_request::get()
 	return return_helper(out, out_size);
 }
 
-std::optional<iscsi_response_set> iscsi_pdu_text_request::get_response(const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
+std::optional<iscsi_response_set> iscsi_pdu_text_request::get_response(session *const s, const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
 {
 	iscsi_response_set response;
 	auto reply_pdu = new iscsi_pdu_text_reply();
@@ -764,7 +786,7 @@ std::vector<blob_t> iscsi_pdu_logout_request::get()
 	return return_helper(out, out_size);
 }
 
-std::optional<iscsi_response_set> iscsi_pdu_logout_request::get_response(const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
+std::optional<iscsi_response_set> iscsi_pdu_logout_request::get_response(session *const s, const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
 {
 	auto parameters = static_cast<const iscsi_response_parameters_logout_req *>(parameters_in);
 
