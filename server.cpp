@@ -162,13 +162,20 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 
 bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const pdu, iscsi_response_parameters *const parameters)
 {
-	auto response_set = pdu->get_response(s, parameters, pdu->get_data());  // FIXME (pdu gets its own get_data?!)
-	if (response_set.has_value() == false) {
-		DOLOG("server::push_response: no response from PDU\n");
-		return false;
-	}
-
 	bool ok = true;
+
+	std::optional<iscsi_response_set> response_set;
+
+	if (pdu->get_opcode() == iscsi_pdu_bhs::iscsi_bhs_opcode::o_r2t) { // maybe also for DATA_OUT/IN?
+		// TODO: get data from PDU, write to backend, update session, end session when done
+	}
+	else {
+		response_set = pdu->get_response(s, parameters, pdu->get_data());  // FIXME (pdu gets its own get_data?!)
+		if (response_set.has_value() == false) {
+			DOLOG("server::push_response: no response from PDU\n");
+			return false;
+		}
+	}
 
 	for(auto & pdu_out: response_set.value().responses) {
 		for(auto & blobs: pdu_out->get()) {
@@ -187,12 +194,12 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 			}
 
 			delete [] blobs.data;
-
-			DOLOG(" ---\n");
 		}
 
 		delete pdu_out;
 	}
+
+	DOLOG(" ---\n");
 
 	return ok;
 }

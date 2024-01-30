@@ -374,12 +374,11 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *cons
 	else if (scsi_reply.value().type == ir_r2t) {
 		auto *temp = new iscsi_pdu_scsi_r2t() /* 0x31 */;
 		DOLOG("iscsi_pdu_scsi_cmd::get_response: sending R2T with %zu sense bytes\n", scsi_reply.value().sense_data.size());
-
-		if (temp->set(*this, scsi_reply.value().r2t.offset_from_lba, scsi_reply.value().r2t.bytes_left) == false) {
+		uint32_t TTT = s->init_r2t_session(scsi_reply.value().r2t);
+		if (temp->set(s, *this, TTT, scsi_reply.value().r2t.offset_from_lba, scsi_reply.value().r2t.bytes_left) == false) {
 			ok = false;
 			DOLOG("iscsi_pdu_scsi_cmd::get_response: iscsi_pdu_scsi_response::set returned error\n");
 		}
-		s->init_r2t_session(temp->get_TTT(), scsi_reply.value().r2t);
 		pdu_scsi_response = temp;
 	}
 	if (pdu_scsi_response)
@@ -602,7 +601,7 @@ bool iscsi_pdu_nop_in::set(const iscsi_pdu_nop_out & reply_to)
 	nop_in->datalenL   = 0;
 	memcpy(nop_in->LUN, reply_to.get_LUN(), sizeof nop_in->LUN);
 	nop_in->Itasktag   = reply_to.get_Itasktag();
-	nop_in->TTF        = reply_to.get_TTF();
+	nop_in->TTT        = reply_to.get_TTT();
 	nop_in->StatSN     = htonl(reply_to.get_ExpStatSN());
 	nop_in->ExpCmdSN   = htonl(reply_to.get_CmdSN() + 1);
 	nop_in->MaxCmdSN   = htonl(reply_to.get_CmdSN() + 1);
@@ -631,7 +630,7 @@ iscsi_pdu_scsi_r2t::~iscsi_pdu_scsi_r2t()
 	delete [] pdu_scsi_r2t_data.first;
 }
 
-bool iscsi_pdu_scsi_r2t::set(const iscsi_pdu_scsi_cmd & reply_to, const uint32_t buffer_offset, const uint32_t data_length)
+bool iscsi_pdu_scsi_r2t::set(session *const s, const iscsi_pdu_scsi_cmd & reply_to, const uint32_t TTT, const uint32_t buffer_offset, const uint32_t data_length)
 {
 	*pdu_scsi_r2t = { };
 	set_bits(&pdu_scsi_r2t->b1, 0, 6, o_r2t);
@@ -640,16 +639,12 @@ bool iscsi_pdu_scsi_r2t::set(const iscsi_pdu_scsi_cmd & reply_to, const uint32_t
 	pdu_scsi_r2t->datalenL   = 0;
 	memcpy(pdu_scsi_r2t->LUN, reply_to.get_LUN(), sizeof pdu_scsi_r2t->LUN);
 	pdu_scsi_r2t->Itasktag   = reply_to.get_Itasktag();
-	pdu_scsi_r2t->TTF        = reply_to.get_TTF();
+	pdu_scsi_r2t->TTT        = TTT;
 	pdu_scsi_r2t->StatSN     = htonl(reply_to.get_ExpStatSN());
 	pdu_scsi_r2t->ExpCmdSN   = htonl(reply_to.get_CmdSN() + 1);
 	pdu_scsi_r2t->MaxCmdSN   = htonl(reply_to.get_CmdSN() + 1);
 	pdu_scsi_r2t->bufferoff  = htonl(buffer_offset);
 	pdu_scsi_r2t->DDTF       = htonl(data_length);
-
-	auto r2t_session = s->get_r2t_sesion(ntohl(reply_to.get_TTF()));
-	if (r2t_session) {
-	}
 
 	return true;
 }
@@ -758,7 +753,7 @@ bool iscsi_pdu_text_reply::set(const iscsi_pdu_text_request & reply_to, const is
 	text_reply->datalenM   = text_reply_reply_data.second >>  8;
 	text_reply->datalenL   = text_reply_reply_data.second      ;
 	memcpy(text_reply->LUN, reply_to.get_LUN(), sizeof text_reply->LUN);
-	text_reply->TTF        = reply_to.get_TTF();
+	text_reply->TTT        = reply_to.get_TTT();
 	text_reply->Itasktag   = reply_to.get_Itasktag();
 	text_reply->StatSN     = htonl(reply_to.get_ExpStatSN());
 	text_reply->ExpCmdSN   = htonl(reply_to.get_CmdSN());

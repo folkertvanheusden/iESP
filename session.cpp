@@ -1,3 +1,4 @@
+#include "random.h"
 #include "session.h"
 
 
@@ -20,16 +21,25 @@ uint32_t session::get_inc_datasn(const uint32_t data_sn_itt)
 	return data_sn++;
 }
 
-void session::init_r2t_session(const uint32_t ttt, const r2t_session & rs)
+uint32_t session::init_r2t_session(const r2t_session & rs)
 {
-	r2t_ttt  = ttt;
-	this->rs = rs;
+	r2t_session *copy = new r2t_session;
+	*copy = rs;
+
+	uint32_t temp_TTT = 0;
+	do {
+		my_getrandom(&temp_TTT, sizeof temp_TTT);
+	}
+	while(r2t_sessions.find(temp_TTT) != r2t_sessions.end());
+
+	r2t_sessions.insert({ temp_TTT, copy });
 }
 
 r2t_session *session::get_r2t_sesion(const uint32_t ttt)
 {
-	if (ttt != r2t_ttt)
+	auto it = r2t_sessions.find(ttt);
+	if (it == r2t_sessions.end())
 		return nullptr;
 
-	return &rs;
+	return it->second;
 }
