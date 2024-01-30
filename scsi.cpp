@@ -47,7 +47,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		response.data.second = 4;
 		response.data.first = new uint8_t[response.data.second]();
 		response.data.first[0] = 0;
-		response.data.first[1] = 0;  // SUBPAGE
+		response.data.first[1] = CDB[3];  // SUBPAGE
 		response.data.first[2] = 0;  // PAGE LENGTH
 		response.data.first[3] = 0;
 	}
