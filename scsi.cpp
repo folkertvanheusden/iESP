@@ -39,17 +39,17 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		DOLOG("scsi::send: MODE SENSE 6\n");
 		if (CDB[1] & 8)
 			DOLOG(" MODE SENSE 6: DBD\n");
-		int pc = CDB[2] >> 6;
+		uint8_t page_control = CDB[2] >> 6;
 		const char *const pagecodes[] { "current values", "changeable values", "default values", "saved values " };
-		DOLOG(" MODE SENSE 6: PAGE CODE %s\n", pagecodes[pc]);
+		DOLOG(" MODE SENSE 6: PAGE CONTROL %s (%d)\n", pagecodes[page_control], page_control);
+		uint8_t page_code = CDB[2] & 0x3f;
+		DOLOG(" MODE SENSE 6: PAGE CODE %02xh\n", page_code);
 		DOLOG(" MODE SENSE 6: SUBPAGE CODE %02xh\n", CDB[3]);
 		DOLOG(" MODE SENSE 6: AllocationLength: %d\n", CDB[4]);
+		DOLOG(" MODE SENSE 6: Control: %02xh\n", CDB[5]);
 		response.data.second = 4;
 		response.data.first = new uint8_t[response.data.second]();
-		response.data.first[0] = 0;
-		response.data.first[1] = CDB[3];  // SUBPAGE
-		response.data.first[2] = 0;  // PAGE LENGTH
-		response.data.first[3] = 0;
+		response.data.first[0] = response.data.second - 1;  // length
 	}
 	else if (opcode == o_inquiry) {  // 0x12
 		DOLOG("scsi::send: INQUIRY\n");
