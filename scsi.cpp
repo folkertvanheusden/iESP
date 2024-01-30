@@ -63,7 +63,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		DOLOG(" INQUIRY: AllocationLength: %d\n", allocation_length);
 		DOLOG(" INQUIRY: ControlByte: %02xh\n", CDB[5]);
 		if ((CDB[1] & 1) == 0) {
-			response.data.second = 66;
+			response.data.second = 68;
 			response.data.first = new uint8_t[response.data.second]();
 			response.data.first[0] = 0x00;  // "Direct access block device"
 			response.data.first[1] = 0;  // not removable
@@ -83,6 +83,8 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 			response.data.first[61] = 0x60;
 			response.data.first[62] = 0x01;  // SCC-2
 			response.data.first[63] = 0xfb;
+			response.data.first[64] = 0x01;  // SPC
+			response.data.first[65] = 0x20;
 			response.data.second = std::min(response.data.second, size_t(allocation_length));
 		}
 		else {
