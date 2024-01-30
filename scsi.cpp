@@ -217,23 +217,26 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		if (data.has_value()) {
 			DOLOG("scsi::send: write command includes data\n");
 
-			size_t expected_size = transfer_length * b->get_block_size();
-			if (expected_size == data.value().second) {
-				if (b->write(lba, transfer_length, data.value().first) == false) {
-					DOLOG("scsi::send: WRITE_xx, failed reading\n");
+			auto   backend_block_size = b->get_block_size();
+			size_t expected_size   = transfer_length * backend_block_size;
+			size_t received_size   = data.value().second;
+			size_t received_blocks = received_size / backend_block_size;
+			if (received_blocks == 0 || b->write(lba, transfer_length, data.value().first) == false) {
+				DOLOG("scsi::send: WRITE_xx, failed writing\n");
 
-					delete [] response.data.first;
-					response.data.first  = nullptr;
-					response.data.second = 0;
-
-					// TODO set sense_data
-				}
-
-				response.type = ir_empty_sense;
+				// TODO set sense_data
 			}
 			else {
-				DOLOG("scsi::send: write did not receive all/more data (expected: %zu, got: %zu)\n", expected_size, data.value().second);
-				// TODO set sense_data
+				if (received_size == expected_size)
+					response.type = ir_empty_sense;
+				else {  // allow R2T packets to come in
+					response.type = ir_r2t;
+
+					response.r2t.buffer_lba      = lba;
+					response.r2t.offset_from_lba = received_blocks * backend_block_size;
+					response.r2t.bytes_left      = (transfer_length - received_blocks) * backend_block_size;
+					DOLOG("scsi::send: starting R2T with %u blocks left (LBA: %llu, offset %u)\n", response.r2t.bytes_left, response.r2t.buffer_lba, response.r2t.offset_from_lba);
+				}
 			}
 		}
 		else {

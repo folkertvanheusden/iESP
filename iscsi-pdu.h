@@ -105,6 +105,13 @@ struct iscsi_response_parameters_scsi_cmd : public iscsi_response_parameters_bhs
 	}
 };
 
+struct iscsi_response_parameters_r2t : public iscsi_response_parameters_bhs
+{
+	iscsi_response_parameters_r2t(session *const ses) :
+		iscsi_response_parameters_bhs(ses) {
+	}
+};
+
 class iscsi_pdu_bhs  // basic header segment
 {
 protected:
@@ -527,7 +534,7 @@ public:
 		uint32_t datalenL  :  8;  // data segment length (bytes, excluding padding) 7...0
 		uint8_t  LUN[8];
 		uint32_t Itasktag  : 32;  // initiator task tag
-		uint32_t TTF       : 32;  // target transfer tag
+		uint32_t TTT       : 32;  // target transfer tag
 		uint32_t StatSN    : 32;
 		uint32_t ExpCmdSN  : 32;
 		uint32_t MaxCmdSN  : 32;
@@ -546,6 +553,8 @@ public:
 
 	bool set(const iscsi_pdu_scsi_cmd & reply_to, const uint32_t buffer_offset, const uint32_t data_length);
 	std::vector<blob_t> get() override;
+
+	uint32_t get_TTT() const { return pdu_scsi_r2t->TTT; }
 };
 
 class iscsi_pdu_text_request : public iscsi_pdu_bhs  // text request 0x04
