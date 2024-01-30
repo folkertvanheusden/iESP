@@ -29,6 +29,8 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 	response.type         = ir_as_is;
 	response.data_is_meta = true;
 
+	// TODO: if LBA or TRANSFER LENGTH out of range, return error
+
 	if (opcode == o_test_unit_ready) {
 		DOLOG("scsi::send: TEST UNIT READY\n");
 		response.type = ir_empty_sense;
@@ -145,9 +147,10 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		response.data.first[7] = block_size;
 	}
 	else if (opcode == o_get_lba_status) {
-		DOLOG("  ServiceAction: %02xh\n", CDB[1] & 31);
+		uint8_t service_action = CDB[1] & 31;
+		DOLOG("  ServiceAction: %02xh\n", service_action);
 
-		if ((CDB[1] & 31) == 0x10) {  // READ CAPACITY
+		if (service_action == 0x10) {  // READ CAPACITY
 			DOLOG("scsi::send: READ_CAPACITY(16)\n");
 
 			response.data.second = 32;
@@ -167,6 +170,18 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 			response.data.first[10] = block_size >>  8;
 			response.data.first[11] = block_size;
 			response.data.first[12] = 1 << 4;  // RC BASIS: "The RETURNED LOGICAL BLOCK ADDRESS field indicates the LBA of the last logical block on the logical unit."
+		}
+		else if (service_action == 0x12) {  // GET LBA STATUS
+			DOLOG("scsi::send: GET_LBA_STATUS\n");
+
+			response.data.second = 24;
+			response.data.first = new uint8_t[response.data.second]();
+			response.data.first[0] = 0;
+			response.data.first[1] = 0;
+			response.data.first[2] = 0;
+			response.data.first[3] = response.data.second - 3;
+			memcpy(&response.data.first[8], &CDB[2], 8);  // LBA STATUS LOGICAL BLOCK ADDRESS
+			memcpy(&response.data.first[16], &CDB[10], 4);  // ALLOCATIN LENGTH
 		}
 	}
 	else if (opcode == o_write_10 || opcode == o_write_16) {
@@ -194,6 +209,8 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 				b->write(lba, transfer_length, data.value().first);
 			else
 				DOLOG("scsi::send: write did not receive all/more data\n");
+
+			response.type = ir_empty_sense;
 		}
 		else {
 			response.type = ir_r2t;  // allow R2T packets to come in

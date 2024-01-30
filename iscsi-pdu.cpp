@@ -244,11 +244,11 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 //		"TargetName=iqn.1993-11.com.vanheusden:test",
 //		"TargetAlias=Bob-s disk",  // TODO
 		"ImmediateData=Yes",
-		"MaxRecvDataSegmentLength=4096",
-		"MaxBurstLength=4096",
+//		"MaxRecvDataSegmentLength=8192",
+		"MaxBurstLength=8192",
 		"FirstBurstLength=4096",
 		"TargetPortalGroupTag=1",
-		"InitialR2T=Yes",  // required for (at least) open-scsi
+		"InitialR2T=Yes",  // required to be Yes for (at least) open-scsi
 		"MaxOutstandingR2T=1",  // ^ (1)
 		"DataPDUInOrder=Yes",
 		"DataSequenceInOrder=Yes",
