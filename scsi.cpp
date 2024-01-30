@@ -217,7 +217,8 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		if (data.has_value()) {
 			DOLOG("scsi::send: write command includes data\n");
 
-			if (transfer_length * b->get_block_size() == data.value().second) {
+			size_t expected_size = transfer_length * b->get_block_size();
+			if (expected_size == data.value().second) {
 				if (b->write(lba, transfer_length, data.value().first) == false) {
 					DOLOG("scsi::send: WRITE_xx, failed reading\n");
 
@@ -231,7 +232,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 				response.type = ir_empty_sense;
 			}
 			else {
-				DOLOG("scsi::send: write did not receive all/more data\n");
+				DOLOG("scsi::send: write did not receive all/more data (expected: %zu, got: %zu)\n", expected_size, data.value().second);
 				// TODO set sense_data
 			}
 		}
