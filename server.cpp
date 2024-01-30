@@ -185,10 +185,10 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 
 			delete [] blobs.data;
 
-			delete pdu_out;
-
 			DOLOG(" ---\n");
 		}
+
+		delete pdu_out;
 	}
 
 	return ok;
