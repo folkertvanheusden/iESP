@@ -25,7 +25,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 	DOLOG("CDB contents: %s\n", to_hex(CDB, size).c_str());
 #endif
 
-	scsi_response   response { };
+	scsi_response response { };
 	response.type         = ir_as_is;
 	response.data_is_meta = true;
 
@@ -85,7 +85,6 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 			response.data.first[63] = 0xfb;
 			response.data.first[64] = 0x01;  // SPC
 			response.data.first[65] = 0x20;
-			response.data.second = std::min(response.data.second, size_t(allocation_length));
 		}
 		else {
 			if (CDB[2] == 0x83) {
@@ -132,6 +131,8 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 				};
 			}
 		}
+
+		response.data.second = std::min(response.data.second, size_t(allocation_length));
 	}
 	else if (opcode == o_read_capacity_10) {
 		DOLOG("scsi::send: READ_CAPACITY\n");
