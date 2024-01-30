@@ -62,29 +62,34 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		uint16_t allocation_length = (CDB[3] << 8) | CDB[4];
 		DOLOG(" INQUIRY: AllocationLength: %d\n", allocation_length);
 		DOLOG(" INQUIRY: ControlByte: %02xh\n", CDB[5]);
+		bool ok = true;
 		if ((CDB[1] & 1) == 0) {
-			response.data.second = 68;
-			response.data.first = new uint8_t[response.data.second]();
-			response.data.first[0] = 0x00;  // "Direct access block device"
-			response.data.first[1] = 0;  // not removable
-			response.data.first[2] = 5;  // VERSION
-			response.data.first[3] = 2;  // response data format
-			response.data.first[4] = response.data.second - 5;  // additional length
-			response.data.first[5] = 0;
-			response.data.first[6] = 0;
-			response.data.first[7] = 0;
-			memcpy(&response.data.first[8],  "vnHeusdn", 8);
-			memcpy(&response.data.first[16], "iESP", 4);  // TODO
-			memcpy(&response.data.first[32], "1.0", 3);  // TODO
-			memcpy(&response.data.first[36], "12345678", 8);  // TODO
-			response.data.first[58] = 0x04;  // SBC-3
-			response.data.first[59] = 0xc0;
-			response.data.first[60] = 0x09;  // iSCSI
-			response.data.first[61] = 0x60;
-			response.data.first[62] = 0x01;  // SCC-2
-			response.data.first[63] = 0xfb;
-			response.data.first[64] = 0x01;  // SPC
-			response.data.first[65] = 0x20;
+			if (CDB[2])
+				ok = false;
+			else {
+				response.data.second = 68;
+				response.data.first = new uint8_t[response.data.second]();
+				response.data.first[0] = 0x00;  // "Direct access block device"
+				response.data.first[1] = 0;  // not removable
+				response.data.first[2] = 5;  // VERSION
+				response.data.first[3] = 2;  // response data format
+				response.data.first[4] = response.data.second - 5;  // additional length
+				response.data.first[5] = 0;
+				response.data.first[6] = 0;
+				response.data.first[7] = 0;
+				memcpy(&response.data.first[8],  "vnHeusdn", 8);
+				memcpy(&response.data.first[16], "iESP", 4);  // TODO
+				memcpy(&response.data.first[32], "1.0", 3);  // TODO
+				memcpy(&response.data.first[36], "12345678", 8);  // TODO
+				response.data.first[58] = 0x04;  // SBC-3
+				response.data.first[59] = 0xc0;
+				response.data.first[60] = 0x09;  // iSCSI
+				response.data.first[61] = 0x60;
+				response.data.first[62] = 0x01;  // SCC-2
+				response.data.first[63] = 0xfb;
+				response.data.first[64] = 0x01;  // SPC
+				response.data.first[65] = 0x20;
+			}
 		}
 		else {
 			if (CDB[2] == 0x83) {
@@ -120,16 +125,20 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 				response.data.first[5] = 0x20;
 				// ... set all to 'not set'
 			}
-			else {  // PageCode not supported
-				response.sense_data = {
-					0x72,  // current errors
-					0x05,  // key: illegal request
-					0x24,  // ASC: invalid field in cdb
-					0x00,  // ASQ: -
-					0x00, 0x00, 0x00,  // reserved
-					0x00  // additional sense length
-				};
+			else {
+				ok = false;
 			}
+		}
+
+		if (!ok) {  // PageCode not supported
+			response.sense_data = {
+				0x72,  // current errors
+				0x05,  // key: illegal request
+				0x24,  // ASC: invalid field in cdb
+				0x00,  // ASQ: -
+				0x00, 0x00, 0x00,  // reserved
+				0x00  // additional sense length
+			};
 		}
 
 		response.data.second = std::min(response.data.second, size_t(allocation_length));
