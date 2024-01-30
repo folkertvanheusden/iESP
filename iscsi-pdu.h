@@ -332,6 +332,7 @@ public:
 	      uint32_t  get_ExpStatSN() const { return ntohl(cdb_pdu_req->ExpStatSN); }
 	      uint32_t  get_CmdSN()     const { return ntohl(cdb_pdu_req->CmdSN);     }
 	const uint8_t * get_LUN()       const { return cdb_pdu_req->LUN;              }
+	const uint32_t  get_ExpDatLen() const { return ntohl(cdb_pdu_req->expdatlen); }
 
 	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters, std::optional<std::pair<uint8_t *, size_t> > data) override;
 };

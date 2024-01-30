@@ -504,6 +504,11 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get()
 {
 	std::vector<blob_t> v_out;
 
+	// resize to limit
+	if (pdu_data_in_data.second > size_t(reply_to_copy.get_ExpDatLen()))
+		DOLOG("iscsi_pdu_scsi_data_in: requested less (%zu) than wat is available (%zu)\n", size_t(reply_to_copy.get_ExpDatLen()), pdu_data_in_data.second);
+	pdu_data_in_data.second = std::min(pdu_data_in_data.second, size_t(reply_to_copy.get_ExpDatLen()));
+
 	size_t n_to_do = (pdu_data_in_data.second + 4095) / 4096;
 
 	for(size_t i=0, count=0; i<pdu_data_in_data.second; i += 4096, count++) {  // 4kB blocks
@@ -524,12 +529,12 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get()
 		pdu_data_in->DataSN     = htonl(s->get_inc_datasn(reply_to_copy.get_Itasktag()));
 		pdu_data_in->ResidualCt = 0;
 
-		size_t out_size = sizeof(*pdu_data_in) + pdu_data_in_data.second;
+		size_t out_size = sizeof(*pdu_data_in) + cur_len;
 		out_size = (out_size + 3) & ~3;
+
 		uint8_t *out = new uint8_t[out_size]();
 		memcpy(out, pdu_data_in, sizeof *pdu_data_in);
-		if (pdu_data_in_data.second)
-			memcpy(&out[sizeof(*pdu_data_in)], pdu_data_in_data.first, pdu_data_in_data.second);
+		memcpy(&out[sizeof(*pdu_data_in)], pdu_data_in_data.first + i, cur_len);
 
 		v_out.push_back({ out, out_size });
 	}
