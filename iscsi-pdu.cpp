@@ -463,7 +463,8 @@ std::vector<blob_t> iscsi_pdu_scsi_response::get()
 	out_size = (out_size + 3) & ~3;
 	uint8_t *out = new uint8_t[out_size]();
 	memcpy(out, pdu_response, sizeof *pdu_response);
-	memcpy(&out[sizeof *pdu_response], pdu_response_data.first, pdu_response_data.second);
+	if (pdu_response_data.second)
+		memcpy(&out[sizeof *pdu_response], pdu_response_data.first, pdu_response_data.second);
 
 	return return_helper(out, out_size);
 }
@@ -505,19 +506,31 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get()
 	std::vector<blob_t> v_out;
 
 	// resize to limit
-	if (pdu_data_in_data.second > size_t(reply_to_copy.get_ExpDatLen()))
-		DOLOG("iscsi_pdu_scsi_data_in: requested less (%zu) than wat is available (%zu)\n", size_t(reply_to_copy.get_ExpDatLen()), pdu_data_in_data.second);
-	pdu_data_in_data.second = std::min(pdu_data_in_data.second, size_t(reply_to_copy.get_ExpDatLen()));
+	auto use_pdu_data_size = pdu_data_in_data.second;
 
-	size_t n_to_do = (pdu_data_in_data.second + 4095) / 4096;
+	if (use_pdu_data_size > size_t(reply_to_copy.get_ExpDatLen()))
+		DOLOG("iscsi_pdu_scsi_data_in: requested less (%zu) than wat is available (%zu)\n", size_t(reply_to_copy.get_ExpDatLen()), use_pdu_data_size);
+	use_pdu_data_size = std::min(use_pdu_data_size, size_t(reply_to_copy.get_ExpDatLen()));
 
-	for(size_t i=0, count=0; i<pdu_data_in_data.second; i += 4096, count++) {  // 4kB blocks
+	size_t n_to_do = (use_pdu_data_size + 4095) / 4096;
+
+	for(size_t i=0, count=0; i<use_pdu_data_size; i += 4096, count++) {  // 4kB blocks
 		*pdu_data_in = { };
 		set_bits(&pdu_data_in->b1, 0, 6, o_scsi_data_in);  // 0x25
 		bool last_block = count == n_to_do - 1;
-		set_bits(&pdu_data_in->b2, 7, 1, last_block);  // F
-		set_bits(&pdu_data_in->b2, 0, 1, last_block);  // S
-		size_t cur_len = std::min(pdu_data_in_data.second - i, size_t(4096));
+		if (last_block) {
+			set_bits(&pdu_data_in->b2, 7, 1, true);  // F
+			if (pdu_data_in_data.second < reply_to_copy.get_ExpDatLen()) {
+				set_bits(&pdu_data_in->b2, 1, 1, true);  // U
+				pdu_data_in->ResidualCt = htonl(reply_to_copy.get_ExpDatLen() - pdu_data_in_data.second);
+			}
+			else if (pdu_data_in_data.second > reply_to_copy.get_ExpDatLen()) {
+				set_bits(&pdu_data_in->b2, 2, 1, true);  // O
+				pdu_data_in->ResidualCt = htonl(pdu_data_in_data.second - reply_to_copy.get_ExpDatLen());
+			}
+			set_bits(&pdu_data_in->b2, 0, 1, true);  // S
+		}
+		size_t cur_len = std::min(use_pdu_data_size - i, size_t(4096));
 		pdu_data_in->datalenH   = cur_len >> 16;
 		pdu_data_in->datalenM   = cur_len >>  8;
 		pdu_data_in->datalenL   = cur_len      ;
@@ -527,7 +540,6 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get()
 		pdu_data_in->ExpCmdSN   = htonl(reply_to_copy.get_CmdSN() + 1);
 		pdu_data_in->MaxCmdSN   = htonl(reply_to_copy.get_CmdSN() + 128);
 		pdu_data_in->DataSN     = htonl(s->get_inc_datasn(reply_to_copy.get_Itasktag()));
-		pdu_data_in->ResidualCt = 0;
 
 		size_t out_size = sizeof(*pdu_data_in) + cur_len;
 		out_size = (out_size + 3) & ~3;
