@@ -217,12 +217,23 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		if (data.has_value()) {
 			DOLOG("scsi::send: write command includes data\n");
 
-			if (transfer_length * b->get_block_size() == data.value().second)
-				b->write(lba, transfer_length, data.value().first);
-			else
-				DOLOG("scsi::send: write did not receive all/more data\n");
+			if (transfer_length * b->get_block_size() == data.value().second) {
+				if (b->write(lba, transfer_length, data.value().first) == false) {
+					DOLOG("scsi::send: WRITE_xx, failed reading\n");
 
-			response.type = ir_empty_sense;
+					delete [] response.data.first;
+					response.data.first  = nullptr;
+					response.data.second = 0;
+
+					// TODO set sense_data
+				}
+
+				response.type = ir_empty_sense;
+			}
+			else {
+				DOLOG("scsi::send: write did not receive all/more data\n");
+				// TODO set sense_data
+			}
 		}
 		else {
 			response.type = ir_r2t;  // allow R2T packets to come in
@@ -251,7 +262,15 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		response.data.second = transfer_length * b->get_block_size();
 		if (response.data.second) {
 			response.data.first = new uint8_t[response.data.second]();
-			b->read(lba, transfer_length, response.data.first);
+			if (b->read(lba, transfer_length, response.data.first) == false) {
+				DOLOG("scsi::send: READ_xx, failed reading\n");
+
+				delete [] response.data.first;
+				response.data.first  = nullptr;
+				response.data.second = 0;
+
+				// TODO set sense_data;
+			}
 		}
 		response.data_is_meta = false;
 	}
