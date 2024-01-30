@@ -106,8 +106,8 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 				response.data.first = new uint8_t[response.data.second]();
 				response.data.first[0] = 0;  // TODO
 				response.data.first[1] = CDB[2];
-				response.data.first[2] = response.data.second >> 8;  // page length
-				response.data.first[3] = response.data.second;
+				response.data.first[2] = (response.data.second - 4) >> 8;  // page length
+				response.data.first[3] = response.data.second - 4;
 				response.data.first[4] = 0;  // WSNZ bit
 				response.data.first[5] = 0;  // compare and write not supported
 				response.data.first[6] = 0;  // OPTIMAL TRANSFER LENGTH GRANULARITY
@@ -119,8 +119,8 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 				response.data.first = new uint8_t[response.data.second]();
 				response.data.first[0] = 0;  // TODO
 				response.data.first[1] = CDB[2];
-				response.data.first[2] = response.data.second >> 8;  // page length
-				response.data.first[3] = response.data.second;
+				response.data.first[2] = (response.data.second - 4)>> 8;  // page length
+				response.data.first[3] = response.data.second - 4;
 				response.data.first[4] = 0x1c;  // device has an RPM of 7200 (fake!)
 				response.data.first[5] = 0x20;
 				// ... set all to 'not set'
