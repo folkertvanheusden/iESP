@@ -239,7 +239,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 					response.r2t.buffer_lba      = lba;
 					//response.r2t.offset_from_lba = received_blocks * backend_block_size;
 					//response.r2t.bytes_left      = (transfer_length - received_blocks) * backend_block_size;
-					response.r2t.bytes_left      = transfer_length * backend_block_size;
+					response.r2t.bytes_left      = (transfer_length - received_blocks) * backend_block_size;
 					response.r2t.bytes_done      = received_blocks * backend_block_size;
 					DOLOG("scsi::send: starting R2T with %u bytes left (LBA: %llu, offset %u)\n", response.r2t.bytes_left, response.r2t.buffer_lba, response.r2t.offset_from_lba);
 				}
