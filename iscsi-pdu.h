@@ -351,6 +351,8 @@ public:
 	      uint32_t  get_ExpDatLen() const { return ntohl(cdb_pdu_req->expdatlen); }
 
 	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters, std::optional<std::pair<uint8_t *, size_t> > data) override;
+	// special case: response after one or more data-out PDUs
+	std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters_in);
 };
 
 class iscsi_pdu_scsi_data_in : public iscsi_pdu_bhs  // 0x25

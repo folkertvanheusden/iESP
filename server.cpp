@@ -205,20 +205,16 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 			return false;
 		}
 
-		if (true) {  // wwas F
-			DOLOG("server::push_response: DATA-OUT-task finished\n");
+		DOLOG("server::push_response: DATA-OUT-task finished\n");
+		// create response
+		iscsi_pdu_scsi_cmd response;
+		response.set(s, session->PDU_initiator.data, session->PDU_initiator.n);
+		response_set = response.get_response(s, parameters);
 
-			iscsi_pdu_scsi_cmd response;
-			response.set(s, session->PDU_initiator.data, session->PDU_initiator.n);
-
-			response_set = response.get_response(s, parameters, response.get_data());  // FIXME (pdu gets its own get_data?!)
-		}
-//		else {
-//			response_set = pdu_data_out->get_response(s, parameters, pdu->get_data());  // FIXME (pdu gets its own get_data?!)
-//		}
-
-		if (F)
+		if (F) {
+			DOLOG("server::push-response: end of task\n");
 			s->remove_r2t_session(TTT);
+		}
 	}
 	else {
 		response_set = pdu->get_response(s, parameters, pdu->get_data());  // FIXME (pdu gets its own get_data?!)

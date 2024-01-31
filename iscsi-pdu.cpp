@@ -332,6 +332,22 @@ std::vector<blob_t> iscsi_pdu_scsi_cmd::get()
 	return return_helper(out, out_size);
 }
 
+std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *const s, const iscsi_response_parameters *const parameters_in)
+{
+	iscsi_response_set response;
+
+	auto *pdu_scsi_response = new iscsi_pdu_scsi_response() /* 0x21 */;
+	if (pdu_scsi_response->set(*this, { }) == false) {
+		DOLOG("iscsi_pdu_scsi_cmd::get_response: iscsi_pdu_scsi_response::set returned error\n");
+
+		return { };
+	}
+
+	response.responses.push_back(pdu_scsi_response);
+
+	return response;
+}
+
 std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *const s, const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
 {
 	auto parameters = static_cast<const iscsi_response_parameters_scsi_cmd *>(parameters_in);
