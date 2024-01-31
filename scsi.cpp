@@ -221,6 +221,8 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 			size_t expected_size      = transfer_length * backend_block_size;
 			size_t received_size      = data.value().second;
 			size_t received_blocks    = received_size / backend_block_size;
+			if (received_blocks)
+				DOLOG("scsi::send: WRITE_xx to LBA %llu is %zu in bytes, %zu bytes\n", lba, lba * backend_block_size, received_size);
 			if (received_blocks > 0 && b->write(lba, received_blocks, data.value().first) == false) {
 				DOLOG("scsi::send: WRITE_xx, failed writing\n");
 
