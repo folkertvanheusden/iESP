@@ -147,7 +147,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		DOLOG("scsi::send: READ_CAPACITY\n");
 		response.data.second = 8;
 		response.data.first = new uint8_t[response.data.second]();
-		auto device_size = b->get_size_in_blocks();
+		auto device_size = b->get_size_in_blocks() - 1;
 		response.data.first[0] = device_size >> 24;  // sector count
 		response.data.first[1] = device_size >> 16;
 		response.data.first[2] = device_size >>  8;
@@ -167,7 +167,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 
 			response.data.second = 32;
 			response.data.first = new uint8_t[response.data.second]();
-			auto device_size = b->get_size_in_blocks();
+			auto device_size = b->get_size_in_blocks() - 1;
 			response.data.first[0] = device_size >> 56;
 			response.data.first[1] = device_size >> 48;
 			response.data.first[2] = device_size >> 40;
