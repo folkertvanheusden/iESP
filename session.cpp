@@ -1,3 +1,4 @@
+#include "log.h"
 #include "random.h"
 #include "session.h"
 
@@ -44,4 +45,16 @@ r2t_session *session::get_r2t_sesion(const uint32_t ttt)
 		return nullptr;
 
 	return it->second;
+}
+
+void session::remove_r2t_session(const uint32_t ttt)
+{
+	auto it = r2t_sessions.find(ttt);
+
+	if (it == r2t_sessions.end())
+		DOLOG("session::remove_r2t_session: unexpected TTT (%x)\n", ttt);
+	else {
+		delete it->second;
+		r2t_sessions.erase(it);
+	}
 }

@@ -582,11 +582,8 @@ bool iscsi_pdu_scsi_data_out::set(session *const s, const iscsi_pdu_scsi_cmd & r
 
 std::vector<blob_t> iscsi_pdu_scsi_data_out::get()
 {
-	size_t out_size = sizeof *pdu_data_out;
-	uint8_t *out = new uint8_t[out_size]();
-	memcpy(out, pdu_data_out, sizeof *pdu_data_out);
-
-	return return_helper(out, out_size);
+	std::vector<blob_t> out;
+	return out;
 }
 
 /*--------------------------------------------------------------------------*/

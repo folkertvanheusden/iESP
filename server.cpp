@@ -173,7 +173,6 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 	std::optional<iscsi_response_set> response_set;
 
 	if (pdu->get_opcode() == iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_data_out) {
-		// TODO: get data from PDU, write to backend, update session, end session when done
 		auto     pdu_data_out = reinterpret_cast<iscsi_pdu_scsi_data_out *>(pdu);
 		uint32_t offset       = pdu_data_out->get_BufferOffset();
 		auto     data         = pdu_data_out->get_data();
@@ -200,7 +199,7 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 
 			return rc;
 		}
-		else {
+		else if (!F) {
 			DOLOG("server::push_response: DATA-OUT PDU has no data?\n");
 			return false;
 		}
@@ -287,7 +286,6 @@ void server::handler()
 		session *s  = nullptr;
 		bool     ok = true;
 
-		// TODO: handle R2T
 		do {
 			iscsi_pdu_bhs *pdu = receive_pdu(fd, &s);
 			if (!pdu)
