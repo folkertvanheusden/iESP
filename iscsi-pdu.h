@@ -849,7 +849,6 @@ public:
 		uint32_t StatSN    : 32;
 		uint32_t ExpCmdSN  : 32;
 		uint32_t MaxCmdSN  : 32;
-		uint32_t ExpDatSN  : 32;
 		uint8_t  filler4[12];
 	};
 
