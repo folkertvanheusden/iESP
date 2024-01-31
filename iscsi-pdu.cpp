@@ -120,7 +120,7 @@ std::optional<std::pair<uint8_t *, size_t> > iscsi_pdu_bhs::get_data() const
 std::vector<blob_t> iscsi_pdu_bhs::get()
 {
 	void *out = new uint8_t[sizeof *bhs]();
-	memcpy(out, &bhs, sizeof *bhs);
+	memcpy(out, bhs, sizeof *bhs);
 
 	return return_helper(out, sizeof *bhs);
 }
@@ -325,9 +325,9 @@ bool iscsi_pdu_scsi_cmd::set(session *const s, const uint8_t *const in, const si
 
 std::vector<blob_t> iscsi_pdu_scsi_cmd::get()
 {
-	size_t out_size = sizeof cdb_pdu_req;
+	size_t out_size = sizeof *cdb_pdu_req;
 	void *out = new uint8_t[out_size]();
-	memcpy(out, &cdb_pdu_req, sizeof cdb_pdu_req);
+	memcpy(out, cdb_pdu_req, sizeof *cdb_pdu_req);
 
 	return return_helper(out, out_size);
 }
