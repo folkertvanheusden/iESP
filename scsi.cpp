@@ -261,17 +261,17 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		if (opcode == o_read_16) {
 			lba             = (uint64_t(CDB[2]) << 56) | (uint64_t(CDB[3]) << 48) | (uint64_t(CDB[4]) << 40) | (uint64_t(CDB[5]) << 32) | (CDB[6] << 24) | (CDB[7] << 16) | (CDB[8] << 8) | CDB[9];
 			transfer_length = (CDB[10] << 24) | (CDB[11] << 16) | (CDB[12] << 8) | CDB[13];
-			DOLOG("scsi::send: READ_16, offset %llu, %u sectors\n", lba, transfer_length);
+			DOLOG("scsi::send: READ_16, LBA %zu, %u sectors\n", size_t(lba), transfer_length);
 		}
 		else if (opcode == o_read_10) {
 			lba             = (uint64_t(CDB[2]) << 24) | (uint64_t(CDB[3]) << 16) | (uint64_t(CDB[4]) << 8) | uint64_t(CDB[5]);
 			transfer_length =  (CDB[7] << 8) | CDB[8];
-			DOLOG("scsi::send: READ_10, offset %llu, %u sectors\n", lba, transfer_length);
+			DOLOG("scsi::send: READ_10, LBA %zu, %u sectors\n", size_t(lba), transfer_length);
 		}
 		else {
 			lba             = ((CDB[1] & 31) << 16) | (CDB[2] << 8) | CDB[3];
 			transfer_length = CDB[4];
-			DOLOG("scsi::send: READ_6, offset %llu, %u sectors\n", lba, transfer_length);
+			DOLOG("scsi::send: READ_6, LBA %zu, %u sectors\n", size_t(lba), transfer_length);
 		}
 
 		response.data.second = transfer_length * b->get_block_size();

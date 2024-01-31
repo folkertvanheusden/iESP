@@ -38,8 +38,8 @@ bool backend_file::write(const uint64_t block_nr, const uint32_t n_blocks, const
 {
 	auto   block_size = get_block_size();
 	off_t  offset     = block_nr * block_size;
-	DOLOG("backend_file::write: block %llu (%lu), %d blocks, block size: %d\n", block_nr, offset, n_blocks, block_size);
 	size_t n_bytes    = n_blocks * block_size;
+	DOLOG("backend_file::write: block %llu (%lu), %d blocks, block size: %d\n", block_nr, offset, n_blocks, block_size);
 	int rc = pwrite(fd, data, n_bytes, offset);
 	if (rc == -1)
 		DOLOG("backend_file::write: ERROR writing; %s\n", strerror(errno));
