@@ -33,6 +33,8 @@ uint32_t session::init_r2t_session(const r2t_session & rs)
 	while(r2t_sessions.find(temp_TTT) != r2t_sessions.end());
 
 	r2t_sessions.insert({ temp_TTT, copy });
+
+	return temp_TTT;
 }
 
 r2t_session *session::get_r2t_sesion(const uint32_t ttt)
