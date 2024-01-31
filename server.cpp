@@ -224,6 +224,12 @@ void server::handler()
 		if (fd == -1)
 			continue;
 
+		int flags = 1;
+		if (setsockopt(fd, SOL_TCP, TCP_NODELAY, (void *)&flags, sizeof(flags)) == -1)
+			DOLOG("server::handler: cannot disable Nagle algorithm\n");
+
+		DOLOG("server::handler: new session\n");
+
 		session *s  = nullptr;
 		bool     ok = true;
 
