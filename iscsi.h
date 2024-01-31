@@ -15,6 +15,7 @@ struct r2t_session {
 	uint64_t buffer_lba;
 	uint32_t offset_from_lba;
 	uint32_t bytes_left;
+	uint32_t bytes_done;
 	blob_t   PDU_initiator;
 };
 

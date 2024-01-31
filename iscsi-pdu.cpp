@@ -205,6 +205,24 @@ std::optional<iscsi_response_set> iscsi_pdu_login_request::get_response(session 
 {
 	auto parameters = static_cast<const iscsi_response_parameters_login_req *>(parameters_in);
 
+	auto kvs_in = data_to_text_array(data.value().first, data.value().second);
+	uint32_t max_burst = ~0;
+	for(auto & kv: kvs_in) {
+		auto parts = split(kv, "=");
+		if (parts.size() < 2)
+			continue;
+
+		if (parts[0] == "MaxBurstLength")
+			max_burst = std::min(max_burst, uint32_t(std::atoi(parts[1].c_str())));
+		if (parts[0] == "FirstBurstLength")
+			max_burst = std::min(max_burst, uint32_t(std::atoi(parts[1].c_str())));
+	}
+
+	if (max_burst < uint32_t(~0)) {
+		DOLOG("iscsi_pdu_login_request::get_response: set max-burst to %u\n", max_burst);
+		s->set_ack_interval(max_burst);
+	}
+
 	iscsi_response_set response;
 	auto reply_pdu = new iscsi_pdu_login_reply();
 	if (reply_pdu->set(*this) == false) {

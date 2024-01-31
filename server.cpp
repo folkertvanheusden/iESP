@@ -4,6 +4,7 @@
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -199,17 +200,27 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 
 			if (rc == false)
 				return rc;
+
+			session->bytes_done += data.value().second;
 		}
 		else if (!F) {
 			DOLOG("server::push_response: DATA-OUT PDU has no data?\n");
 			return false;
 		}
 
-		DOLOG("server::push_response: DATA-OUT-task finished\n");
 		// create response
-		iscsi_pdu_scsi_cmd response;
-		response.set(s, session->PDU_initiator.data, session->PDU_initiator.n);
-		response_set = response.get_response(s, parameters);
+		if (session->bytes_done >= s->get_ack_interval() || F) {
+			if (F)
+				DOLOG("server::push_response: DATA-OUT-task finished\n");
+			else
+				DOLOG("server::push_response: DATA-OUT: burst interval\n");
+
+			iscsi_pdu_scsi_cmd response;
+			response.set(s, session->PDU_initiator.data, session->PDU_initiator.n);
+			response_set = response.get_response(s, parameters);
+
+			session->bytes_done = 0;
+		}
 
 		if (F) {
 			DOLOG("server::push-response: end of task\n");
@@ -222,7 +233,7 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 
 	if (response_set.has_value() == false) {
 		DOLOG("server::push_response: no response from PDU\n");
-		return false;
+		return true;
 	}
 
 	for(auto & pdu_out: response_set.value().responses) {
@@ -238,7 +249,7 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 				printf("SENDING %zu bytes\n", blobs.n);
 				ok = WRITE(fd, blobs.data, blobs.n) != -1;
 				if (!ok)
-					DOLOG("server::push_response: sending PDU to peer failed\n");
+					DOLOG("server::push_response: sending PDU to peer failed (%s)\n", strerror(errno));
 			}
 
 			delete [] blobs.data;
