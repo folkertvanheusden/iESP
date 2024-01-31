@@ -565,6 +565,7 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get()
 			set_bits(&pdu_data_in->b2, 0, 1, true);  // S
 		}
 		size_t cur_len = std::min(use_pdu_data_size - i, size_t(4096));
+		DOLOG("iscsi_pdu_scsi_data_in::get: block %zu, last_block: %d, cur_len: %zu\n", count, last_block, cur_len);
 		pdu_data_in->datalenH   = cur_len >> 16;
 		pdu_data_in->datalenM   = cur_len >>  8;
 		pdu_data_in->datalenL   = cur_len      ;
