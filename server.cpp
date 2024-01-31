@@ -188,6 +188,7 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 		}
 		else if (data.has_value() && data.value().second > 0) {
 			auto block_size = b->get_block_size();
+			DOLOG("server::push_response: writing %zu bytes to offset LBA %zu + offset %u => %zu (in bytes)\n", data.value().second, session->buffer_lba, offset, session->buffer_lba * block_size + offset);
 
 			assert((offset % block_size) == 0);
 			assert((data.value().second % block_size) == 0);
