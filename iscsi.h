@@ -6,10 +6,16 @@
 #include <vector>
 
 
+typedef struct {
+	uint8_t *data;
+	size_t n;
+} blob_t;
+
 struct r2t_session {
 	uint64_t buffer_lba;
 	uint32_t offset_from_lba;
 	uint32_t bytes_left;
+	blob_t   PDU_initiator;
 };
 
 typedef enum

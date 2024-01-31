@@ -181,7 +181,7 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 		auto     session      = s->get_r2t_sesion(TTT);
 
 		if (session == nullptr) {
-			DOLOG("server::push_response: DATA-OUT PDU references unknown TTT\n");
+			DOLOG("server::push_response: DATA-OUT PDU references unknown TTT (%08x)\n", TTT);
 			delete [] data.value().first;
 			return false;
 		}
@@ -197,19 +197,28 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 
 			delete [] data.value().first;
 
-			return rc;
+			if (rc == false)
+				return rc;
 		}
 		else if (!F) {
 			DOLOG("server::push_response: DATA-OUT PDU has no data?\n");
 			return false;
 		}
 
-		if (F) {
-			s->remove_r2t_session(TTT);
+		if (true) {  // wwas F
 			DOLOG("server::push_response: DATA-OUT-task finished\n");
-		}
 
-		response_set = pdu_data_out->get_response(s, parameters, pdu->get_data());  // FIXME (pdu gets its own get_data?!)
+			iscsi_pdu_scsi_cmd response;
+			response.set(s, session->PDU_initiator.data, session->PDU_initiator.n);
+
+			response_set = response.get_response(s, parameters, response.get_data());  // FIXME (pdu gets its own get_data?!)
+		}
+//		else {
+//			response_set = pdu_data_out->get_response(s, parameters, pdu->get_data());  // FIXME (pdu gets its own get_data?!)
+//		}
+
+		if (F)
+			s->remove_r2t_session(TTT);
 	}
 	else {
 		response_set = pdu->get_response(s, parameters, pdu->get_data());  // FIXME (pdu gets its own get_data?!)
@@ -282,6 +291,8 @@ void server::handler()
 		int fd = accept(listen_fd, nullptr, nullptr);
 		if (fd == -1)
 			continue;
+
+		DOLOG("server::handler: new session\n");
 
 		session *s  = nullptr;
 		bool     ok = true;

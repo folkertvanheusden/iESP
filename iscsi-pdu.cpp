@@ -120,7 +120,7 @@ std::optional<std::pair<uint8_t *, size_t> > iscsi_pdu_bhs::get_data() const
 std::vector<blob_t> iscsi_pdu_bhs::get()
 {
 	void *out = new uint8_t[sizeof *bhs]();
-	memcpy(out, &bhs, sizeof *bhs);
+	memcpy(out, bhs, sizeof *bhs);
 
 	return return_helper(out, sizeof *bhs);
 }
@@ -374,7 +374,8 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *cons
 	else if (scsi_reply.value().type == ir_r2t) {
 		auto *temp = new iscsi_pdu_scsi_r2t() /* 0x31 */;
 		DOLOG("iscsi_pdu_scsi_cmd::get_response: sending R2T with %zu sense bytes\n", scsi_reply.value().sense_data.size());
-		uint32_t TTT = s->init_r2t_session(scsi_reply.value().r2t);
+		uint32_t TTT = s->init_r2t_session(scsi_reply.value().r2t, this);
+		DOLOG("iscsi_pdu_scsi_cmd::get_response: TTT is %08x\n", TTT);
 		if (temp->set(s, *this, TTT, scsi_reply.value().r2t.offset_from_lba, scsi_reply.value().r2t.bytes_left) == false) {
 			ok = false;
 			DOLOG("iscsi_pdu_scsi_cmd::get_response: iscsi_pdu_scsi_response::set returned error\n");

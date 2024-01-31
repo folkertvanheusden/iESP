@@ -227,8 +227,10 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 				// TODO set sense_data
 			}
 			else {
-				if (received_size == expected_size)
+				if (received_size == expected_size) {
 					response.type = ir_empty_sense;
+					DOLOG("scsi::send: received_size == expected_size\n");
+				}
 				else {  // allow R2T packets to come in
 					response.type = ir_r2t;
 
@@ -241,7 +243,12 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 			}
 		}
 		else {
-			response.type = ir_r2t;  // allow R2T packets to come in
+			DOLOG("scsi::send: WRITE without data\n");
+
+			if (transfer_length)
+				response.type = ir_r2t;  // allow R2T packets to come in
+			else
+				DOLOG("scsi::send: WRITE with 0 transfer_length\n");
 		}
 	}
 	else if (opcode == o_read_16 || opcode == o_read_10 || opcode == o_read_6) {  // 0x88, 0x28, 0x08

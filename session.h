@@ -5,6 +5,8 @@
 #include "iscsi.h"
 
 
+class iscsi_pdu_scsi_cmd;
+
 class session
 {
 private:
@@ -19,7 +21,7 @@ public:
 
 	uint32_t get_inc_datasn(const uint32_t itt);
 
-	uint32_t init_r2t_session(const r2t_session & rs);
+	uint32_t init_r2t_session(const r2t_session & rs, iscsi_pdu_scsi_cmd *const pdu);
 	r2t_session *get_r2t_sesion(const uint32_t ttt);
 	void remove_r2t_session(const uint32_t ttt);
 };

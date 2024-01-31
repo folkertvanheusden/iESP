@@ -14,11 +14,6 @@
 // These classes have a 'set' method as to have a way to return validity - an is_valid method would've worked as well.
 // Also no direct retrieval from filedescriptors to help porting to platforms without socket-api.
 
-typedef struct {
-	uint8_t *data;
-	size_t n;
-} blob_t;
-
 class iscsi_pdu_ahs
 {
 private:
@@ -358,53 +353,6 @@ public:
 	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters, std::optional<std::pair<uint8_t *, size_t> > data) override;
 };
 
-class iscsi_pdu_scsi_response : public iscsi_pdu_bhs  // 0x21
-{
-public:
-	struct __pdu_response__ {
-		uint8_t  b1;
-		// uint8_t  opcode    :  6;
-		// bool     reserved1 :  1;
-		// bool     reserved0 :  1;  // bit 7
-
-		uint8_t  b2;
-		// bool     reserved3 :  1;
-		// bool     U         :  1;
-		// bool     O         :  1;
-		// bool     u         :  1;
-		// bool     o         :  1;
-		// uint8_t  reserved2 :  2;
-		// bool     set_to_1  :  1;  // 1, bit 7
-
-		uint8_t  response  :  8;
-		uint8_t  status    :  8;
-		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
-		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
-		uint32_t datalenM  :  8;  // data segment length (bytes, excluding padding) 15...8
-		uint32_t datalenL  :  8;  // data segment length (bytes, excluding padding) 7...0
-		uint8_t  reserved5[8];
-		uint32_t Itasktag  : 32;  // initiator task tag
-		uint32_t snack_tag : 32;
-		uint32_t StatSN    : 32;
-		uint32_t ExpCmdSN  : 32;
-		uint32_t MaxCmdSN  : 32;
-		uint32_t ExpDataSN : 32;
-		uint32_t BidirResCt: 32;  // bidirectional read residual count or reserved
-		uint32_t ResidualCt: 32;  // residual count or reserved
-	};
-
-	__pdu_response__ *pdu_response __attribute__((packed)) =  { reinterpret_cast<__pdu_response__ *>(pdu_bytes) };
-
-	std::pair<uint8_t *, size_t> pdu_response_data { nullptr, 0 };
-
-public:
-	iscsi_pdu_scsi_response();
-	virtual ~iscsi_pdu_scsi_response();
-
-	bool set(const iscsi_pdu_scsi_cmd & reply_to, const std::vector<uint8_t> & scsi_sense_data);
-	std::vector<blob_t> get() override;
-};
-
 class iscsi_pdu_scsi_data_in : public iscsi_pdu_bhs  // 0x25
 {
 public:
@@ -504,6 +452,56 @@ public:
 	uint32_t get_BufferOffset() const { return ntohl(pdu_data_out->bufferoff); }
         uint32_t get_TTT()          const { return pdu_data_out->TTT;              }
 	bool     get_F()            const { return !!(pdu_data_out->b2 & 128);     }
+	uint32_t get_Itasktag()     const { return pdu_data_out->Itasktag;         }
+	uint32_t get_ExpStatSN()    const { return pdu_data_out->ExpStatSN;        }
+};
+
+class iscsi_pdu_scsi_response : public iscsi_pdu_bhs  // 0x21
+{
+public:
+	struct __pdu_response__ {
+		uint8_t  b1;
+		// uint8_t  opcode    :  6;
+		// bool     reserved1 :  1;
+		// bool     reserved0 :  1;  // bit 7
+
+		uint8_t  b2;
+		// bool     reserved3 :  1;
+		// bool     U         :  1;
+		// bool     O         :  1;
+		// bool     u         :  1;
+		// bool     o         :  1;
+		// uint8_t  reserved2 :  2;
+		// bool     set_to_1  :  1;  // 1, bit 7
+
+		uint8_t  response  :  8;
+		uint8_t  status    :  8;
+		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
+		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
+		uint32_t datalenM  :  8;  // data segment length (bytes, excluding padding) 15...8
+		uint32_t datalenL  :  8;  // data segment length (bytes, excluding padding) 7...0
+		uint8_t  reserved5[8];
+		uint32_t Itasktag  : 32;  // initiator task tag
+		uint32_t snack_tag : 32;
+		uint32_t StatSN    : 32;
+		uint32_t ExpCmdSN  : 32;
+		uint32_t MaxCmdSN  : 32;
+		uint32_t ExpDataSN : 32;
+		uint32_t BidirResCt: 32;  // bidirectional read residual count or reserved
+		uint32_t ResidualCt: 32;  // residual count or reserved
+	};
+
+	__pdu_response__ *pdu_response __attribute__((packed)) =  { reinterpret_cast<__pdu_response__ *>(pdu_bytes) };
+
+	std::pair<uint8_t *, size_t> pdu_response_data { nullptr, 0 };
+
+public:
+	iscsi_pdu_scsi_response();
+	virtual ~iscsi_pdu_scsi_response();
+
+	bool set(const iscsi_pdu_scsi_cmd & reply_to, const std::vector<uint8_t> & scsi_sense_data);
+
+	std::vector<blob_t> get() override;
 };
 
 class iscsi_pdu_nop_out : public iscsi_pdu_bhs  // NOP-Out  0x00
