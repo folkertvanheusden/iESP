@@ -209,7 +209,7 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 		}
 
 		// create response
-		if (session->bytes_done >= s->get_ack_interval() || F) {
+		if (/*session->bytes_done >= s->get_ack_interval() ||*/ F) {
 			if (F)
 				DOLOG("server::push_response: DATA-OUT-task finished\n");
 			else
