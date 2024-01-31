@@ -105,6 +105,9 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_r2t:
 			pdu_obj = new iscsi_pdu_scsi_r2t();
 			break;
+		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_taskman:
+			pdu_obj = new iscsi_pdu_taskman_request();
+			break;
 		default:
 			DOLOG("server::receive_pdu: opcode %02xh not implemented\n", bhs.get_opcode());
 			break;
@@ -219,6 +222,8 @@ iscsi_response_parameters *server::select_parameters(iscsi_pdu_bhs *const pdu, s
 			return new iscsi_response_parameters_logout_req(ses);
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_r2t:
 			return new iscsi_response_parameters_r2t(ses);
+		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_taskman:
+			return new iscsi_response_parameters_taskman(ses);
 		default:
 			DOLOG("server::select_parameters: opcode %02xh not implemented\n", pdu->get_opcode());
 			break;

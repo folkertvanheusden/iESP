@@ -855,3 +855,82 @@ std::vector<blob_t> iscsi_pdu_logout_reply::get()
 	return { { out, out_size } };
 }
 
+/*--------------------------------------------------------------------------*/
+
+iscsi_pdu_taskman_request::iscsi_pdu_taskman_request()
+{
+	assert(sizeof(*taskman_req) == 48);
+
+	*taskman_req = { };
+}
+
+iscsi_pdu_taskman_request::~iscsi_pdu_taskman_request()
+{
+}
+
+bool iscsi_pdu_taskman_request::set(session *const s, const uint8_t *const in, const size_t n)
+{
+	if (iscsi_pdu_bhs::set(s, in, n) == false)
+		return false;
+
+	// TODO further validation
+
+	return true;
+}
+
+std::vector<blob_t> iscsi_pdu_taskman_request::get()
+{
+	size_t out_size = sizeof *taskman_req;
+	void *out = new uint8_t[out_size]();
+	memcpy(out, taskman_req, sizeof *taskman_req);
+
+	return return_helper(out, out_size);
+}
+
+std::optional<iscsi_response_set> iscsi_pdu_taskman_request::get_response(session *const s, const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
+{
+	auto parameters = static_cast<const iscsi_response_parameters_taskman *>(parameters_in);
+
+	iscsi_response_set response;
+	auto reply_pdu = new iscsi_pdu_taskman_reply();
+	if (reply_pdu->set(*this) == false) {
+		delete reply_pdu;
+		return { };
+	}
+	response.responses.push_back(reply_pdu);
+
+	return response;
+}
+
+/*--------------------------------------------------------------------------*/
+
+iscsi_pdu_taskman_reply::iscsi_pdu_taskman_reply()
+{
+	assert(sizeof(*taskman_reply) == 48);
+}
+
+iscsi_pdu_taskman_reply::~iscsi_pdu_taskman_reply()
+{
+}
+
+bool iscsi_pdu_taskman_reply::set(const iscsi_pdu_taskman_request & reply_to)
+{
+	*taskman_reply = { };
+	set_bits(&taskman_reply->b1, 0, 6, o_scsi_taskmanr);  // 0x22
+	set_bits(&taskman_reply->b2, 7, 1, true);
+	taskman_reply->Itasktag = reply_to.get_Itasktag();
+	taskman_reply->StatSN   = htonl(reply_to.get_ExpStatSN());
+	taskman_reply->ExpCmdSN = htonl(reply_to.get_CmdSN() + 1);
+	taskman_reply->MaxCmdSN = htonl(reply_to.get_CmdSN() + 1);
+
+	return true;
+}
+
+std::vector<blob_t> iscsi_pdu_taskman_reply::get()
+{
+	size_t   out_size = sizeof(*taskman_reply);
+	uint8_t *out      = new uint8_t[out_size]();
+	memcpy(out, taskman_reply, sizeof *taskman_reply);
+
+	return { { out, out_size } };
+}
