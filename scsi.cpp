@@ -221,7 +221,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 			size_t expected_size   = transfer_length * backend_block_size;
 			size_t received_size   = data.value().second;
 			size_t received_blocks = received_size / backend_block_size;
-			if (received_blocks == 0 || b->write(lba, transfer_length, data.value().first) == false) {
+			if (received_blocks > 0 && b->write(lba, received_blocks, data.value().first) == false) {
 				DOLOG("scsi::send: WRITE_xx, failed writing\n");
 
 				// TODO set sense_data
@@ -235,7 +235,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 					response.r2t.buffer_lba      = lba;
 					response.r2t.offset_from_lba = received_blocks * backend_block_size;
 					response.r2t.bytes_left      = (transfer_length - received_blocks) * backend_block_size;
-					DOLOG("scsi::send: starting R2T with %u blocks left (LBA: %llu, offset %u)\n", response.r2t.bytes_left, response.r2t.buffer_lba, response.r2t.offset_from_lba);
+					DOLOG("scsi::send: starting R2T with %u bytes left (LBA: %llu, offset %u)\n", response.r2t.bytes_left, response.r2t.buffer_lba, response.r2t.offset_from_lba);
 				}
 			}
 		}
