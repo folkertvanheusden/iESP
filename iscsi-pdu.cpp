@@ -266,8 +266,8 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 		"MaxBurstLength=8192",
 		"FirstBurstLength=4096",
 		"TargetPortalGroupTag=1",
-		"InitialR2T=Yes",  // required to be Yes for (at least) open-scsi
-		"MaxOutstandingR2T=1",  // ^ (1)
+		"InitialR2T=No",
+		"MaxOutstandingR2T=1",
 		"DataPDUInOrder=Yes",
 		"DataSequenceInOrder=Yes",
 	};
@@ -368,6 +368,7 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *cons
 
 std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *const s, const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
 {
+	DOLOG("iscsi_pdu_scsi_cmd::get_response: working on ITT %08x\n", get_Itasktag());
 	auto parameters = static_cast<const iscsi_response_parameters_scsi_cmd *>(parameters_in);
 	auto scsi_reply = parameters->sd->send(get_CDB(), 16, data);
 	if (scsi_reply.has_value() == false) {
@@ -702,6 +703,7 @@ bool iscsi_pdu_scsi_r2t::set(session *const s, const iscsi_pdu_scsi_cmd & reply_
 {
 	*pdu_scsi_r2t = { };
 	set_bits(&pdu_scsi_r2t->b1, 0, 6, o_r2t);
+	set_bits(&pdu_scsi_r2t->b2, 7, 1, true);
 	pdu_scsi_r2t->datalenH   = 0;
 	pdu_scsi_r2t->datalenM   = 0;
 	pdu_scsi_r2t->datalenL   = 0;
