@@ -500,7 +500,6 @@ bool iscsi_pdu_scsi_data_in::set(session *const s, const iscsi_pdu_scsi_cmd & re
 	return true;
 }
 
-// TODO: vector so that a reply can be consisting of multiple PDUs
 std::vector<blob_t> iscsi_pdu_scsi_data_in::get()
 {
 	std::vector<blob_t> v_out;
@@ -552,6 +551,42 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get()
 	}
 
 	return v_out;
+}
+
+/*--------------------------------------------------------------------------*/
+
+iscsi_pdu_scsi_data_out::iscsi_pdu_scsi_data_out()
+{
+	assert(sizeof(*pdu_data_out) == 48);
+}
+
+iscsi_pdu_scsi_data_out::~iscsi_pdu_scsi_data_out()
+{
+	delete [] pdu_data_out_data.first;
+}
+
+bool iscsi_pdu_scsi_data_out::set(session *const s, const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data)
+{
+	DOLOG("iscsi_pdu_scsi_data_out::set: with %zu payload bytes\n", scsi_reply_data.second);
+
+	this->s = s;
+
+	pdu_data_out_data.second = scsi_reply_data.second;
+	if (pdu_data_out_data.second) {
+		pdu_data_out_data.first = new uint8_t[pdu_data_out_data.second]();
+		memcpy(pdu_data_out_data.first, scsi_reply_data.first, pdu_data_out_data.second);
+	}
+
+	return true;
+}
+
+std::vector<blob_t> iscsi_pdu_scsi_data_out::get()
+{
+	size_t out_size = sizeof *pdu_data_out;
+	uint8_t *out = new uint8_t[out_size]();
+	memcpy(out, pdu_data_out, sizeof *pdu_data_out);
+
+	return return_helper(out, out_size);
 }
 
 /*--------------------------------------------------------------------------*/

@@ -119,6 +119,13 @@ struct iscsi_response_parameters_taskman : public iscsi_response_parameters_bhs
 	}
 };
 
+struct iscsi_response_parameters_data_out : public iscsi_response_parameters_bhs
+{
+	iscsi_response_parameters_data_out(session *const ses) :
+		iscsi_response_parameters_bhs(ses) {
+	}
+};
+
 class iscsi_pdu_bhs  // basic header segment
 {
 protected:
@@ -449,6 +456,54 @@ public:
 	bool set(session *const s, const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data, const bool has_sense);
 	std::vector<blob_t> get() override;
         uint32_t get_TTT() const { return pdu_data_in->TTT; }
+};
+
+class iscsi_pdu_scsi_data_out : public iscsi_pdu_bhs  // 0x05
+{
+public:
+	struct __pdu_data_out__ {
+		uint8_t  b1;
+		// uint8_t  opcode    :  6;
+		// bool     reserved0 :  2;  // bit 7
+
+		uint8_t  b2;
+		// bool     reserved1 :  7;
+		// bool     F         :  1;  // bit 7
+
+		uint16_t  reserved2: 16;
+
+		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
+		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
+		uint32_t datalenM  :  8;  // data segment length (bytes, excluding padding) 15...8
+		uint32_t datalenL  :  8;  // data segment length (bytes, excluding padding) 7...0
+		uint8_t  LUN[8];
+		uint32_t Itasktag  : 32;  // initiator task tag
+		uint32_t TTT       : 32;  // target transfer tag
+		uint32_t reserved3 : 32;
+		uint32_t ExpStatSN : 32;
+		uint32_t reserved4 : 32;
+		uint32_t DataSN    : 32;
+		uint32_t bufferoff : 32;
+		uint32_t reserved5 : 32;  // residual count or reserved
+	};
+
+	__pdu_data_out__ *pdu_data_out __attribute__((packed)) { reinterpret_cast<__pdu_data_out__ *>(pdu_bytes) };
+	std::pair<uint8_t *, size_t> pdu_data_out_data { nullptr, 0 };
+
+private:
+	iscsi_pdu_scsi_cmd reply_to_copy;
+	session           *s { nullptr };
+
+public:
+	iscsi_pdu_scsi_data_out();
+	virtual ~iscsi_pdu_scsi_data_out();
+
+	bool set(session *const s, const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data);
+	std::vector<blob_t> get() override;
+
+	uint32_t get_BufferOffset() const { return ntohl(pdu_data_out->bufferoff); }
+        uint32_t get_TTT()          const { return pdu_data_out->TTT;              }
+	bool     get_F()            const { return !!(pdu_data_out->b2 & 128);     }
 };
 
 class iscsi_pdu_nop_out : public iscsi_pdu_bhs  // NOP-Out  0x00

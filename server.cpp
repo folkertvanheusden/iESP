@@ -108,6 +108,9 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_taskman:
 			pdu_obj = new iscsi_pdu_taskman_request();
 			break;
+		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_data_out:
+			pdu_obj = new iscsi_pdu_scsi_data_out();
+			break;
 		default:
 			DOLOG("server::receive_pdu: opcode %02xh not implemented\n", bhs.get_opcode());
 			break;
@@ -169,15 +172,53 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 
 	std::optional<iscsi_response_set> response_set;
 
-	if (pdu->get_opcode() == iscsi_pdu_bhs::iscsi_bhs_opcode::o_r2t) { // maybe also for DATA_OUT/IN?
+	if (pdu->get_opcode() == iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_data_out) {
 		// TODO: get data from PDU, write to backend, update session, end session when done
+		auto     pdu_data_out = reinterpret_cast<iscsi_pdu_scsi_data_out *>(pdu);
+		uint32_t offset       = pdu_data_out->get_BufferOffset();
+		auto     data         = pdu_data_out->get_data();
+		uint32_t TTT          = pdu_data_out->get_TTT();
+		bool     F            = pdu_data_out->get_F();
+		auto     session      = s->get_r2t_sesion(TTT);
+
+		if (session == nullptr) {
+			DOLOG("server::push_response: DATA-OUT PDU references unknown TTT\n");
+			delete [] data.value().first;
+			return false;
+		}
+		else if (data.has_value() && data.value().second > 0) {
+			auto block_size = b->get_block_size();
+
+			assert((offset % block_size) == 0);
+			assert((data.value().second % block_size) == 0);
+
+			bool rc = b->write(session->buffer_lba + offset / block_size, data.value().second / block_size, data.value().first);
+			if (rc == false)
+				DOLOG("server::push_response: DATA-OUT problem writing to backend\n");
+
+			delete [] data.value().first;
+
+			return rc;
+		}
+		else {
+			DOLOG("server::push_response: DATA-OUT PDU has no data?\n");
+			return false;
+		}
+
+		if (F) {
+			s->remove_r2t_session(TTT);
+			DOLOG("server::push_response: DATA-OUT-task finished\n");
+		}
+
+		response_set = pdu_data_out->get_response(s, parameters, pdu->get_data());  // FIXME (pdu gets its own get_data?!)
 	}
 	else {
 		response_set = pdu->get_response(s, parameters, pdu->get_data());  // FIXME (pdu gets its own get_data?!)
-		if (response_set.has_value() == false) {
-			DOLOG("server::push_response: no response from PDU\n");
-			return false;
-		}
+	}
+
+	if (response_set.has_value() == false) {
+		DOLOG("server::push_response: no response from PDU\n");
+		return false;
 	}
 
 	for(auto & pdu_out: response_set.value().responses) {
@@ -224,6 +265,8 @@ iscsi_response_parameters *server::select_parameters(iscsi_pdu_bhs *const pdu, s
 			return new iscsi_response_parameters_r2t(ses);
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_taskman:
 			return new iscsi_response_parameters_taskman(ses);
+		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_data_out:
+			return new iscsi_response_parameters_data_out(ses);
 		default:
 			DOLOG("server::select_parameters: opcode %02xh not implemented\n", pdu->get_opcode());
 			break;
