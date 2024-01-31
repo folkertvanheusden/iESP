@@ -21,7 +21,7 @@ void setup()
 	wifiManager.setConfigPortalTimeout(120);
 	wifiManager.autoConnect();
 
-	Serial.print(F("Will listen on (in a few seconds): "));
+	Serial.print(F("Will listen on (in a bit): "));
 	Serial.println(WiFi.localIP());
 }
 
