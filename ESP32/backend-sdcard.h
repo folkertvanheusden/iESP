@@ -5,6 +5,10 @@
 
 class backend_sdcard : public backend
 {
+private:
+	uint64_t card_size   { 0 };
+	size_t   sector_size { 0 };
+
 public:
 	backend_sdcard();
 	virtual ~backend_sdcard();
