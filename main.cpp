@@ -1,13 +1,24 @@
+#include <atomic>
 #include <csignal>
 #include <cstdio>
 
 #include "backend-file.h"
+#include "log.h"
 #include "server.h"
 
+
+std::atomic_bool stop { false };
+
+void sigh(int sig)
+{
+	stop = true;
+	DOLOG("Stop signal received\n");
+}
 
 int main(int argc, char *argv[])
 {
 	signal(SIGPIPE, SIG_IGN);
+	signal(SIGINT, sigh);
 
 	backend_file bf("test.dat");
 

@@ -1,10 +1,12 @@
 #ifdef ESP32
 #include <Arduino.h>
 #endif
+#include <atomic>
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <poll.h>
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -21,6 +23,8 @@
 #include "server.h"
 #include "utils.h"
 
+
+extern std::atomic_bool stop;
 
 server::server(backend *const b, const std::string & listen_ip, const int listen_port):
 	b(b),
@@ -69,6 +73,24 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 {
 	if (*s == nullptr)
 		*s = new session();
+
+	pollfd fds[] { { fd, POLLIN, 0 } };
+
+	for(;;) {
+		int rc = poll(fds, 1, 100);
+		if (rc == -1) {
+			DOLOG("server::receive_pdu: poll failed with error %s\n", strerror(errno));
+			return nullptr;
+		}
+
+		if (stop == true) {
+			DOLOG("server::receive_pdu: abort due external stop\n");
+			return nullptr;
+		}
+
+		if (rc >= 1)
+			break;
+	}
 
 	uint8_t pdu[48] { 0 };
 	if (READ(fd, pdu, sizeof pdu) == -1) {
@@ -300,7 +322,24 @@ void server::handler()
 {
 	scsi scsi_dev(b);
 
-	for(;;) {
+	pollfd fds[] { { listen_fd, POLLIN, 0 } };
+
+	while(!stop) {
+
+		while(!stop) {
+			int rc = poll(fds, 1, 100);
+			if (rc == -1) {
+				DOLOG("server::handler: poll failed with error %s\n", strerror(errno));
+				break;
+			}
+
+			if (rc >= 1)
+				break;
+		}
+
+		if (stop)
+			break;
+
 		int fd = accept(listen_fd, nullptr, nullptr);
 		if (fd == -1)
 			continue;
@@ -316,8 +355,10 @@ void server::handler()
 
 		do {
 			iscsi_pdu_bhs *pdu = receive_pdu(fd, &s);
-			if (!pdu)
+			if (!pdu) {
+				DOLOG("server::handler: no PDU received, aborting socket connection\n");
 				break;
+			}
 
 			auto parameters = select_parameters(pdu, s, &scsi_dev);
 			if (parameters) {
