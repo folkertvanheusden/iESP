@@ -6,7 +6,9 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#ifndef ESP32
 #include <poll.h>
+#endif
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -74,6 +76,7 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 	if (*s == nullptr)
 		*s = new session();
 
+#ifndef ESP32
 	pollfd fds[] { { fd, POLLIN, 0 } };
 
 	for(;;) {
@@ -91,6 +94,7 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 		if (rc >= 1)
 			break;
 	}
+#endif
 
 	uint8_t pdu[48] { 0 };
 	if (READ(fd, pdu, sizeof pdu) == -1) {
@@ -274,7 +278,6 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 			assert((blobs.n & 3) == 0);
 
 			if (ok) {
-				printf("SENDING %zu bytes\n", blobs.n);
 				ok = WRITE(fd, blobs.data, blobs.n) != -1;
 				if (!ok)
 					DOLOG("server::push_response: sending PDU to peer failed (%s)\n", strerror(errno));
@@ -322,10 +325,12 @@ void server::handler()
 {
 	scsi scsi_dev(b);
 
+#ifndef ESP32
 	pollfd fds[] { { listen_fd, POLLIN, 0 } };
+#endif
 
 	while(!stop) {
-
+#ifndef ESP32
 		while(!stop) {
 			int rc = poll(fds, 1, 100);
 			if (rc == -1) {
@@ -336,6 +341,7 @@ void server::handler()
 			if (rc >= 1)
 				break;
 		}
+#endif
 
 		if (stop)
 			break;
