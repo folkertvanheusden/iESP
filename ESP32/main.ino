@@ -1,6 +1,7 @@
 // (C) 2023-2024 by Folkert van Heusden
 // Released under MIT license
 
+#include <atomic>
 #include <csignal>
 #include <cstdio>
 #include <SPI.h>
@@ -10,6 +11,8 @@
 #include "backend-sdcard.h"
 #include "server.h"
 
+
+std::atomic_bool stop { false };
 
 WiFiManager wifiManager;
 
