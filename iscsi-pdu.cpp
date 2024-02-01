@@ -51,6 +51,8 @@ iscsi_pdu_bhs::~iscsi_pdu_bhs()
 {
 	for(auto & ahs : ahs_list)
 		delete ahs;
+
+	delete [] data.first;
 }
 
 std::vector<blob_t> iscsi_pdu_bhs::return_helper(void *const data, size_t n)
