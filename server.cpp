@@ -9,6 +9,11 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <sys/socket.h>
+#ifdef ESP32
+#ifndef SOL_TCP
+#define SOL_TCP 6
+#endif
+#endif
 
 #include "iscsi-pdu.h"
 #include "log.h"
