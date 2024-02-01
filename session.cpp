@@ -10,6 +10,10 @@ session::session()
 
 session::~session()
 {
+	for(auto & it: r2t_sessions) {
+		delete [] it.second->PDU_initiator.data;
+		delete it.second;
+	}
 }
 
 uint32_t session::get_inc_datasn(const uint32_t data_sn_itt)

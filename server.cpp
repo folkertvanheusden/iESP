@@ -256,7 +256,7 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 		}
 	}
 	else {
-		response_set = pdu->get_response(s, parameters, pdu->get_data());  // FIXME (pdu gets its own get_data?!)
+		response_set = pdu->get_response(s, parameters);
 	}
 
 	if (response_set.has_value() == false) {

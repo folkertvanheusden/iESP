@@ -127,7 +127,7 @@ std::vector<blob_t> iscsi_pdu_bhs::get()
 	return return_helper(out, sizeof *bhs);
 }
 
-std::optional<iscsi_response_set> iscsi_pdu_bhs::get_response(session *const s, const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
+std::optional<iscsi_response_set> iscsi_pdu_bhs::get_response(session *const s, const iscsi_response_parameters *const parameters_in)
 {
 	DOLOG("iscsi_pdu_bhs::get_response invoked!\n");
 	assert(0);
@@ -203,11 +203,11 @@ std::vector<blob_t> iscsi_pdu_login_request::get()
 	return return_helper(out, sizeof *login_req);
 }
 
-std::optional<iscsi_response_set> iscsi_pdu_login_request::get_response(session *const s, const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
+std::optional<iscsi_response_set> iscsi_pdu_login_request::get_response(session *const s, const iscsi_response_parameters *const parameters_in)
 {
 	auto parameters = static_cast<const iscsi_response_parameters_login_req *>(parameters_in);
 
-	auto kvs_in = data_to_text_array(data.value().first, data.value().second);
+	auto kvs_in = data_to_text_array(data.first, data.second);
 	uint32_t max_burst = ~0;
 	for(auto & kv: kvs_in) {
 		auto parts = split(kv, "=");
@@ -352,8 +352,9 @@ std::vector<blob_t> iscsi_pdu_scsi_cmd::get()
 	return return_helper(out, out_size);
 }
 
-std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *const s, const iscsi_response_parameters *const parameters_in)
+std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *const s, const iscsi_response_parameters *const parameters_in, const uint8_t status)
 {
+	// TODO: handle errors (see 'status')
 	iscsi_response_set response;
 
 	auto *pdu_scsi_response = new iscsi_pdu_scsi_response() /* 0x21 */;
@@ -368,7 +369,7 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *cons
 	return response;
 }
 
-std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *const s, const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
+std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *const s, const iscsi_response_parameters *const parameters_in)
 {
 	DOLOG("iscsi_pdu_scsi_cmd::get_response: working on ITT %08x\n", get_Itasktag());
 	auto parameters = static_cast<const iscsi_response_parameters_scsi_cmd *>(parameters_in);
@@ -636,7 +637,7 @@ iscsi_pdu_nop_out::~iscsi_pdu_nop_out()
 {
 }
 
-std::optional<iscsi_response_set> iscsi_pdu_nop_out::get_response(session *const s, const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
+std::optional<iscsi_response_set> iscsi_pdu_nop_out::get_response(session *const s, const iscsi_response_parameters *const parameters_in)
 {
 	DOLOG("invoking iscsi_pdu_nop_out::get_response\n");
 
@@ -762,7 +763,7 @@ std::vector<blob_t> iscsi_pdu_text_request::get()
 	return return_helper(out, out_size);
 }
 
-std::optional<iscsi_response_set> iscsi_pdu_text_request::get_response(session *const s, const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
+std::optional<iscsi_response_set> iscsi_pdu_text_request::get_response(session *const s, const iscsi_response_parameters *const parameters_in)
 {
 	iscsi_response_set response;
 	auto reply_pdu = new iscsi_pdu_text_reply();
@@ -878,7 +879,7 @@ std::vector<blob_t> iscsi_pdu_logout_request::get()
 	return return_helper(out, out_size);
 }
 
-std::optional<iscsi_response_set> iscsi_pdu_logout_request::get_response(session *const s, const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
+std::optional<iscsi_response_set> iscsi_pdu_logout_request::get_response(session *const s, const iscsi_response_parameters *const parameters_in)
 {
 	auto parameters = static_cast<const iscsi_response_parameters_logout_req *>(parameters_in);
 
@@ -959,7 +960,7 @@ std::vector<blob_t> iscsi_pdu_taskman_request::get()
 	return return_helper(out, out_size);
 }
 
-std::optional<iscsi_response_set> iscsi_pdu_taskman_request::get_response(session *const s, const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
+std::optional<iscsi_response_set> iscsi_pdu_taskman_request::get_response(session *const s, const iscsi_response_parameters *const parameters_in)
 {
 	auto parameters = static_cast<const iscsi_response_parameters_taskman *>(parameters_in);
 

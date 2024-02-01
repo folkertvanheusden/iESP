@@ -44,5 +44,5 @@ public:
 		o_report_luns      = 0xa0,
 	};
 
-	std::optional<scsi_response> send(const uint8_t *const CDB, const size_t size, std::optional<std::pair<uint8_t *, size_t> > & data);
+	std::optional<scsi_response> send(const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
 };

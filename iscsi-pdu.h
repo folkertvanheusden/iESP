@@ -190,7 +190,7 @@ public:
 	std::optional<std::pair<uint8_t *, size_t> > get_data() const;
 	bool             set_data(std::pair<const uint8_t *, std::size_t> data_in);
 
-	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters, std::optional<std::pair<uint8_t *, size_t> > data);
+	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters);
 };
 
 struct iscsi_response_set
@@ -254,7 +254,7 @@ public:
 	      uint32_t get_Itasktag()   const { return login_req->Itasktag;     }
 	      uint32_t get_ExpStatSN()  const { return ntohl(login_req->ExpStatSN); }
 
-	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters, std::optional<std::pair<uint8_t *, size_t> > data) override;
+	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters) override;
 };
 
 class iscsi_pdu_login_reply : public iscsi_pdu_bhs
@@ -350,9 +350,9 @@ public:
 	const uint8_t * get_LUN()       const { return cdb_pdu_req->LUN;              }
 	      uint32_t  get_ExpDatLen() const { return ntohl(cdb_pdu_req->expdatlen); }
 
-	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters, std::optional<std::pair<uint8_t *, size_t> > data) override;
+	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters) override;
 	// special case: response after one or more data-out PDUs
-	std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters_in);
+	std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters_in, const uint8_t error);
 };
 
 class iscsi_pdu_scsi_data_in : public iscsi_pdu_bhs  // 0x25
@@ -542,7 +542,7 @@ public:
 	      uint32_t  get_CmdSN()      const { return ntohl(nop_out->CmdSN);     }
 	      uint32_t  get_ExpStatSN()  const { return ntohl(nop_out->ExpStatSN); }
 
-	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters, std::optional<std::pair<uint8_t *, size_t> > data) override;
+	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters) override;
 };
 
 class iscsi_pdu_nop_in : public iscsi_pdu_bhs  // NOP-In
@@ -661,7 +661,7 @@ public:
 	      uint32_t get_ExpStatSN() const { return ntohl(text_req->ExpStatSN); }
               uint32_t get_TTT()       const { return text_req->TTT;              }
 
-	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters, std::optional<std::pair<uint8_t *, size_t> > data) override;
+	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters) override;
 };
 
 class iscsi_pdu_text_reply : public iscsi_pdu_bhs  // 0x24
@@ -740,7 +740,7 @@ public:
 	uint32_t get_Itasktag()   const { return logout_req->Itasktag;     }
 	uint32_t get_ExpStatSN()  const { return ntohl(logout_req->ExpStatSN); }
 
-	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters, std::optional<std::pair<uint8_t *, size_t> > data) override;
+	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters) override;
 };
 
 class iscsi_pdu_logout_reply : public iscsi_pdu_bhs
@@ -824,7 +824,7 @@ public:
 	uint32_t get_ExpStatSN() const { return ntohl(taskman_req->ExpStatSN); }
 	uint32_t get_CmdSN()     const { return ntohl(taskman_req->CmdSN);     }
 
-	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters, std::optional<std::pair<uint8_t *, size_t> > data) override;
+	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters) override;
 };
 
 class iscsi_pdu_taskman_reply : public iscsi_pdu_bhs

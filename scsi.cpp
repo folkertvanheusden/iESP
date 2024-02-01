@@ -15,7 +15,7 @@ scsi::~scsi()
 {
 }
 
-std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t size, std::optional<std::pair<uint8_t *, size_t> > & data)
+std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data)
 {
 	assert(size >= 16);
 
@@ -214,16 +214,16 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 
 		DOLOG("scsi::send: WRITE_1%c, offset %llu, %u sectors\n", opcode == o_write_10 ? '0' : '6', lba, transfer_length);
 
-		if (data.has_value()) {
-			DOLOG("scsi::send: write command includes data (%zu bytes)\n", data.value().second);
+		if (data.first) {
+			DOLOG("scsi::send: write command includes data (%zu bytes)\n", data.second);
 
 			auto   backend_block_size = b->get_block_size();
 			size_t expected_size      = transfer_length * backend_block_size;
-			size_t received_size      = data.value().second;
+			size_t received_size      = data.second;
 			size_t received_blocks    = received_size / backend_block_size;
 			if (received_blocks)
 				DOLOG("scsi::send: WRITE_xx to LBA %llu is %zu in bytes, %zu bytes\n", lba, lba * backend_block_size, received_size);
-			if (received_blocks > 0 && b->write(lba, received_blocks, data.value().first) == false) {
+			if (received_blocks > 0 && b->write(lba, received_blocks, data.first) == false) {
 				DOLOG("scsi::send: WRITE_xx, failed writing\n");
 
 				// TODO set sense_data
@@ -302,9 +302,6 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 	}
 
 	DOLOG("-> returning %zu bytes of sense data\n", response.sense_data.size());
-
-	if (data.has_value())
-		delete [] data.value().first;
 
 	return response;
 }
