@@ -580,6 +580,8 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get()
 		pdu_data_in->ExpCmdSN   = htonl(reply_to_copy.get_CmdSN() + 1);  // TODO?
 		pdu_data_in->MaxCmdSN   = htonl(reply_to_copy.get_CmdSN() + 128);  // TODO?
 		pdu_data_in->DataSN     = htonl(s->get_inc_datasn(reply_to_copy.get_Itasktag()));
+		pdu_data_in->bufferoff  = htonl(i);
+		pdu_data_in->ResidualCt = htonl(use_pdu_data_size - i);
 
 		size_t out_size = sizeof(*pdu_data_in) + cur_len;
 		out_size = (out_size + 3) & ~3;

@@ -13,7 +13,7 @@ device = init_device('iscsi://192.168.64.206/test/1')
 # device = init_device('iscsi://192.168.65.238/target1/1')
 bs = 512
 count = 256
-step_start = 3
+step_start = 1
 errors = False
 with SCSI(device, blocksize=bs) as d:
     d.device.opcodes = sbc
@@ -44,7 +44,6 @@ with SCSI(device, blocksize=bs) as d:
                             break
             else:
                 print(f'Short read, expected {step * bs} bytes, got {len(r)}')
-        break
 
 if not errors:
     print('All good!')
