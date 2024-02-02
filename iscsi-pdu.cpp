@@ -264,9 +264,9 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 //		"TargetName=iqn.1993-11.com.vanheusden:test",
 //		"TargetAlias=Bob-s disk",  // TODO
 		"ImmediateData=Yes",
-//		"MaxRecvDataSegmentLength=8192",
-		"MaxBurstLength=4096",
-		"FirstBurstLength=4096",
+//		"MaxRecvDataSegmentLength=1024",
+		"MaxBurstLength=512",
+		"FirstBurstLength=512",
 		"TargetPortalGroupTag=1",
 		"InitialR2T=No",
 		"MaxOutstandingR2T=1",
@@ -551,9 +551,9 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get()
 		DOLOG("iscsi_pdu_scsi_data_in: requested less (%zu) than wat is available (%zu)\n", size_t(reply_to_copy.get_ExpDatLen()), use_pdu_data_size);
 	use_pdu_data_size = std::min(use_pdu_data_size, size_t(reply_to_copy.get_ExpDatLen()));
 
-	size_t n_to_do = (use_pdu_data_size + 4095) / 4096;
+	size_t n_to_do = (use_pdu_data_size + 511) / 512;
 
-	for(size_t i=0, count=0; i<use_pdu_data_size; i += 4096, count++) {  // 4kB blocks
+	for(size_t i=0, count=0; i<use_pdu_data_size; i += 512, count++) {  // 4kB blocks
 		*pdu_data_in = { };
 		set_bits(&pdu_data_in->b1, 0, 6, o_scsi_data_in);  // 0x25
 		bool last_block = count == n_to_do - 1;
@@ -569,7 +569,7 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get()
 			}
 			set_bits(&pdu_data_in->b2, 0, 1, true);  // S
 		}
-		size_t cur_len = std::min(use_pdu_data_size - i, size_t(4096));
+		size_t cur_len = std::min(use_pdu_data_size - i, size_t(512));
 		DOLOG("iscsi_pdu_scsi_data_in::get: block %zu, last_block: %d, cur_len: %zu\n", count, last_block, cur_len);
 		pdu_data_in->datalenH   = cur_len >> 16;
 		pdu_data_in->datalenM   = cur_len >>  8;
