@@ -234,6 +234,7 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 				return rc;
 
 			session->bytes_done += data.value().second;
+			session->bytes_left -= data.value().second;
 		}
 		else if (!F) {
 			DOLOG("server::push_response: DATA-OUT PDU has no data?\n");
@@ -241,22 +242,30 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 		}
 
 		// create response
-		if (/*session->bytes_done >= s->get_ack_interval() ||*/ F) {
-			if (F)
-				DOLOG("server::push_response: DATA-OUT-task finished\n");
-			else
-				DOLOG("server::push_response: DATA-OUT: burst interval\n");
+		if (F) {
+			DOLOG("server::push-response: end of batch\n");
 
 			iscsi_pdu_scsi_cmd response;
-			response.set(s, session->PDU_initiator.data, session->PDU_initiator.n);
-			response_set = response.get_response(s, parameters);
+			response.set(s, session->PDU_initiator.data, session->PDU_initiator.n);  // TODO check for false
+			response_set = response.get_response(s, parameters, session->bytes_left);
 
-			session->bytes_done = 0;
-		}
+			if (session->bytes_left == 0) {
+				DOLOG("server::push-response: end of task\n");
 
-		if (F) {
-			DOLOG("server::push-response: end of task\n");
-			s->remove_r2t_session(TTT);
+				s->remove_r2t_session(TTT);
+			}
+			else {
+				DOLOG("server::push-response: ask for more (%u bytes left)\n", session->bytes_left);
+				// send 0x31 for range
+				iscsi_pdu_scsi_cmd temp;
+				temp.set(s, session->PDU_initiator.data, session->PDU_initiator.n);
+
+				auto *response = new iscsi_pdu_scsi_r2t /* 0x31 */;
+				response->set(s, temp, TTT, session->bytes_done, session->bytes_left);  // TODO check for false
+				// ^ ADD TO RESPONSE SET TODO
+
+				response_set.value().responses.push_back(response);
+			}
 		}
 	}
 	else {

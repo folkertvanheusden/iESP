@@ -265,7 +265,7 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 //		"TargetAlias=Bob-s disk",  // TODO
 		"ImmediateData=Yes",
 //		"MaxRecvDataSegmentLength=8192",
-		"MaxBurstLength=8192",
+		"MaxBurstLength=4096",
 		"FirstBurstLength=4096",
 		"TargetPortalGroupTag=1",
 		"InitialR2T=No",
@@ -358,7 +358,7 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *cons
 	iscsi_response_set response;
 
 	auto *pdu_scsi_response = new iscsi_pdu_scsi_response() /* 0x21 */;
-	if (pdu_scsi_response->set(*this, { }) == false) {
+	if (pdu_scsi_response->set(*this, { }, { }) == false) {
 		DOLOG("iscsi_pdu_scsi_cmd::get_response: iscsi_pdu_scsi_response::set returned error\n");
 
 		return { };
@@ -402,7 +402,7 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *cons
 			auto *temp = new iscsi_pdu_scsi_response() /* 0x21 */;
 			DOLOG("iscsi_pdu_scsi_cmd::get_response: sending SCSI response with %zu sense bytes\n", scsi_reply.value().sense_data.size());
 
-			if (temp->set(*this, scsi_reply.value().sense_data) == false) {
+			if (temp->set(*this, scsi_reply.value().sense_data, { }) == false) {
 				ok = false;
 				DOLOG("iscsi_pdu_scsi_cmd::get_response: iscsi_pdu_scsi_response::set returned error\n");
 			}
@@ -414,7 +414,7 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *cons
 		DOLOG("iscsi_pdu_scsi_cmd::get_response: sending R2T with %zu sense bytes\n", scsi_reply.value().sense_data.size());
 		uint32_t TTT = s->init_r2t_session(scsi_reply.value().r2t, this);
 		DOLOG("iscsi_pdu_scsi_cmd::get_response: TTT is %08x\n", TTT);
-		if (temp->set(s, *this, TTT, scsi_reply.value().r2t.offset_from_lba, scsi_reply.value().r2t.bytes_left) == false) {
+		if (temp->set(s, *this, TTT, scsi_reply.value().r2t.bytes_done, scsi_reply.value().r2t.bytes_left) == false) {
 			ok = false;
 			DOLOG("iscsi_pdu_scsi_cmd::get_response: iscsi_pdu_scsi_response::set returned error\n");
 		}
@@ -456,12 +456,10 @@ iscsi_pdu_scsi_response::~iscsi_pdu_scsi_response()
 	delete [] pdu_response_data.first;
 }
 
-bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std::vector<uint8_t> & scsi_sense_data)
+bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std::vector<uint8_t> & scsi_sense_data, std::optional<uint32_t> ResidualCt)
 {
 	size_t sense_data_size = scsi_sense_data.size();
-	printf("sense_data_size: %zu\n", sense_data_size);
 	size_t reply_data_plus_sense_header = sense_data_size > 0 ? 2 + sense_data_size : 0;
-	printf("reply_data_plus_sense_header: %zu\n", reply_data_plus_sense_header);
 
 	*pdu_response = { };
 	set_bits(&pdu_response->b1, 0, 6, o_scsi_resp);  // 0x21
@@ -478,7 +476,10 @@ bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std
 	pdu_response->ExpCmdSN   = htonl(reply_to.get_CmdSN() + 1);
 	pdu_response->MaxCmdSN   = htonl(reply_to.get_CmdSN() + 1);
 	pdu_response->ExpDataSN  = htonl(1);  // TODO
-	pdu_response->ResidualCt = 0;
+	if (ResidualCt.has_value()) {
+		set_bits(&pdu_response->b2, 1, 1, true);  // U (residual underflow)
+		pdu_response->ResidualCt = ResidualCt.value();
+	}
 
 	pdu_response_data.second = reply_data_plus_sense_header;
 	if (pdu_response_data.second) {
@@ -576,8 +577,8 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get()
 		memcpy(pdu_data_in->LUN, reply_to_copy.get_LUN(), sizeof pdu_data_in->LUN);
 		pdu_data_in->Itasktag   = reply_to_copy.get_Itasktag();
 		pdu_data_in->StatSN     = htonl(reply_to_copy.get_ExpStatSN());
-		pdu_data_in->ExpCmdSN   = htonl(reply_to_copy.get_CmdSN() + 1);
-		pdu_data_in->MaxCmdSN   = htonl(reply_to_copy.get_CmdSN() + 128);
+		pdu_data_in->ExpCmdSN   = htonl(reply_to_copy.get_CmdSN() + 1);  // TODO?
+		pdu_data_in->MaxCmdSN   = htonl(reply_to_copy.get_CmdSN() + 128);  // TODO?
 		pdu_data_in->DataSN     = htonl(s->get_inc_datasn(reply_to_copy.get_Itasktag()));
 
 		size_t out_size = sizeof(*pdu_data_in) + cur_len;
@@ -707,15 +708,12 @@ bool iscsi_pdu_scsi_r2t::set(session *const s, const iscsi_pdu_scsi_cmd & reply_
 	*pdu_scsi_r2t = { };
 	set_bits(&pdu_scsi_r2t->b1, 0, 6, o_r2t);
 	set_bits(&pdu_scsi_r2t->b2, 7, 1, true);
-	pdu_scsi_r2t->datalenH   = 0;
-	pdu_scsi_r2t->datalenM   = 0;
-	pdu_scsi_r2t->datalenL   = 0;
 	memcpy(pdu_scsi_r2t->LUN, reply_to.get_LUN(), sizeof pdu_scsi_r2t->LUN);
 	pdu_scsi_r2t->Itasktag   = reply_to.get_Itasktag();
 	pdu_scsi_r2t->TTT        = TTT;
 	pdu_scsi_r2t->StatSN     = htonl(reply_to.get_ExpStatSN());
 	pdu_scsi_r2t->ExpCmdSN   = htonl(reply_to.get_CmdSN() + 1);
-	pdu_scsi_r2t->MaxCmdSN   = htonl(reply_to.get_CmdSN() + 1);
+	pdu_scsi_r2t->MaxCmdSN   = htonl(reply_to.get_CmdSN() + 128);
 	pdu_scsi_r2t->bufferoff  = htonl(buffer_offset);
 	pdu_scsi_r2t->DDTF       = htonl(data_length);
 

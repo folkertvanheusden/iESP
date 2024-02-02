@@ -501,7 +501,7 @@ public:
 	iscsi_pdu_scsi_response();
 	virtual ~iscsi_pdu_scsi_response();
 
-	bool set(const iscsi_pdu_scsi_cmd & reply_to, const std::vector<uint8_t> & scsi_sense_data);
+	bool set(const iscsi_pdu_scsi_cmd & reply_to, const std::vector<uint8_t> & scsi_sense_data, std::optional<uint32_t> ResidualCt);
 
 	std::vector<blob_t> get() override;
 };
