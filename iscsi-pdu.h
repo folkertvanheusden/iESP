@@ -7,6 +7,7 @@
 #include <arpa/inet.h>
 #include <sys/types.h>
 
+#include "gen.h"
 #include "iscsi.h"
 #include "session.h"
 
@@ -197,6 +198,8 @@ struct iscsi_response_set
 {
 	std::vector<iscsi_pdu_bhs *> responses;
 	bool r2t { false };
+
+	std::optional<data_descriptor> to_stream;
 };
 
 std::string pdu_opcode_to_string(const iscsi_pdu_bhs::iscsi_bhs_opcode opcode);
@@ -406,6 +409,8 @@ public:
 	bool set(session *const s, const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data, const bool has_sense);
 	std::vector<blob_t> get() override;
         uint32_t get_TTT() const { return pdu_data_in->TTT; }
+
+	static blob_t gen_data_in_pdu(session *const s, const iscsi_pdu_scsi_cmd & reply_to, const blob_t & pdu_data_in_data, const size_t use_pdu_data_size, const size_t offset_in_data);
 };
 
 class iscsi_pdu_scsi_data_out : public iscsi_pdu_bhs  // 0x05

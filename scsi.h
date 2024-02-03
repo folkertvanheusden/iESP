@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "backend.h"
+#include "gen.h"
 #include "iscsi.h"
 #include "iscsi-pdu.h"
 
@@ -12,8 +13,18 @@ struct scsi_response
 {
 	iscsi_reacion_t              type;
 	std::vector<uint8_t>         sense_data;  // error data
-	std::pair<uint8_t *, size_t> data;  // meta data or disk-data
 	bool                         data_is_meta;  // scsi command reply data
+
+	struct {
+		bool is_inline;  // if true, then next is valid
+
+		union {
+			std::pair<uint8_t *, size_t> data;  // meta data or disk-data
+
+			// if not inline
+			data_descriptor location;
+		} what;
+	} io;
 
 	r2t_session r2t;
 };

@@ -382,18 +382,18 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *cons
 	iscsi_response_set response;
 	bool               ok       { true };
 
-	if (scsi_reply.value().data.second) {
+	if (scsi_reply.value().io.is_inline) {
 		auto pdu_data_in = new iscsi_pdu_scsi_data_in();  // 0x25
-		DOLOG("iscsi_pdu_scsi_cmd::get_response: sending SCSI DATA-IN with %zu payload bytes, is meta: %d\n", scsi_reply.value().data.second, scsi_reply.value().data_is_meta);
-		if (pdu_data_in->set(s, *this, scsi_reply.value().data, scsi_reply.value().data_is_meta) == false) {
+		DOLOG("iscsi_pdu_scsi_cmd::get_response: sending SCSI DATA-IN with %zu payload bytes, is meta: %d\n", scsi_reply.value().io.what.data.second, scsi_reply.value().data_is_meta);
+		if (pdu_data_in->set(s, *this, scsi_reply.value().io.what.data, scsi_reply.value().data_is_meta) == false) {
 			ok = false;
 			DOLOG("iscsi_pdu_scsi_cmd::get_response: iscsi_pdu_scsi_data_in::set returned error state\n");
 		}
 		response.responses.push_back(pdu_data_in);
-		delete [] scsi_reply.value().data.first;
+		delete [] scsi_reply.value().io.what.data.first;
 	}
 	else {
-		assert(scsi_reply.value().data.first == nullptr);
+		assert(scsi_reply.value().io.what.data.first == nullptr);
 	}
 
 	iscsi_pdu_bhs *pdu_scsi_response = nullptr;
@@ -594,6 +594,46 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get()
 	}
 
 	return v_out;
+}
+
+blob_t iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *const s, const iscsi_pdu_scsi_cmd & reply_to, const blob_t & pdu_data_in_data, const size_t use_pdu_data_size, const size_t offset_in_data)
+{
+	bool last_block = (offset_in_data + pdu_data_in_data.n) == use_pdu_data_size;
+
+	__pdu_data_in__ pdu_data_in __attribute__((packed)) { };
+
+	set_bits(&pdu_data_in.b1, 0, 6, o_scsi_data_in);  // 0x25
+	if (last_block) {
+		set_bits(&pdu_data_in.b2, 7, 1, true);  // F
+		if (pdu_data_in_data.n < reply_to.get_ExpDatLen()) {
+			set_bits(&pdu_data_in.b2, 1, 1, true);  // U
+		}
+		else if (pdu_data_in_data.n > reply_to.get_ExpDatLen()) {
+			set_bits(&pdu_data_in.b2, 2, 1, true);  // O
+		}
+		set_bits(&pdu_data_in.b2, 0, 1, true);  // S
+	}
+	DOLOG("iscsi_pdu_scsi_data_in::get: block %zu, last_block: %d, cur_len: %zu\n", count, last_block, pdu_data_in_data.n);
+	pdu_data_in.datalenH   = pdu_data_in_data.n >> 16;
+	pdu_data_in.datalenM   = pdu_data_in_data.n >>  8;
+	pdu_data_in.datalenL   = pdu_data_in_data.n      ;
+	memcpy(pdu_data_in.LUN, reply_to.get_LUN(), sizeof pdu_data_in.LUN);
+	pdu_data_in.Itasktag   = reply_to.get_Itasktag();
+	pdu_data_in.StatSN     = htonl(reply_to.get_ExpStatSN());
+	pdu_data_in.ExpCmdSN   = htonl(reply_to.get_CmdSN() + 1);  // TODO?
+	pdu_data_in.MaxCmdSN   = htonl(reply_to.get_CmdSN() + 128);  // TODO?
+	pdu_data_in.DataSN     = htonl(s->get_inc_datasn(reply_to.get_Itasktag()));
+	pdu_data_in.bufferoff  = htonl(offset_in_data);
+	pdu_data_in.ResidualCt = htonl(use_pdu_data_size - offset_in_data);
+
+	size_t out_size = sizeof(pdu_data_in) + pdu_data_in_data.n;
+	out_size = (out_size + 3) & ~3;
+
+	uint8_t *out = new uint8_t[out_size]();
+	memcpy(out, &pdu_data_in, sizeof pdu_data_in);
+	memcpy(&out[sizeof(pdu_data_in)], pdu_data_in_data.data, pdu_data_in_data.n);
+
+	return { out, out_size };
 }
 
 /*--------------------------------------------------------------------------*/

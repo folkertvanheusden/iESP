@@ -47,9 +47,10 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		DOLOG(" MODE SENSE 6: SUBPAGE CODE %02xh\n", CDB[3]);
 		DOLOG(" MODE SENSE 6: AllocationLength: %d\n", CDB[4]);
 		DOLOG(" MODE SENSE 6: Control: %02xh\n", CDB[5]);
-		response.data.second = 4;
-		response.data.first = new uint8_t[response.data.second]();
-		response.data.first[0] = response.data.second - 1;  // length
+		response.io.is_inline          = true;
+		response.io.what.data.second   = 4;
+		response.io.what.data.first    = new uint8_t[response.io.what.data.second]();
+		response.io.what.data.first[0] = response.io.what.data.second - 1;  // length
 	}
 	else if (opcode == o_inquiry) {  // 0x12
 		DOLOG("scsi::send: INQUIRY\n");
@@ -67,74 +68,79 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 			if (CDB[2])
 				ok = false;
 			else {
-				response.data.second = 68;
-				response.data.first = new uint8_t[response.data.second]();
-				response.data.first[0] = 0x00;  // "Direct access block device"
-				response.data.first[1] = 0;  // not removable
-				response.data.first[2] = 5;  // VERSION
-				response.data.first[3] = 2;  // response data format
-				response.data.first[4] = response.data.second - 5;  // additional length
-				response.data.first[5] = 0;
-				response.data.first[6] = 0;
-				response.data.first[7] = 0;
-				memcpy(&response.data.first[8],  "vnHeusdn", 8);
-				memcpy(&response.data.first[16], "iESP", 4);  // TODO
-				memcpy(&response.data.first[32], "1.0", 3);  // TODO
-				memcpy(&response.data.first[36], "12345678", 8);  // TODO
-				response.data.first[58] = 0x04;  // SBC-3
-				response.data.first[59] = 0xc0;
-				response.data.first[60] = 0x09;  // iSCSI
-				response.data.first[61] = 0x60;
-				response.data.first[62] = 0x01;  // SCC-2
-				response.data.first[63] = 0xfb;
-				response.data.first[64] = 0x01;  // SPC
-				response.data.first[65] = 0x20;
+				response.io.is_inline        = true;
+				response.io.what.data.second = 68;
+				response.io.what.data.first  = new uint8_t[response.io.what.data.second]();
+				response.io.what.data.first[0] = 0x00;  // "Direct access block device"
+				response.io.what.data.first[1] = 0;  // not removable
+				response.io.what.data.first[2] = 5;  // VERSION
+				response.io.what.data.first[3] = 2;  // response data format
+				response.io.what.data.first[4] = response.io.what.data.second - 5;  // additional length
+				response.io.what.data.first[5] = 0;
+				response.io.what.data.first[6] = 0;
+				response.io.what.data.first[7] = 0;
+				memcpy(&response.io.what.data.first[8],  "vnHeusdn", 8);
+				memcpy(&response.io.what.data.first[16], "iESP", 4);  // TODO
+				memcpy(&response.io.what.data.first[32], "1.0", 3);  // TODO
+				memcpy(&response.io.what.data.first[36], "12345678", 8);  // TODO
+				response.io.what.data.first[58] = 0x04;  // SBC-3
+				response.io.what.data.first[59] = 0xc0;
+				response.io.what.data.first[60] = 0x09;  // iSCSI
+				response.io.what.data.first[61] = 0x60;
+				response.io.what.data.first[62] = 0x01;  // SCC-2
+				response.io.what.data.first[63] = 0xfb;
+				response.io.what.data.first[64] = 0x01;  // SPC
+				response.io.what.data.first[65] = 0x20;
 			}
 		}
 		else {
                         if (CDB[2] == 0x00) {
-                                response.data.second = 8;
-                                response.data.first = new uint8_t[response.data.second]();
-                                response.data.first[0] = 0;  // TODO
-                                response.data.first[1] = CDB[2];
-                                response.data.first[2] = 0;  // reserved
-                                response.data.first[3] = response.data.second - 3;
-                                response.data.first[4] = 0x00;
-                                response.data.first[5] = 0x83;  // see CDB[2] below
-                                response.data.first[6] = 0xb0;
-                                response.data.first[7] = 0xb1;
+				response.io.is_inline          = true;
+                                response.io.what.data.second   = 8;
+                                response.io.what.data.first    = new uint8_t[response.io.what.data.second]();
+                                response.io.what.data.first[0] = 0;  // TODO
+                                response.io.what.data.first[1] = CDB[2];
+                                response.io.what.data.first[2] = 0;  // reserved
+                                response.io.what.data.first[3] = response.io.what.data.second - 3;
+                                response.io.what.data.first[4] = 0x00;
+                                response.io.what.data.first[5] = 0x83;  // see CDB[2] below
+                                response.io.what.data.first[6] = 0xb0;
+                                response.io.what.data.first[7] = 0xb1;
                         }
 			else if (CDB[2] == 0x83) {
-				response.data.second = 4 + 5;
-				response.data.first = new uint8_t[response.data.second]();
-				response.data.first[0] = 0;  // TODO
-				response.data.first[1] = CDB[2];
-				response.data.first[3] = 1;
-				response.data.first[4 + 3] = 1;
-				response.data.first[4 + 4] = 1;
+				response.io.is_inline          = true;
+				response.io.what.data.second = 4 + 5;
+				response.io.what.data.first = new uint8_t[response.io.what.data.second]();
+				response.io.what.data.first[0] = 0;  // TODO
+				response.io.what.data.first[1] = CDB[2];
+				response.io.what.data.first[3] = 1;
+				response.io.what.data.first[4 + 3] = 1;
+				response.io.what.data.first[4 + 4] = 1;
 			}
 			else if (CDB[2] == 0xb0) {
-				response.data.second = 64;
-				response.data.first = new uint8_t[response.data.second]();
-				response.data.first[0] = 0;  // TODO
-				response.data.first[1] = CDB[2];
-				response.data.first[2] = (response.data.second - 4) >> 8;  // page length
-				response.data.first[3] = response.data.second - 4;
-				response.data.first[4] = 0;  // WSNZ bit
-				response.data.first[5] = 0;  // compare and write not supported
-				response.data.first[6] = 0;  // OPTIMAL TRANSFER LENGTH GRANULARITY
-				response.data.first[7] = 0;
+				response.io.is_inline          = true;
+				response.io.what.data.second = 64;
+				response.io.what.data.first = new uint8_t[response.io.what.data.second]();
+				response.io.what.data.first[0] = 0;  // TODO
+				response.io.what.data.first[1] = CDB[2];
+				response.io.what.data.first[2] = (response.io.what.data.second - 4) >> 8;  // page length
+				response.io.what.data.first[3] = response.io.what.data.second - 4;
+				response.io.what.data.first[4] = 0;  // WSNZ bit
+				response.io.what.data.first[5] = 0;  // compare and write not supported
+				response.io.what.data.first[6] = 0;  // OPTIMAL TRANSFER LENGTH GRANULARITY
+				response.io.what.data.first[7] = 0;
 				// ... set all to 'not set'
 			}
 			else if (CDB[2] == 0xb1) {
-				response.data.second = 64;
-				response.data.first = new uint8_t[response.data.second]();
-				response.data.first[0] = 0;  // TODO
-				response.data.first[1] = CDB[2];
-				response.data.first[2] = (response.data.second - 4)>> 8;  // page length
-				response.data.first[3] = response.data.second - 4;
-				response.data.first[4] = 0x1c;  // device has an RPM of 7200 (fake!)
-				response.data.first[5] = 0x20;
+				response.io.is_inline          = true;
+				response.io.what.data.second = 64;
+				response.io.what.data.first = new uint8_t[response.io.what.data.second]();
+				response.io.what.data.first[0] = 0;  // TODO
+				response.io.what.data.first[1] = CDB[2];
+				response.io.what.data.first[2] = (response.io.what.data.second - 4)>> 8;  // page length
+				response.io.what.data.first[3] = response.io.what.data.second - 4;
+				response.io.what.data.first[4] = 0x1c;  // device has an RPM of 7200 (fake!)
+				response.io.what.data.first[5] = 0x20;
 				// ... set all to 'not set'
 			}
 			else {
@@ -153,22 +159,23 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 			};
 		}
 
-		response.data.second = std::min(response.data.second, size_t(allocation_length));
+		response.io.what.data.second = std::min(response.io.what.data.second, size_t(allocation_length));
 	}
 	else if (opcode == o_read_capacity_10) {
 		DOLOG("scsi::send: READ_CAPACITY\n");
-		response.data.second = 8;
-		response.data.first = new uint8_t[response.data.second]();
+		response.io.is_inline          = true;
+		response.io.what.data.second = 8;
+		response.io.what.data.first = new uint8_t[response.io.what.data.second]();
 		auto device_size = b->get_size_in_blocks() - 1;
-		response.data.first[0] = device_size >> 24;  // sector count
-		response.data.first[1] = device_size >> 16;
-		response.data.first[2] = device_size >>  8;
-		response.data.first[3] = device_size;
+		response.io.what.data.first[0] = device_size >> 24;  // sector count
+		response.io.what.data.first[1] = device_size >> 16;
+		response.io.what.data.first[2] = device_size >>  8;
+		response.io.what.data.first[3] = device_size;
 		auto block_size = b->get_block_size();
-		response.data.first[4] = block_size >> 24;  // sector size
-		response.data.first[5] = block_size >> 16;
-		response.data.first[6] = block_size >>  8;
-		response.data.first[7] = block_size;
+		response.io.what.data.first[4] = block_size >> 24;  // sector size
+		response.io.what.data.first[5] = block_size >> 16;
+		response.io.what.data.first[6] = block_size >>  8;
+		response.io.what.data.first[7] = block_size;
 	}
 	else if (opcode == o_get_lba_status) {
 		uint8_t service_action = CDB[1] & 31;
@@ -177,35 +184,37 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		if (service_action == 0x10) {  // READ CAPACITY
 			DOLOG("scsi::send: READ_CAPACITY(16)\n");
 
-			response.data.second = 32;
-			response.data.first = new uint8_t[response.data.second]();
+			response.io.is_inline          = true;
+			response.io.what.data.second = 32;
+			response.io.what.data.first = new uint8_t[response.io.what.data.second]();
 			auto device_size = b->get_size_in_blocks() - 1;
-			response.data.first[0] = device_size >> 56;
-			response.data.first[1] = device_size >> 48;
-			response.data.first[2] = device_size >> 40;
-			response.data.first[3] = device_size >> 32;
-			response.data.first[4] = device_size >> 24;
-			response.data.first[5] = device_size >> 16;
-			response.data.first[6] = device_size >>  8;
-			response.data.first[7] = device_size;
+			response.io.what.data.first[0] = device_size >> 56;
+			response.io.what.data.first[1] = device_size >> 48;
+			response.io.what.data.first[2] = device_size >> 40;
+			response.io.what.data.first[3] = device_size >> 32;
+			response.io.what.data.first[4] = device_size >> 24;
+			response.io.what.data.first[5] = device_size >> 16;
+			response.io.what.data.first[6] = device_size >>  8;
+			response.io.what.data.first[7] = device_size;
 			uint32_t block_size = b->get_block_size();
-			response.data.first[8] = block_size >> 24;
-			response.data.first[9] = block_size >> 16;
-			response.data.first[10] = block_size >>  8;
-			response.data.first[11] = block_size;
-			response.data.first[12] = 1 << 4;  // RC BASIS: "The RETURNED LOGICAL BLOCK ADDRESS field indicates the LBA of the last logical block on the logical unit."
+			response.io.what.data.first[8] = block_size >> 24;
+			response.io.what.data.first[9] = block_size >> 16;
+			response.io.what.data.first[10] = block_size >>  8;
+			response.io.what.data.first[11] = block_size;
+			response.io.what.data.first[12] = 1 << 4;  // RC BASIS: "The RETURNED LOGICAL BLOCK ADDRESS field indicates the LBA of the last logical block on the logical unit."
 		}
 		else if (service_action == 0x12) {  // GET LBA STATUS
 			DOLOG("scsi::send: GET_LBA_STATUS\n");
 
-			response.data.second = 24;
-			response.data.first = new uint8_t[response.data.second]();
-			response.data.first[0] = 0;
-			response.data.first[1] = 0;
-			response.data.first[2] = 0;
-			response.data.first[3] = response.data.second - 3;
-			memcpy(&response.data.first[8], &CDB[2], 8);  // LBA STATUS LOGICAL BLOCK ADDRESS
-			memcpy(&response.data.first[16], &CDB[10], 4);  // ALLOCATIN LENGTH
+			response.io.is_inline          = true;
+			response.io.what.data.second = 24;
+			response.io.what.data.first = new uint8_t[response.io.what.data.second]();
+			response.io.what.data.first[0] = 0;
+			response.io.what.data.first[1] = 0;
+			response.io.what.data.first[2] = 0;
+			response.io.what.data.first[3] = response.io.what.data.second - 3;
+			memcpy(&response.io.what.data.first[8], &CDB[2], 8);  // LBA STATUS LOGICAL BLOCK ADDRESS
+			memcpy(&response.io.what.data.first[16], &CDB[10], 4);  // ALLOCATIN LENGTH
 		}
 	}
 	else if (opcode == o_write_10 || opcode == o_write_16) {
@@ -284,33 +293,19 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 			DOLOG("scsi::send: READ_6, LBA %zu, %u sectors\n", size_t(lba), transfer_length);
 		}
 
-		response.data.second = transfer_length * b->get_block_size();
-		if (response.data.second) {
-			response.data.first = new uint8_t[response.data.second]();
-			if (b->read(lba, transfer_length, response.data.first) == false) {
-				DOLOG("scsi::send: READ_xx, failed reading\n");
+		response.io.is_inline          = false;
+		response.io.what.location.lba       = lba;
+		response.io.what.location.n_sectors = transfer_length;
 
-				delete [] response.data.first;
-				response.data.first  = nullptr;
-				response.data.second = 0;
-
-				// TODO set sense_data;
-			}
-			else {
-				DOLOG("scsi::send: READ %zu bytes (%u sectors)\n", response.data.second, transfer_length);
-			}
-		}
-		else {
-			DOLOG("scsi::send: 0 bytes request\n");
-		}
 		response.data_is_meta = false;
 	}
 	else if (opcode == o_report_luns) {  // 0xA0
 		DOLOG("scsi::send: REPORT_LUNS, report: %02xh\n", CDB[2]);
 
-		response.data.second = 16;
-		response.data.first = new uint8_t[response.data.second]();
-		response.data.first[3] = 1;  // lun list length of 1
+		response.io.is_inline          = true;
+		response.io.what.data.second = 16;
+		response.io.what.data.first = new uint8_t[response.io.what.data.second]();
+		response.io.what.data.first[3] = 1;  // lun list length of 1
 	}
 	else {
 		DOLOG("scsi::send: opcode %02xh not implemented\n", opcode);

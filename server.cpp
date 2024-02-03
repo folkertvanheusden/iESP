@@ -298,6 +298,40 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 		delete pdu_out;
 	}
 
+	// e.g. for READ_xx (as buffering may be RAM-wise too costly)
+	if (response_set.value().to_stream.has_value()) {
+		auto & stream_parameters = response_set.value().to_stream.value();
+
+		iscsi_pdu_scsi_cmd reply_to;
+		auto temp = reply_to.get_raw();
+		reply_to.set(s, temp.data, temp.n);
+		delete [] temp.data;
+
+	        auto use_pdu_data_size = stream_parameters.n_sectors * 512;
+		if (use_pdu_data_size > size_t(reply_to.get_ExpDatLen())) {
+			DOLOG("iscsi_pdu_scsi_data_in: requested less (%zu) than wat is available (%zu)\n", size_t(reply_to_copy.get_ExpDatLen()), use_pdu_data_size);
+			use_pdu_data_size = reply_to.get_ExpDatLen();
+		}
+
+		blob_t buffer;
+		buffer.n    = 512;
+		buffer.data = new uint8_t[buffer.n]();
+
+		uint32_t offset = 0;
+
+		for(uint32_t block_nr = 0; block_nr < stream_parameters.n_sectors; block_nr++) {
+			if (b->read(block_nr + stream_parameters.lba, 1, buffer.data) == false) {
+				// TODO
+				break;
+			}
+
+			blob_t out = iscsi_pdu_scsi_data_in::gen_data_in_pdu(s, reply_to, buffer, use_pdu_data_size, offset);
+			offset += buffer.n;
+		}
+
+		delete [] buffer.data;
+	}
+
 	DOLOG(" ---\n");
 
 	return ok;
