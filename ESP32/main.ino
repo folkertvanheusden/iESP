@@ -38,6 +38,7 @@ void loop()
 	snprintf(buffer, sizeof buffer, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
 
 	server s(&bs, buffer, 3260);
+	Serial.println(F("Go!"));
 	s.begin();
 
 	s.handler();

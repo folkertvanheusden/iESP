@@ -1,40 +1,90 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
-#include <SD.h>
 
 #include "backend-sdcard.h"
 #include "log.h"
 
 
+#define CS_SD 5
+#define FILENAME "test.dat"
+
 backend_sdcard::backend_sdcard()
 {
-	if (!SD.begin(5)) {
-		Serial.println("SD-card mount failed");
+	Serial.println(F("Init SD-card backend..."));
+
+	bool ok = false;
+	for(int sp=50; sp>=14; sp -= 4) {
+		Serial.printf("Trying %d MHz...\r\n", sp);
+
+		if (sd.begin(5, SD_SCK_MHZ(sp))) {
+			Serial.printf("Accessing SD card at %d MHz\r\n", sp);
+			ok = true;
+			break;
+		}
+	}
+	if (ok == false) {
+		Serial.println(F("SD-card mount failed (assuming CS is on pin 5)"));
+		sd.initErrorHalt(&Serial);
 		return;
 	}
 
-	auto card_type = SD.cardType();
+	sd.ls();
 
-	Serial.print("SD-card type: ");
+retry:
+	if (sd.exists(FILENAME) == false)
+		init_file();
 
-	if (card_type == CARD_MMC)
-		Serial.println("MMC");
-	else if (card_type == CARD_SD)
-		Serial.println("SDSC");
-	else if (card_type == CARD_SDHC)
-		Serial.println("SDHC");
-	else
-		Serial.println("UNKNOWN");
+	if (file.open(FILENAME, O_RDWR) == false) {
+		Serial.print(F("Cannot access test.dat on SD-card"));
+		return;
+	}
 
-	card_size = SD.cardSize();
-	Serial.printf("SD-card size: %zuMB\r\n", size_t(card_size / 1024 / 1024));
-	sector_size = SD.sectorSize();
-	Serial.printf("Sector size: %zu\r\n", sector_size);
+	// virtual sizes
+	card_size   = file.fileSize();
+	sector_size = 512;
+
+	if (card_size == 0) {
+		Serial.println(F("File is 0 bytes, recreating in 5s..."));
+		file.close();
+		sd.remove(FILENAME);
+		delay(5000);
+		goto retry;
+	}
+
+	Serial.printf("Virtual disk size: %zuMB\r\n", size_t(card_size / 1024 / 1024));
 }
 
 backend_sdcard::~backend_sdcard()
 {
+	file.close();
+
+	sd.end();
+}
+
+void backend_sdcard::init_file()
+{
+	Serial.println(F("Creating " FILENAME "..."));
+
+	if (file.open(FILENAME, O_RDWR | O_CREAT) == false) {
+		Serial.println(F("Cannot create backend file"));
+		return;
+	}
+
+	uint64_t vol_free = sd.vol()->freeClusterCount();
+	Serial.printf("Free clusters: %zu\r\n", size_t(vol_free));
+
+	uint64_t total_free_bytes = vol_free * sd.vol()->sectorsPerCluster() * 512ll;
+	Serial.printf("Free space in bytes: %zu\r\n", size_t(total_free_bytes));
+
+	total_free_bytes = (total_free_bytes * 7 / 8) & ~511;
+
+	if (file.truncate(total_free_bytes) == false)
+		Serial.printf("Cannot resize file to %zu bytes: %d\r\n", total_free_bytes, file.getError());
+
+	file.close();
+
+	file.ls();
 }
 
 uint64_t backend_sdcard::get_size_in_blocks() const
@@ -49,42 +99,34 @@ uint64_t backend_sdcard::get_block_size() const
 
 bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data)
 {
+	Serial.printf("Write to block %zu, %u blocks\r\n", size_t(block_nr), n_blocks);
+
 	uint64_t iscsi_block_size = get_block_size();
+	uint64_t byte_address     = block_nr * iscsi_block_size;  // iSCSI to bytes
 
-	for(uint32_t i=0; i<n_blocks; i++) {
-		const uint8_t *iscsi_block_offset = &data[i * iscsi_block_size];
-
-		uint64_t byte_address  = (block_nr + i) * iscsi_block_size;  // iSCSI to bytes
-		uint32_t sd_block_nr   = byte_address / sector_size;   // bytes to SD
-
-		for(int s=0; s<iscsi_block_size / sector_size; s++) {  // an iSCSI block is usually 4kB (in this implementation) and an SD-card has 0.5kB sectors
-			const uint8_t *sd_block_offset = iscsi_block_offset + s * sector_size;
-
-			if (SD.writeRAW(const_cast<uint8_t *>(sd_block_offset), sd_block_nr + s) == false)
-				return false;
-		}
+	if (file.seekSet(byte_address) == false) {
+		Serial.println(F("Cannot seek to position"));
+		return false;
 	}
 
-	return true;
+	size_t n_bytes_to_write = n_blocks * iscsi_block_size;
+
+	return file.write(data, n_bytes_to_write) == n_bytes_to_write;
 }
 
 bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_t *const data)
 {
+	Serial.printf("Read from block %zu, %u blocks\r\n", size_t(block_nr), n_blocks);
+
 	uint64_t iscsi_block_size = get_block_size();
+	uint64_t byte_address     = block_nr * iscsi_block_size;  // iSCSI to bytes
 
-	for(uint32_t i=0; i<n_blocks; i++) {
-		uint8_t *iscsi_block_offset = &data[i * iscsi_block_size];
-
-		uint64_t byte_address  = (block_nr + i) * iscsi_block_size;  // iSCSI to bytes
-		uint32_t sd_block_nr   = byte_address / sector_size;   // bytes to SD
-
-		for(int s=0; s<iscsi_block_size / sector_size; s++) {  // an iSCSI block is usually 4kB (in this implementation) and an SD-card has 0.5kB sectors
-			uint8_t *sd_block_offset = iscsi_block_offset + s * sector_size;
-
-			if (SD.readRAW(sd_block_offset, sd_block_nr + s) == false)
-				return false;
-		}
+	if (file.seekSet(byte_address) == false) {
+		Serial.println(F("Cannot seek to position"));
+		return false;
 	}
 
-	return true;
+	size_t n_bytes_to_read = n_blocks * iscsi_block_size;
+
+	return file.read(data, n_bytes_to_read) == n_bytes_to_read;
 }

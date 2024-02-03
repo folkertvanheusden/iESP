@@ -1,3 +1,4 @@
+#include <SdFat.h>
 #include <string>
 
 #include "backend.h"
@@ -6,8 +7,12 @@
 class backend_sdcard : public backend
 {
 private:
-	uint64_t card_size   { 0 };
-	size_t   sector_size { 0 };
+	SdExFat   sd;
+	ExFatFile file;
+	uint64_t  card_size   { 0 };
+	size_t    sector_size { 0 };
+
+	void init_file();
 
 public:
 	backend_sdcard();

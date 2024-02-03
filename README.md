@@ -25,7 +25,7 @@ For Linux:
 
 using
 -----
-On the ESP32 it uses the connected SD-card in raw mode. The ESP32 version uses 'WifiManager' so after the first powerup, you need to configure an access point via the temporary accesspoint.
+On the ESP32 it uses the connected SD-card. Make sure it is formatted in 'exfat' format. Create a test.dat file on the SD-card of the size you want your iSCSI target to be. The ESP32 version uses 'WifiManager': after the first powerup you need to configure an access point via the temporary accesspoint.
 
 On Linux, it assumes you have a test.dat file (in the same directory) of appropriate size. Note that you need to adjust the IP-address in main.cpp for it to work.
 
