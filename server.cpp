@@ -302,6 +302,8 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 	if (response_set.value().to_stream.has_value()) {
 		auto & stream_parameters = response_set.value().to_stream.value();
 
+		DOLOG("server::push_response: stream %zu sectors (opcode %02xh)\n", stream_parameters.n_sectors, pdu->get_opcode());
+
 		iscsi_pdu_scsi_cmd reply_to;
 		auto temp = reply_to.get_raw();
 		reply_to.set(s, temp.data, temp.n);
@@ -326,6 +328,15 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 			}
 
 			blob_t out = iscsi_pdu_scsi_data_in::gen_data_in_pdu(s, reply_to, buffer, use_pdu_data_size, offset);
+
+			if (WRITE(fd, out.data, out.n) == -1) {
+				delete [] out.data;
+				// TODO
+				break;
+			}
+
+			delete [] out.data;
+
 			offset += buffer.n;
 		}
 

@@ -432,6 +432,12 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *cons
 		return { };
 	}
 
+	if (scsi_reply.value().io.is_inline == false) {
+		DOLOG("iscsi_pdu_scsi_cmd::get_response: queing stream\n");
+
+		response.to_stream = scsi_reply.value().io.what.location;
+	}
+
 	return response;
 }
 
@@ -599,6 +605,11 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get()
 blob_t iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *const s, const iscsi_pdu_scsi_cmd & reply_to, const blob_t & pdu_data_in_data, const size_t use_pdu_data_size, const size_t offset_in_data)
 {
 	bool last_block = (offset_in_data + pdu_data_in_data.n) == use_pdu_data_size;
+
+	if (last_block)
+		DOLOG("iscsi_pdu_scsi_data_in::gen_data_in_pdu: last block\n");
+	else
+		DOLOG("iscsi_pdu_scsi_data_in::gen_data_in_pdu: offset %zu + %zu != %zu\n", offset_in_data, pdu_data_in_data.n, use_pdu_data_size);
 
 	__pdu_data_in__ pdu_data_in __attribute__((packed)) { };
 

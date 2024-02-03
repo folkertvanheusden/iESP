@@ -293,7 +293,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 			DOLOG("scsi::send: READ_6, LBA %zu, %u sectors\n", size_t(lba), transfer_length);
 		}
 
-		response.io.is_inline          = false;
+		response.io.is_inline               = false;
 		response.io.what.location.lba       = lba;
 		response.io.what.location.n_sectors = transfer_length;
 
@@ -303,8 +303,8 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		DOLOG("scsi::send: REPORT_LUNS, report: %02xh\n", CDB[2]);
 
 		response.io.is_inline          = true;
-		response.io.what.data.second = 16;
-		response.io.what.data.first = new uint8_t[response.io.what.data.second]();
+		response.io.what.data.second   = 16;
+		response.io.what.data.first    = new uint8_t[response.io.what.data.second]();
 		response.io.what.data.first[3] = 1;  // lun list length of 1
 	}
 	else {
