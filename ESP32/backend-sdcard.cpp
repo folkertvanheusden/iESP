@@ -99,7 +99,7 @@ uint64_t backend_sdcard::get_block_size() const
 
 bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data)
 {
-	Serial.printf("Write to block %zu, %u blocks\r\n", size_t(block_nr), n_blocks);
+	// Serial.printf("Write to block %zu, %u blocks\r\n", size_t(block_nr), n_blocks);
 
 	uint64_t iscsi_block_size = get_block_size();
 	uint64_t byte_address     = block_nr * iscsi_block_size;  // iSCSI to bytes
@@ -116,7 +116,7 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 
 bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_t *const data)
 {
-	Serial.printf("Read from block %zu, %u blocks\r\n", size_t(block_nr), n_blocks);
+	// Serial.printf("Read from block %zu, %u blocks\r\n", size_t(block_nr), n_blocks);
 
 	uint64_t iscsi_block_size = get_block_size();
 	uint64_t byte_address     = block_nr * iscsi_block_size;  // iSCSI to bytes
