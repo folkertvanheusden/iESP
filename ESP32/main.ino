@@ -20,6 +20,7 @@ void setup()
 {
 	Serial.begin(115200);
 	Serial.println(F("iESP, (C) 2023-2024 by Folkert van Heusden <mail@vanheusden.com>"));
+	Serial.println(F("Compiled on " __DATE__ " " __TIME__));
 
 	wifiManager.setConfigPortalTimeout(120);
 	wifiManager.autoConnect();
