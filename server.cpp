@@ -302,7 +302,7 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 	if (response_set.value().to_stream.has_value()) {
 		auto & stream_parameters = response_set.value().to_stream.value();
 
-		DOLOG("server::push_response: stream %zu sectors (opcode %02xh)\n", stream_parameters.n_sectors, pdu->get_opcode());
+		DOLOG("server::push_response: stream %zu sectors, LBA: %zu\n", stream_parameters.n_sectors, size_t(stream_parameters.lba));
 
 		iscsi_pdu_scsi_cmd reply_to;
 		auto temp = pdu->get_raw();
@@ -323,6 +323,7 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 
 		for(uint32_t block_nr = 0; block_nr < stream_parameters.n_sectors; block_nr++) {
 			uint64_t cur_block_nr = block_nr + stream_parameters.lba;
+			DOLOG("server::push_response: reading block %zu from backend\n", size_t(cur_block_nr));
 			if (b->read(cur_block_nr, 1, buffer.data) == false) {
 				DOLOG("server::push_response: reading block %zu from backend failed\n", size_t(cur_block_nr));
 				ok = false;

@@ -18,7 +18,7 @@ struct scsi_response
 	struct {
 		bool is_inline;  // if true, then next is valid
 
-		union {
+		struct {
 			std::pair<uint8_t *, size_t> data;  // meta data or disk-data
 
 			// if not inline
