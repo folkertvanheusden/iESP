@@ -616,10 +616,10 @@ blob_t iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *const s, const iscsi_pdu
 	set_bits(&pdu_data_in.b1, 0, 6, o_scsi_data_in);  // 0x25
 	if (last_block) {
 		set_bits(&pdu_data_in.b2, 7, 1, true);  // F
-		if (pdu_data_in_data.n < reply_to.get_ExpDatLen()) {
+		if (use_pdu_data_size < reply_to.get_ExpDatLen()) {
 			set_bits(&pdu_data_in.b2, 1, 1, true);  // U
 		}
-		else if (pdu_data_in_data.n > reply_to.get_ExpDatLen()) {
+		else if (use_pdu_data_size > reply_to.get_ExpDatLen()) {
 			set_bits(&pdu_data_in.b2, 2, 1, true);  // O
 		}
 		set_bits(&pdu_data_in.b2, 0, 1, true);  // S
