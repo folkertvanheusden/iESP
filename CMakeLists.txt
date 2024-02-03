@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.9)
 
 #add_compile_options(-Wall -pedantic -Wextra -fanalyzer)
 #add_compile_options(-fsanitize=address)
-add_compile_options(-fsanitize=undefined)
+#add_compile_options(-fsanitize=undefined)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
@@ -24,4 +24,4 @@ add_executable(
 
 set(CMAKE_BUILD_TYPE Debug)
 #target_link_libraries(iesp -fsanitize=address)
-target_link_libraries(iesp -fsanitize=undefined)
+#target_link_libraries(iesp -fsanitize=undefined)
