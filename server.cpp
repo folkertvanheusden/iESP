@@ -1,9 +1,14 @@
 #ifdef ESP32
 #include <Arduino.h>
 #endif
+#include <atomic>
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
+#ifndef ESP32
+#include <poll.h>
+#endif
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -20,6 +25,8 @@
 #include "server.h"
 #include "utils.h"
 
+
+extern std::atomic_bool stop;
 
 server::server(backend *const b, const std::string & listen_ip, const int listen_port):
 	b(b),
@@ -69,6 +76,26 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 	if (*s == nullptr)
 		*s = new session();
 
+#ifndef ESP32
+	pollfd fds[] { { fd, POLLIN, 0 } };
+
+	for(;;) {
+		int rc = poll(fds, 1, 100);
+		if (rc == -1) {
+			DOLOG("server::receive_pdu: poll failed with error %s\n", strerror(errno));
+			return nullptr;
+		}
+
+		if (stop == true) {
+			DOLOG("server::receive_pdu: abort due external stop\n");
+			return nullptr;
+		}
+
+		if (rc >= 1)
+			break;
+	}
+#endif
+
 	uint8_t pdu[48] { 0 };
 	if (READ(fd, pdu, sizeof pdu) == -1) {
 		DOLOG("server::receive_pdu: PDU receive error\n");
@@ -106,6 +133,15 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 			break;
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_logout_req:
 			pdu_obj = new iscsi_pdu_logout_request();
+			break;
+		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_r2t:
+			pdu_obj = new iscsi_pdu_scsi_r2t();
+			break;
+		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_taskman:
+			pdu_obj = new iscsi_pdu_taskman_request();
+			break;
+		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_data_out:
+			pdu_obj = new iscsi_pdu_scsi_data_out();
 			break;
 		default:
 			DOLOG("server::receive_pdu: opcode %02xh not implemented\n", bhs.get_opcode());
@@ -164,13 +200,82 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 
 bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const pdu, iscsi_response_parameters *const parameters)
 {
-	auto response_set = pdu->get_response(s, parameters, pdu->get_data());
-	if (response_set.has_value() == false) {
-		DOLOG("server::push_response: no response from PDU\n");
-		return false;
+	bool ok = true;
+
+	std::optional<iscsi_response_set> response_set;
+
+	if (pdu->get_opcode() == iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_data_out) {
+		auto     pdu_data_out = reinterpret_cast<iscsi_pdu_scsi_data_out *>(pdu);
+		uint32_t offset       = pdu_data_out->get_BufferOffset();
+		auto     data         = pdu_data_out->get_data();
+		uint32_t TTT          = pdu_data_out->get_TTT();
+		bool     F            = pdu_data_out->get_F();
+		auto     session      = s->get_r2t_sesion(TTT);
+
+		if (session == nullptr) {
+			DOLOG("server::push_response: DATA-OUT PDU references unknown TTT (%08x)\n", TTT);
+			delete [] data.value().first;
+			return false;
+		}
+		else if (data.has_value() && data.value().second > 0) {
+			auto block_size = b->get_block_size();
+			DOLOG("server::push_response: writing %zu bytes to offset LBA %zu + offset %u => %zu (in bytes)\n", data.value().second, session->buffer_lba, offset, session->buffer_lba * block_size + offset);
+
+			assert((offset % block_size) == 0);
+			assert((data.value().second % block_size) == 0);
+
+			bool rc = b->write(session->buffer_lba + offset / block_size, data.value().second / block_size, data.value().first);
+			if (rc == false)
+				DOLOG("server::push_response: DATA-OUT problem writing to backend\n");
+
+			delete [] data.value().first;
+
+			if (rc == false)
+				return rc;
+
+			session->bytes_done += data.value().second;
+			session->bytes_left -= data.value().second;
+		}
+		else if (!F) {
+			DOLOG("server::push_response: DATA-OUT PDU has no data?\n");
+			return false;
+		}
+
+		// create response
+		if (F) {
+			DOLOG("server::push-response: end of batch\n");
+
+			iscsi_pdu_scsi_cmd response;
+			response.set(s, session->PDU_initiator.data, session->PDU_initiator.n);  // TODO check for false
+			response_set = response.get_response(s, parameters, session->bytes_left);
+
+			if (session->bytes_left == 0) {
+				DOLOG("server::push-response: end of task\n");
+
+				s->remove_r2t_session(TTT);
+			}
+			else {
+				DOLOG("server::push-response: ask for more (%u bytes left)\n", session->bytes_left);
+				// send 0x31 for range
+				iscsi_pdu_scsi_cmd temp;
+				temp.set(s, session->PDU_initiator.data, session->PDU_initiator.n);
+
+				auto *response = new iscsi_pdu_scsi_r2t /* 0x31 */;
+				response->set(s, temp, TTT, session->bytes_done, session->bytes_left);  // TODO check for false
+				// ^ ADD TO RESPONSE SET TODO
+
+				response_set.value().responses.push_back(response);
+			}
+		}
+	}
+	else {
+		response_set = pdu->get_response(s, parameters);
 	}
 
-	bool ok = true;
+	if (response_set.has_value() == false) {
+		DOLOG("server::push_response: no response from PDU\n");
+		return true;
+	}
 
 	for(auto & pdu_out: response_set.value().responses) {
 		for(auto & blobs: pdu_out->get()) {
@@ -182,19 +287,18 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 			assert((blobs.n & 3) == 0);
 
 			if (ok) {
-				printf("SENDING %zu bytes\n", blobs.n);
 				ok = WRITE(fd, blobs.data, blobs.n) != -1;
 				if (!ok)
-					DOLOG("server::push_response: sending PDU to peer failed\n");
+					DOLOG("server::push_response: sending PDU to peer failed (%s)\n", strerror(errno));
 			}
 
 			delete [] blobs.data;
-
-			DOLOG(" ---\n");
 		}
 
 		delete pdu_out;
 	}
+
+	DOLOG(" ---\n");
 
 	return ok;
 }
@@ -212,6 +316,12 @@ iscsi_response_parameters *server::select_parameters(iscsi_pdu_bhs *const pdu, s
 			return new iscsi_response_parameters_text_req(ses, listen_ip, listen_port);
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_logout_req:
 			return new iscsi_response_parameters_logout_req(ses);
+		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_r2t:
+			return new iscsi_response_parameters_r2t(ses);
+		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_taskman:
+			return new iscsi_response_parameters_taskman(ses);
+		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_data_out:
+			return new iscsi_response_parameters_data_out(ses);
 		default:
 			DOLOG("server::select_parameters: opcode %02xh not implemented\n", pdu->get_opcode());
 			break;
@@ -224,7 +334,27 @@ void server::handler()
 {
 	scsi scsi_dev(b);
 
-	for(;;) {
+#ifndef ESP32
+	pollfd fds[] { { listen_fd, POLLIN, 0 } };
+#endif
+
+	while(!stop) {
+#ifndef ESP32
+		while(!stop) {
+			int rc = poll(fds, 1, 100);
+			if (rc == -1) {
+				DOLOG("server::handler: poll failed with error %s\n", strerror(errno));
+				break;
+			}
+
+			if (rc >= 1)
+				break;
+		}
+#endif
+
+		if (stop)
+			break;
+
 		int fd = accept(listen_fd, nullptr, nullptr);
 		if (fd == -1)
 			continue;
@@ -238,11 +368,12 @@ void server::handler()
 		session *s  = nullptr;
 		bool     ok = true;
 
-		// TODO: handle R2T
 		do {
 			iscsi_pdu_bhs *pdu = receive_pdu(fd, &s);
-			if (!pdu)
+			if (!pdu) {
+				DOLOG("server::handler: no PDU received, aborting socket connection\n");
 				break;
+			}
 
 			auto parameters = select_parameters(pdu, s, &scsi_dev);
 			if (parameters) {

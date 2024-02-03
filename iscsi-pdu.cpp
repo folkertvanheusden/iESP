@@ -51,6 +51,8 @@ iscsi_pdu_bhs::~iscsi_pdu_bhs()
 {
 	for(auto & ahs : ahs_list)
 		delete ahs;
+
+	delete [] data.first;
 }
 
 std::vector<blob_t> iscsi_pdu_bhs::return_helper(void *const data, size_t n)
@@ -125,7 +127,7 @@ std::vector<blob_t> iscsi_pdu_bhs::get()
 	return return_helper(out, sizeof *bhs);
 }
 
-std::optional<iscsi_response_set> iscsi_pdu_bhs::get_response(session *const s, const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
+std::optional<iscsi_response_set> iscsi_pdu_bhs::get_response(session *const s, const iscsi_response_parameters *const parameters_in)
 {
 	DOLOG("iscsi_pdu_bhs::get_response invoked!\n");
 	assert(0);
@@ -201,9 +203,27 @@ std::vector<blob_t> iscsi_pdu_login_request::get()
 	return return_helper(out, sizeof *login_req);
 }
 
-std::optional<iscsi_response_set> iscsi_pdu_login_request::get_response(session *const s, const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
+std::optional<iscsi_response_set> iscsi_pdu_login_request::get_response(session *const s, const iscsi_response_parameters *const parameters_in)
 {
 	auto parameters = static_cast<const iscsi_response_parameters_login_req *>(parameters_in);
+
+	auto kvs_in = data_to_text_array(data.first, data.second);
+	uint32_t max_burst = ~0;
+	for(auto & kv: kvs_in) {
+		auto parts = split(kv, "=");
+		if (parts.size() < 2)
+			continue;
+
+		if (parts[0] == "MaxBurstLength")
+			max_burst = std::min(max_burst, uint32_t(std::atoi(parts[1].c_str())));
+		if (parts[0] == "FirstBurstLength")
+			max_burst = std::min(max_burst, uint32_t(std::atoi(parts[1].c_str())));
+	}
+
+	if (max_burst < uint32_t(~0)) {
+		DOLOG("iscsi_pdu_login_request::get_response: set max-burst to %u\n", max_burst);
+		s->set_ack_interval(max_burst);
+	}
 
 	iscsi_response_set response;
 	auto reply_pdu = new iscsi_pdu_login_reply();
@@ -244,12 +264,12 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 //		"TargetName=iqn.1993-11.com.vanheusden:test",
 //		"TargetAlias=Bob-s disk",  // TODO
 		"ImmediateData=Yes",
-//		"MaxRecvDataSegmentLength=8192",
-		"MaxBurstLength=8192",
-		"FirstBurstLength=4096",
+		"MaxRecvDataSegmentLength=1024",
+		"MaxBurstLength=512",
+		"FirstBurstLength=512",
 		"TargetPortalGroupTag=1",
-		"InitialR2T=Yes",  // required to be Yes for (at least) open-scsi
-		"MaxOutstandingR2T=1",  // ^ (1)
+		"InitialR2T=No",
+		"MaxOutstandingR2T=1",
 		"DataPDUInOrder=Yes",
 		"DataSequenceInOrder=Yes",
 	};
@@ -332,8 +352,26 @@ std::vector<blob_t> iscsi_pdu_scsi_cmd::get()
 	return return_helper(out, out_size);
 }
 
-std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *const s, const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
+std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *const s, const iscsi_response_parameters *const parameters_in, const uint8_t status)
 {
+	// TODO: handle errors (see 'status')
+	iscsi_response_set response;
+
+	auto *pdu_scsi_response = new iscsi_pdu_scsi_response() /* 0x21 */;
+	if (pdu_scsi_response->set(*this, { }, { }) == false) {
+		DOLOG("iscsi_pdu_scsi_cmd::get_response: iscsi_pdu_scsi_response::set returned error\n");
+
+		return { };
+	}
+
+	response.responses.push_back(pdu_scsi_response);
+
+	return response;
+}
+
+std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *const s, const iscsi_response_parameters *const parameters_in)
+{
+	DOLOG("iscsi_pdu_scsi_cmd::get_response: working on ITT %08x\n", get_Itasktag());
 	auto parameters = static_cast<const iscsi_response_parameters_scsi_cmd *>(parameters_in);
 	auto scsi_reply = parameters->sd->send(get_CDB(), 16, data);
 	if (scsi_reply.has_value() == false) {
@@ -364,7 +402,7 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *cons
 			auto *temp = new iscsi_pdu_scsi_response() /* 0x21 */;
 			DOLOG("iscsi_pdu_scsi_cmd::get_response: sending SCSI response with %zu sense bytes\n", scsi_reply.value().sense_data.size());
 
-			if (temp->set(*this, scsi_reply.value().sense_data) == false) {
+			if (temp->set(*this, scsi_reply.value().sense_data, { }) == false) {
 				ok = false;
 				DOLOG("iscsi_pdu_scsi_cmd::get_response: iscsi_pdu_scsi_response::set returned error\n");
 			}
@@ -374,8 +412,9 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *cons
 	else if (scsi_reply.value().type == ir_r2t) {
 		auto *temp = new iscsi_pdu_scsi_r2t() /* 0x31 */;
 		DOLOG("iscsi_pdu_scsi_cmd::get_response: sending R2T with %zu sense bytes\n", scsi_reply.value().sense_data.size());
-
-		if (temp->set(*this, scsi_reply.value().buffer_offset, scsi_reply.value().buffer_segment_length) == false) {
+		uint32_t TTT = s->init_r2t_session(scsi_reply.value().r2t, this);
+		DOLOG("iscsi_pdu_scsi_cmd::get_response: TTT is %08x\n", TTT);
+		if (temp->set(s, *this, TTT, scsi_reply.value().r2t.bytes_done, scsi_reply.value().r2t.bytes_left) == false) {
 			ok = false;
 			DOLOG("iscsi_pdu_scsi_cmd::get_response: iscsi_pdu_scsi_response::set returned error\n");
 		}
@@ -417,12 +456,10 @@ iscsi_pdu_scsi_response::~iscsi_pdu_scsi_response()
 	delete [] pdu_response_data.first;
 }
 
-bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std::vector<uint8_t> & scsi_sense_data)
+bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std::vector<uint8_t> & scsi_sense_data, std::optional<uint32_t> ResidualCt)
 {
 	size_t sense_data_size = scsi_sense_data.size();
-	printf("sense_data_size: %zu\n", sense_data_size);
 	size_t reply_data_plus_sense_header = sense_data_size > 0 ? 2 + sense_data_size : 0;
-	printf("reply_data_plus_sense_header: %zu\n", reply_data_plus_sense_header);
 
 	*pdu_response = { };
 	set_bits(&pdu_response->b1, 0, 6, o_scsi_resp);  // 0x21
@@ -439,7 +476,10 @@ bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std
 	pdu_response->ExpCmdSN   = htonl(reply_to.get_CmdSN() + 1);
 	pdu_response->MaxCmdSN   = htonl(reply_to.get_CmdSN() + 1);
 	pdu_response->ExpDataSN  = htonl(1);  // TODO
-	pdu_response->ResidualCt = 0;
+	if (ResidualCt.has_value()) {
+		set_bits(&pdu_response->b2, 1, 1, true);  // U (residual underflow)
+		pdu_response->ResidualCt = ResidualCt.value();
+	}
 
 	pdu_response_data.second = reply_data_plus_sense_header;
 	if (pdu_response_data.second) {
@@ -500,7 +540,6 @@ bool iscsi_pdu_scsi_data_in::set(session *const s, const iscsi_pdu_scsi_cmd & re
 	return true;
 }
 
-// TODO: vector so that a reply can be consisting of multiple PDUs
 std::vector<blob_t> iscsi_pdu_scsi_data_in::get()
 {
 	std::vector<blob_t> v_out;
@@ -512,9 +551,9 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get()
 		DOLOG("iscsi_pdu_scsi_data_in: requested less (%zu) than wat is available (%zu)\n", size_t(reply_to_copy.get_ExpDatLen()), use_pdu_data_size);
 	use_pdu_data_size = std::min(use_pdu_data_size, size_t(reply_to_copy.get_ExpDatLen()));
 
-	size_t n_to_do = (use_pdu_data_size + 4095) / 4096;
+	size_t n_to_do = (use_pdu_data_size + 511) / 512;
 
-	for(size_t i=0, count=0; i<use_pdu_data_size; i += 4096, count++) {  // 4kB blocks
+	for(size_t i=0, count=0; i<use_pdu_data_size; i += 512, count++) {  // 4kB blocks
 		*pdu_data_in = { };
 		set_bits(&pdu_data_in->b1, 0, 6, o_scsi_data_in);  // 0x25
 		bool last_block = count == n_to_do - 1;
@@ -530,16 +569,19 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get()
 			}
 			set_bits(&pdu_data_in->b2, 0, 1, true);  // S
 		}
-		size_t cur_len = std::min(use_pdu_data_size - i, size_t(4096));
+		size_t cur_len = std::min(use_pdu_data_size - i, size_t(512));
+		DOLOG("iscsi_pdu_scsi_data_in::get: block %zu, last_block: %d, cur_len: %zu\n", count, last_block, cur_len);
 		pdu_data_in->datalenH   = cur_len >> 16;
 		pdu_data_in->datalenM   = cur_len >>  8;
 		pdu_data_in->datalenL   = cur_len      ;
 		memcpy(pdu_data_in->LUN, reply_to_copy.get_LUN(), sizeof pdu_data_in->LUN);
 		pdu_data_in->Itasktag   = reply_to_copy.get_Itasktag();
 		pdu_data_in->StatSN     = htonl(reply_to_copy.get_ExpStatSN());
-		pdu_data_in->ExpCmdSN   = htonl(reply_to_copy.get_CmdSN() + 1);
-		pdu_data_in->MaxCmdSN   = htonl(reply_to_copy.get_CmdSN() + 128);
+		pdu_data_in->ExpCmdSN   = htonl(reply_to_copy.get_CmdSN() + 1);  // TODO?
+		pdu_data_in->MaxCmdSN   = htonl(reply_to_copy.get_CmdSN() + 128);  // TODO?
 		pdu_data_in->DataSN     = htonl(s->get_inc_datasn(reply_to_copy.get_Itasktag()));
+		pdu_data_in->bufferoff  = htonl(i);
+		pdu_data_in->ResidualCt = htonl(use_pdu_data_size - i);
 
 		size_t out_size = sizeof(*pdu_data_in) + cur_len;
 		out_size = (out_size + 3) & ~3;
@@ -556,6 +598,39 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get()
 
 /*--------------------------------------------------------------------------*/
 
+iscsi_pdu_scsi_data_out::iscsi_pdu_scsi_data_out()
+{
+	assert(sizeof(*pdu_data_out) == 48);
+}
+
+iscsi_pdu_scsi_data_out::~iscsi_pdu_scsi_data_out()
+{
+	delete [] pdu_data_out_data.first;
+}
+
+bool iscsi_pdu_scsi_data_out::set(session *const s, const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data)
+{
+	DOLOG("iscsi_pdu_scsi_data_out::set: with %zu payload bytes\n", scsi_reply_data.second);
+
+	this->s = s;
+
+	pdu_data_out_data.second = scsi_reply_data.second;
+	if (pdu_data_out_data.second) {
+		pdu_data_out_data.first = new uint8_t[pdu_data_out_data.second]();
+		memcpy(pdu_data_out_data.first, scsi_reply_data.first, pdu_data_out_data.second);
+	}
+
+	return true;
+}
+
+std::vector<blob_t> iscsi_pdu_scsi_data_out::get()
+{
+	std::vector<blob_t> out;
+	return out;
+}
+
+/*--------------------------------------------------------------------------*/
+
 iscsi_pdu_nop_out::iscsi_pdu_nop_out()
 {
 	assert(sizeof(*nop_out) == 48);
@@ -565,7 +640,7 @@ iscsi_pdu_nop_out::~iscsi_pdu_nop_out()
 {
 }
 
-std::optional<iscsi_response_set> iscsi_pdu_nop_out::get_response(session *const s, const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
+std::optional<iscsi_response_set> iscsi_pdu_nop_out::get_response(session *const s, const iscsi_response_parameters *const parameters_in)
 {
 	DOLOG("invoking iscsi_pdu_nop_out::get_response\n");
 
@@ -601,7 +676,7 @@ bool iscsi_pdu_nop_in::set(const iscsi_pdu_nop_out & reply_to)
 	nop_in->datalenL   = 0;
 	memcpy(nop_in->LUN, reply_to.get_LUN(), sizeof nop_in->LUN);
 	nop_in->Itasktag   = reply_to.get_Itasktag();
-	nop_in->TTF        = reply_to.get_TTF();
+	nop_in->TTT        = reply_to.get_TTT();
 	nop_in->StatSN     = htonl(reply_to.get_ExpStatSN());
 	nop_in->ExpCmdSN   = htonl(reply_to.get_CmdSN() + 1);
 	nop_in->MaxCmdSN   = htonl(reply_to.get_CmdSN() + 1);
@@ -630,21 +705,19 @@ iscsi_pdu_scsi_r2t::~iscsi_pdu_scsi_r2t()
 	delete [] pdu_scsi_r2t_data.first;
 }
 
-bool iscsi_pdu_scsi_r2t::set(const iscsi_pdu_scsi_cmd & reply_to, const uint32_t buffer_offset, const uint32_t data_length)
+bool iscsi_pdu_scsi_r2t::set(session *const s, const iscsi_pdu_scsi_cmd & reply_to, const uint32_t TTT, const uint32_t buffer_offset, const uint32_t data_length)
 {
 	*pdu_scsi_r2t = { };
 	set_bits(&pdu_scsi_r2t->b1, 0, 6, o_r2t);
-	pdu_scsi_r2t->datalenH   = 0;
-	pdu_scsi_r2t->datalenM   = 0;
-	pdu_scsi_r2t->datalenL   = 0;
+	set_bits(&pdu_scsi_r2t->b2, 7, 1, true);
 	memcpy(pdu_scsi_r2t->LUN, reply_to.get_LUN(), sizeof pdu_scsi_r2t->LUN);
 	pdu_scsi_r2t->Itasktag   = reply_to.get_Itasktag();
-	// TODO pdu_scsi_r2t->TTF        = reply_to.get_TTF();
+	pdu_scsi_r2t->TTT        = TTT;
 	pdu_scsi_r2t->StatSN     = htonl(reply_to.get_ExpStatSN());
 	pdu_scsi_r2t->ExpCmdSN   = htonl(reply_to.get_CmdSN() + 1);
-	pdu_scsi_r2t->MaxCmdSN   = htonl(reply_to.get_CmdSN() + 1);
-	pdu_scsi_r2t->bufferoff  = buffer_offset;
-	pdu_scsi_r2t->DDTF       = data_length;
+	pdu_scsi_r2t->MaxCmdSN   = htonl(reply_to.get_CmdSN() + 128);
+	pdu_scsi_r2t->bufferoff  = htonl(buffer_offset);
+	pdu_scsi_r2t->DDTF       = htonl(data_length);
 
 	return true;
 }
@@ -690,7 +763,7 @@ std::vector<blob_t> iscsi_pdu_text_request::get()
 	return return_helper(out, out_size);
 }
 
-std::optional<iscsi_response_set> iscsi_pdu_text_request::get_response(session *const s, const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
+std::optional<iscsi_response_set> iscsi_pdu_text_request::get_response(session *const s, const iscsi_response_parameters *const parameters_in)
 {
 	iscsi_response_set response;
 	auto reply_pdu = new iscsi_pdu_text_reply();
@@ -753,7 +826,7 @@ bool iscsi_pdu_text_reply::set(const iscsi_pdu_text_request & reply_to, const is
 	text_reply->datalenM   = text_reply_reply_data.second >>  8;
 	text_reply->datalenL   = text_reply_reply_data.second      ;
 	memcpy(text_reply->LUN, reply_to.get_LUN(), sizeof text_reply->LUN);
-	text_reply->TTF        = reply_to.get_TTF();
+	text_reply->TTT        = reply_to.get_TTT();
 	text_reply->Itasktag   = reply_to.get_Itasktag();
 	text_reply->StatSN     = htonl(reply_to.get_ExpStatSN());
 	text_reply->ExpCmdSN   = htonl(reply_to.get_CmdSN());
@@ -806,7 +879,7 @@ std::vector<blob_t> iscsi_pdu_logout_request::get()
 	return return_helper(out, out_size);
 }
 
-std::optional<iscsi_response_set> iscsi_pdu_logout_request::get_response(session *const s, const iscsi_response_parameters *const parameters_in, std::optional<std::pair<uint8_t *, size_t> > data)
+std::optional<iscsi_response_set> iscsi_pdu_logout_request::get_response(session *const s, const iscsi_response_parameters *const parameters_in)
 {
 	auto parameters = static_cast<const iscsi_response_parameters_logout_req *>(parameters_in);
 
@@ -855,3 +928,82 @@ std::vector<blob_t> iscsi_pdu_logout_reply::get()
 	return { { out, out_size } };
 }
 
+/*--------------------------------------------------------------------------*/
+
+iscsi_pdu_taskman_request::iscsi_pdu_taskman_request()
+{
+	assert(sizeof(*taskman_req) == 48);
+
+	*taskman_req = { };
+}
+
+iscsi_pdu_taskman_request::~iscsi_pdu_taskman_request()
+{
+}
+
+bool iscsi_pdu_taskman_request::set(session *const s, const uint8_t *const in, const size_t n)
+{
+	if (iscsi_pdu_bhs::set(s, in, n) == false)
+		return false;
+
+	// TODO further validation
+
+	return true;
+}
+
+std::vector<blob_t> iscsi_pdu_taskman_request::get()
+{
+	size_t out_size = sizeof *taskman_req;
+	void *out = new uint8_t[out_size]();
+	memcpy(out, taskman_req, sizeof *taskman_req);
+
+	return return_helper(out, out_size);
+}
+
+std::optional<iscsi_response_set> iscsi_pdu_taskman_request::get_response(session *const s, const iscsi_response_parameters *const parameters_in)
+{
+	auto parameters = static_cast<const iscsi_response_parameters_taskman *>(parameters_in);
+
+	iscsi_response_set response;
+	auto reply_pdu = new iscsi_pdu_taskman_reply();
+	if (reply_pdu->set(*this) == false) {
+		delete reply_pdu;
+		return { };
+	}
+	response.responses.push_back(reply_pdu);
+
+	return response;
+}
+
+/*--------------------------------------------------------------------------*/
+
+iscsi_pdu_taskman_reply::iscsi_pdu_taskman_reply()
+{
+	assert(sizeof(*taskman_reply) == 48);
+}
+
+iscsi_pdu_taskman_reply::~iscsi_pdu_taskman_reply()
+{
+}
+
+bool iscsi_pdu_taskman_reply::set(const iscsi_pdu_taskman_request & reply_to)
+{
+	*taskman_reply = { };
+	set_bits(&taskman_reply->b1, 0, 6, o_scsi_taskmanr);  // 0x22
+	set_bits(&taskman_reply->b2, 7, 1, true);
+	taskman_reply->Itasktag = reply_to.get_Itasktag();
+	taskman_reply->StatSN   = htonl(reply_to.get_ExpStatSN());
+	taskman_reply->ExpCmdSN = htonl(reply_to.get_CmdSN() + 1);
+	taskman_reply->MaxCmdSN = htonl(reply_to.get_CmdSN() + 1);
+
+	return true;
+}
+
+std::vector<blob_t> iscsi_pdu_taskman_reply::get()
+{
+	size_t   out_size = sizeof(*taskman_reply);
+	uint8_t *out      = new uint8_t[out_size]();
+	memcpy(out, taskman_reply, sizeof *taskman_reply);
+
+	return { { out, out_size } };
+}

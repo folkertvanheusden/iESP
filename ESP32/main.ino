@@ -1,6 +1,7 @@
 // (C) 2023-2024 by Folkert van Heusden
 // Released under MIT license
 
+#include <atomic>
 #include <csignal>
 #include <cstdio>
 #include <SPI.h>
@@ -11,17 +12,20 @@
 #include "server.h"
 
 
+std::atomic_bool stop { false };
+
 WiFiManager wifiManager;
 
 void setup()
 {
 	Serial.begin(115200);
-	Serial.println(F("iESP, (C) 2023-2024 by Folkert van Heusden <mail@vanheusden.com"));
+	Serial.println(F("iESP, (C) 2023-2024 by Folkert van Heusden <mail@vanheusden.com>"));
+	Serial.println(F("Compiled on " __DATE__ " " __TIME__));
 
 	wifiManager.setConfigPortalTimeout(120);
 	wifiManager.autoConnect();
 
-	Serial.print(F("Will listen on (in a few seconds): "));
+	Serial.print(F("Will listen on (in a bit): "));
 	Serial.println(WiFi.localIP());
 }
 

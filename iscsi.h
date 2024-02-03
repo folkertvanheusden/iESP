@@ -6,12 +6,23 @@
 #include <vector>
 
 
+typedef struct {
+	uint8_t *data;
+	size_t n;
+} blob_t;
+
+struct r2t_session {
+	uint64_t buffer_lba;
+	uint32_t bytes_left;
+	uint32_t bytes_done;
+	blob_t   PDU_initiator;
+};
+
 typedef enum
 {
 	ir_as_is,  // only a sense and/or data pdu
 	ir_empty_sense,  // only a possibly empty sense
 	ir_r2t,  // R2T
-	ir_datain_sense,  // data-in finished
 } iscsi_reacion_t;
 
 std::vector<std::string>     data_to_text_array(const uint8_t *const data, const size_t n);

@@ -33,7 +33,7 @@ ssize_t WRITE(const int fd, const uint8_t *whereto, size_t len)
 			return -1;
 
 		whereto += rc;
-		len -= rc;
+		len     -= rc;
 	}
 
 	return cnt;

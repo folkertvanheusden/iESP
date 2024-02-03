@@ -44,7 +44,7 @@ uint64_t backend_sdcard::get_size_in_blocks() const
 
 uint64_t backend_sdcard::get_block_size() const
 {
-	return 4096;
+	return 512;
 }
 
 bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data)

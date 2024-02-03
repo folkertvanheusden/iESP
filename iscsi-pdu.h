@@ -14,11 +14,6 @@
 // These classes have a 'set' method as to have a way to return validity - an is_valid method would've worked as well.
 // Also no direct retrieval from filedescriptors to help porting to platforms without socket-api.
 
-typedef struct {
-	uint8_t *data;
-	size_t n;
-} blob_t;
-
 class iscsi_pdu_ahs
 {
 private:
@@ -105,6 +100,27 @@ struct iscsi_response_parameters_scsi_cmd : public iscsi_response_parameters_bhs
 	}
 };
 
+struct iscsi_response_parameters_r2t : public iscsi_response_parameters_bhs
+{
+	iscsi_response_parameters_r2t(session *const ses) :
+		iscsi_response_parameters_bhs(ses) {
+	}
+};
+
+struct iscsi_response_parameters_taskman : public iscsi_response_parameters_bhs
+{
+	iscsi_response_parameters_taskman(session *const ses) :
+		iscsi_response_parameters_bhs(ses) {
+	}
+};
+
+struct iscsi_response_parameters_data_out : public iscsi_response_parameters_bhs
+{
+	iscsi_response_parameters_data_out(session *const ses) :
+		iscsi_response_parameters_bhs(ses) {
+	}
+};
+
 class iscsi_pdu_bhs  // basic header segment
 {
 protected:
@@ -174,7 +190,7 @@ public:
 	std::optional<std::pair<uint8_t *, size_t> > get_data() const;
 	bool             set_data(std::pair<const uint8_t *, std::size_t> data_in);
 
-	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters, std::optional<std::pair<uint8_t *, size_t> > data);
+	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters);
 };
 
 struct iscsi_response_set
@@ -238,7 +254,7 @@ public:
 	      uint32_t get_Itasktag()   const { return login_req->Itasktag;     }
 	      uint32_t get_ExpStatSN()  const { return ntohl(login_req->ExpStatSN); }
 
-	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters, std::optional<std::pair<uint8_t *, size_t> > data) override;
+	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters) override;
 };
 
 class iscsi_pdu_login_reply : public iscsi_pdu_bhs
@@ -334,7 +350,112 @@ public:
 	const uint8_t * get_LUN()       const { return cdb_pdu_req->LUN;              }
 	      uint32_t  get_ExpDatLen() const { return ntohl(cdb_pdu_req->expdatlen); }
 
-	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters, std::optional<std::pair<uint8_t *, size_t> > data) override;
+	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters) override;
+	// special case: response after one or more data-out PDUs
+	std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters_in, const uint8_t error);
+};
+
+class iscsi_pdu_scsi_data_in : public iscsi_pdu_bhs  // 0x25
+{
+public:
+	struct __pdu_data_in__ {
+		uint8_t  b1;
+		// uint8_t  opcode    :  6;
+		// bool     reserved1 :  1;
+		// bool     reserved0 :  1;  // bit 7
+
+		uint8_t  b2;
+		// bool     S         :  1;
+		// bool     U         :  1;
+		// bool     O         :  1;
+		// bool     reserved5 :  1;
+		// bool     reserved4 :  1;
+		// bool     reserved3 :  1;
+		// bool     A         :  1;
+		// bool     F         :  1;  // bit 7
+
+		uint8_t  reserved6 :  8;
+		uint8_t  status    :  8;
+
+		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
+		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
+		uint32_t datalenM  :  8;  // data segment length (bytes, excluding padding) 15...8
+		uint32_t datalenL  :  8;  // data segment length (bytes, excluding padding) 7...0
+		uint8_t  LUN[8];
+		uint32_t Itasktag  : 32;  // initiator task tag
+		uint32_t TTT       : 32;  // target transfer tag
+		uint32_t StatSN    : 32;
+		uint32_t ExpCmdSN  : 32;
+		uint32_t MaxCmdSN  : 32;
+		uint32_t DataSN    : 32;
+		uint32_t bufferoff : 32;
+		uint32_t ResidualCt: 32;  // residual count or reserved
+	};
+
+	__pdu_data_in__ *pdu_data_in __attribute__((packed)) { reinterpret_cast<__pdu_data_in__ *>(pdu_bytes) };
+	std::pair<uint8_t *, size_t> pdu_data_in_data { nullptr, 0 };
+
+private:
+	iscsi_pdu_scsi_cmd reply_to_copy;
+	session           *s { nullptr };
+
+public:
+	iscsi_pdu_scsi_data_in();
+	virtual ~iscsi_pdu_scsi_data_in();
+
+	bool set(session *const s, const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data, const bool has_sense);
+	std::vector<blob_t> get() override;
+        uint32_t get_TTT() const { return pdu_data_in->TTT; }
+};
+
+class iscsi_pdu_scsi_data_out : public iscsi_pdu_bhs  // 0x05
+{
+public:
+	struct __pdu_data_out__ {
+		uint8_t  b1;
+		// uint8_t  opcode    :  6;
+		// bool     reserved0 :  2;  // bit 7
+
+		uint8_t  b2;
+		// bool     reserved1 :  7;
+		// bool     F         :  1;  // bit 7
+
+		uint16_t  reserved2: 16;
+
+		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
+		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
+		uint32_t datalenM  :  8;  // data segment length (bytes, excluding padding) 15...8
+		uint32_t datalenL  :  8;  // data segment length (bytes, excluding padding) 7...0
+		uint8_t  LUN[8];
+		uint32_t Itasktag  : 32;  // initiator task tag
+		uint32_t TTT       : 32;  // target transfer tag
+		uint32_t reserved3 : 32;
+		uint32_t ExpStatSN : 32;
+		uint32_t reserved4 : 32;
+		uint32_t DataSN    : 32;
+		uint32_t bufferoff : 32;
+		uint32_t reserved5 : 32;  // residual count or reserved
+	};
+
+	__pdu_data_out__ *pdu_data_out __attribute__((packed)) { reinterpret_cast<__pdu_data_out__ *>(pdu_bytes) };
+	std::pair<uint8_t *, size_t> pdu_data_out_data { nullptr, 0 };
+
+private:
+	iscsi_pdu_scsi_cmd reply_to_copy;
+	session           *s { nullptr };
+
+public:
+	iscsi_pdu_scsi_data_out();
+	virtual ~iscsi_pdu_scsi_data_out();
+
+	bool set(session *const s, const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data);
+	std::vector<blob_t> get() override;
+
+	uint32_t get_BufferOffset() const { return ntohl(pdu_data_out->bufferoff); }
+        uint32_t get_TTT()          const { return pdu_data_out->TTT;              }
+	bool     get_F()            const { return !!(pdu_data_out->b2 & 128);     }
+	uint32_t get_Itasktag()     const { return pdu_data_out->Itasktag;         }
+	uint32_t get_ExpStatSN()    const { return pdu_data_out->ExpStatSN;        }
 };
 
 class iscsi_pdu_scsi_response : public iscsi_pdu_bhs  // 0x21
@@ -380,61 +501,9 @@ public:
 	iscsi_pdu_scsi_response();
 	virtual ~iscsi_pdu_scsi_response();
 
-	bool set(const iscsi_pdu_scsi_cmd & reply_to, const std::vector<uint8_t> & scsi_sense_data);
+	bool set(const iscsi_pdu_scsi_cmd & reply_to, const std::vector<uint8_t> & scsi_sense_data, std::optional<uint32_t> ResidualCt);
+
 	std::vector<blob_t> get() override;
-};
-
-class iscsi_pdu_scsi_data_in : public iscsi_pdu_bhs  // 0x25
-{
-public:
-	struct __pdu_data_in__ {
-		uint8_t  b1;
-		// uint8_t  opcode    :  6;
-		// bool     reserved1 :  1;
-		// bool     reserved0 :  1;  // bit 7
-
-		uint8_t  b2;
-		// bool     S         :  1;
-		// bool     U         :  1;
-		// bool     O         :  1;
-		// bool     reserved5 :  1;
-		// bool     reserved4 :  1;
-		// bool     reserved3 :  1;
-		// bool     A         :  1;
-		// bool     F         :  1;  // bit 7
-
-		uint8_t  reserved6 :  8;
-		uint8_t  status    :  8;
-
-		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
-		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
-		uint32_t datalenM  :  8;  // data segment length (bytes, excluding padding) 15...8
-		uint32_t datalenL  :  8;  // data segment length (bytes, excluding padding) 7...0
-		uint8_t  LUN[8];
-		uint32_t Itasktag  : 32;  // initiator task tag
-		uint32_t TTF       : 32;  // target transfer tag
-		uint32_t StatSN    : 32;
-		uint32_t ExpCmdSN  : 32;
-		uint32_t MaxCmdSN  : 32;
-		uint32_t DataSN    : 32;
-		uint32_t bufferoff : 32;
-		uint32_t ResidualCt: 32;  // residual count or reserved
-	};
-
-	__pdu_data_in__ *pdu_data_in __attribute__((packed)) { reinterpret_cast<__pdu_data_in__ *>(pdu_bytes) };
-	std::pair<uint8_t *, size_t> pdu_data_in_data { nullptr, 0 };
-
-private:
-	iscsi_pdu_scsi_cmd reply_to_copy;
-	session           *s { nullptr };
-
-public:
-	iscsi_pdu_scsi_data_in();
-	virtual ~iscsi_pdu_scsi_data_in();
-
-	bool set(session *const s, const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data, const bool has_sense);
-	std::vector<blob_t> get() override;
-        uint32_t get_TTF() const { return pdu_data_in->TTF; }
 };
 
 class iscsi_pdu_nop_out : public iscsi_pdu_bhs  // NOP-Out  0x00
@@ -455,7 +524,7 @@ public:
 		uint32_t datalenL  :  8;  // data segment length (bytes, excluding padding) 7...0
 		uint8_t  LUN[8];  // lun
 		uint32_t Itasktag  : 32;  // initiator task tag
-		uint32_t TTF       : 32;  // target transfer tag
+		uint32_t TTT       : 32;  // target transfer tag
 		uint32_t CmdSN     : 32;
 		uint32_t ExpStatSN : 32;
 		uint8_t  filler4[16];
@@ -469,11 +538,11 @@ public:
 
 	const uint8_t  *get_LUN()        const { return nop_out->LUN;              }
 	      uint32_t  get_Itasktag()   const { return nop_out->Itasktag;         }
-	      uint32_t  get_TTF()        const { return nop_out->TTF;              }
+	      uint32_t  get_TTT()        const { return nop_out->TTT;              }
 	      uint32_t  get_CmdSN()      const { return ntohl(nop_out->CmdSN);     }
 	      uint32_t  get_ExpStatSN()  const { return ntohl(nop_out->ExpStatSN); }
 
-	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters, std::optional<std::pair<uint8_t *, size_t> > data) override;
+	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters) override;
 };
 
 class iscsi_pdu_nop_in : public iscsi_pdu_bhs  // NOP-In
@@ -492,7 +561,7 @@ public:
 		uint32_t datalenL  :  8;  // data segment length (bytes, excluding padding) 7...0
 		uint8_t  LUN[8];  // lun
 		uint32_t Itasktag  : 32;  // initiator task tag
-		uint32_t TTF       : 32;  // target transfer tag
+		uint32_t TTT       : 32;  // target transfer tag
 		uint32_t StatSN    : 32;
 		uint32_t ExpCmdSN  : 32;
 		uint32_t MaxCmdSN  : 32;
@@ -527,7 +596,7 @@ public:
 		uint32_t datalenL  :  8;  // data segment length (bytes, excluding padding) 7...0
 		uint8_t  LUN[8];
 		uint32_t Itasktag  : 32;  // initiator task tag
-		uint32_t TTF       : 32;  // target transfer tag
+		uint32_t TTT       : 32;  // target transfer tag
 		uint32_t StatSN    : 32;
 		uint32_t ExpCmdSN  : 32;
 		uint32_t MaxCmdSN  : 32;
@@ -544,8 +613,10 @@ public:
 	iscsi_pdu_scsi_r2t();
 	virtual ~iscsi_pdu_scsi_r2t();
 
-	bool set(const iscsi_pdu_scsi_cmd & reply_to, const uint32_t buffer_offset, const uint32_t data_length);
+	bool set(session *const s, const iscsi_pdu_scsi_cmd & reply_to, const uint32_t TTT, const uint32_t buffer_offset, const uint32_t data_length);
 	std::vector<blob_t> get() override;
+
+	uint32_t get_TTT() const { return pdu_scsi_r2t->TTT; }
 };
 
 class iscsi_pdu_text_request : public iscsi_pdu_bhs  // text request 0x04
@@ -569,7 +640,7 @@ public:
 		uint32_t datalenL  :  8;  // data segment length (bytes, excluding padding) 7...0
 		uint8_t  LUN[8];
 		uint32_t Itasktag  : 32;  // initiator task tag
-		uint32_t TTF       : 32;  // target transfer tag
+		uint32_t TTT       : 32;  // target transfer tag
 		uint32_t CmdSN     : 32;
 		uint32_t ExpStatSN : 32;
 		uint8_t  filler3[16];
@@ -588,9 +659,9 @@ public:
 	      uint32_t get_CmdSN()     const { return ntohl(text_req->CmdSN);     }
 	      uint32_t get_Itasktag()  const { return text_req->Itasktag;         }
 	      uint32_t get_ExpStatSN() const { return ntohl(text_req->ExpStatSN); }
-              uint32_t get_TTF()       const { return text_req->TTF;              }
+              uint32_t get_TTT()       const { return text_req->TTT;              }
 
-	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters, std::optional<std::pair<uint8_t *, size_t> > data) override;
+	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters) override;
 };
 
 class iscsi_pdu_text_reply : public iscsi_pdu_bhs  // 0x24
@@ -613,7 +684,7 @@ public:
 		uint32_t datalenL  :  8;  // data segment length (bytes, excluding padding) 7...0
 		uint8_t  LUN[8];
 		uint32_t Itasktag  : 32;  // initiator task tag
-		uint32_t TTF       : 32;  // target transfer tag
+		uint32_t TTT       : 32;  // target transfer tag
 		uint32_t StatSN    : 32;
 		uint32_t ExpCmdSN  : 32;
 		uint32_t MaxCmdSN  : 32;
@@ -669,7 +740,7 @@ public:
 	uint32_t get_Itasktag()   const { return logout_req->Itasktag;     }
 	uint32_t get_ExpStatSN()  const { return ntohl(logout_req->ExpStatSN); }
 
-	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters, std::optional<std::pair<uint8_t *, size_t> > data) override;
+	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters) override;
 };
 
 class iscsi_pdu_logout_reply : public iscsi_pdu_bhs
@@ -709,5 +780,84 @@ public:
 	virtual ~iscsi_pdu_logout_reply();
 
 	bool set(const iscsi_pdu_logout_request & reply_to);
+	std::vector<blob_t> get() override;
+};
+
+///
+
+class iscsi_pdu_taskman_request : public iscsi_pdu_bhs  // taskman request 0x02
+{
+public:
+	struct __taskman_req__ {
+		uint8_t  b1;
+		// uint8_t  opcode    :  6;  // 0x02
+		// bool     I         :  1;
+		// bool     filler0   :  1;  // bit 7
+
+		uint8_t  b2;  // bit 7 is 1, 6...0 is function
+		uint16_t filler1_2;
+
+		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
+		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
+		uint32_t datalenM  :  8;  // data segment length (bytes, excluding padding) 15...8
+		uint32_t datalenL  :  8;  // data segment length (bytes, excluding padding) 7...0
+		uint8_t  LUN[8];
+		uint32_t Itasktag  : 32;  // initiator task tag
+		uint32_t RefTaskTag: 32;
+		uint32_t CmdSN     : 32;
+		uint32_t ExpStatSN : 32;
+		uint32_t RefCmdSN  : 32;
+		uint32_t ExpDatSN  : 32;
+		uint8_t  filler3[8];
+	};
+
+	__taskman_req__ *taskman_req __attribute__((packed)) { reinterpret_cast<__taskman_req__ *>(pdu_bytes) };
+
+public:
+	iscsi_pdu_taskman_request();
+	virtual ~iscsi_pdu_taskman_request();
+
+	bool set(session *const s, const uint8_t *const in, const size_t n) override;
+	std::vector<blob_t> get() override;
+
+	uint32_t get_Itasktag()  const { return taskman_req->Itasktag;         }
+	uint32_t get_ExpStatSN() const { return ntohl(taskman_req->ExpStatSN); }
+	uint32_t get_CmdSN()     const { return ntohl(taskman_req->CmdSN);     }
+
+	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters) override;
+};
+
+class iscsi_pdu_taskman_reply : public iscsi_pdu_bhs
+{
+public:
+	struct __taskman_reply__ {
+		uint8_t  b1;
+		// uint8_t  opcode    :  6;  // 0x22
+		// bool     filler0   :  2;  // bit 7
+
+		uint8_t  b2;  // bit 7 is 1
+		uint8_t  response;
+		uint8_t  filler1;
+
+		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
+		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
+		uint32_t datalenM  :  8;  // data segment length (bytes, excluding padding) 15...8
+		uint32_t datalenL  :  8;  // data segment length (bytes, excluding padding) 7...0
+		uint8_t  filler2[8];
+		uint32_t Itasktag  : 32;  // initiator task tag
+		uint32_t filler3   : 32;
+		uint32_t StatSN    : 32;
+		uint32_t ExpCmdSN  : 32;
+		uint32_t MaxCmdSN  : 32;
+		uint8_t  filler4[12];
+	};
+
+	__taskman_reply__ *taskman_reply __attribute__((packed)) =  { reinterpret_cast<__taskman_reply__ *>(pdu_bytes) };
+
+public:
+	iscsi_pdu_taskman_reply();
+	virtual ~iscsi_pdu_taskman_reply();
+
+	bool set(const iscsi_pdu_taskman_request & reply_to);
 	std::vector<blob_t> get() override;
 };

@@ -1,3 +1,4 @@
+#pragma once
 #include <cstddef>
 #include <cstdint>
 #include <utility>
@@ -14,8 +15,7 @@ struct scsi_response
 	std::pair<uint8_t *, size_t> data;  // meta data or disk-data
 	bool                         data_is_meta;  // scsi command reply data
 
-	uint32_t buffer_offset;
-	uint32_t buffer_segment_length;
+	r2t_session r2t;
 };
 
 class scsi
@@ -44,5 +44,5 @@ public:
 		o_report_luns      = 0xa0,
 	};
 
-	std::optional<scsi_response> send(const uint8_t *const CDB, const size_t size, std::optional<std::pair<uint8_t *, size_t> > & data);
+	std::optional<scsi_response> send(const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
 };

@@ -15,7 +15,7 @@ scsi::~scsi()
 {
 }
 
-std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t size, std::optional<std::pair<uint8_t *, size_t> > & data)
+std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data)
 {
 	assert(size >= 16);
 
@@ -92,7 +92,19 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 			}
 		}
 		else {
-			if (CDB[2] == 0x83) {
+                        if (CDB[2] == 0x00) {
+                                response.data.second = 8;
+                                response.data.first = new uint8_t[response.data.second]();
+                                response.data.first[0] = 0;  // TODO
+                                response.data.first[1] = CDB[2];
+                                response.data.first[2] = 0;  // reserved
+                                response.data.first[3] = response.data.second - 3;
+                                response.data.first[4] = 0x00;
+                                response.data.first[5] = 0x83;  // see CDB[2] below
+                                response.data.first[6] = 0xb0;
+                                response.data.first[7] = 0xb1;
+                        }
+			else if (CDB[2] == 0x83) {
 				response.data.second = 4 + 5;
 				response.data.first = new uint8_t[response.data.second]();
 				response.data.first[0] = 0;  // TODO
@@ -147,7 +159,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		DOLOG("scsi::send: READ_CAPACITY\n");
 		response.data.second = 8;
 		response.data.first = new uint8_t[response.data.second]();
-		auto device_size = b->get_size_in_blocks();
+		auto device_size = b->get_size_in_blocks() - 1;
 		response.data.first[0] = device_size >> 24;  // sector count
 		response.data.first[1] = device_size >> 16;
 		response.data.first[2] = device_size >>  8;
@@ -167,7 +179,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 
 			response.data.second = 32;
 			response.data.first = new uint8_t[response.data.second]();
-			auto device_size = b->get_size_in_blocks();
+			auto device_size = b->get_size_in_blocks() - 1;
 			response.data.first[0] = device_size >> 56;
 			response.data.first[1] = device_size >> 48;
 			response.data.first[2] = device_size >> 40;
@@ -202,7 +214,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 
 		if (opcode == o_write_10) {
 			lba             = (CDB[2] << 24) | (CDB[3] << 16) | (CDB[4] << 8) | CDB[5];
-			transfer_length = (CDB[6] << 8) | CDB[7];
+			transfer_length = (CDB[7] << 8) | CDB[8];
 		}
 		else if (opcode == o_write_16) {
 			lba             = (uint64_t(CDB[2]) << 56) | (uint64_t(CDB[3]) << 48) | (uint64_t(CDB[4]) << 40) | (uint64_t(CDB[5]) << 32) | (CDB[6] << 24) | (CDB[7] << 16) | (CDB[8] << 8) | CDB[9];
@@ -214,30 +226,42 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 
 		DOLOG("scsi::send: WRITE_1%c, offset %llu, %u sectors\n", opcode == o_write_10 ? '0' : '6', lba, transfer_length);
 
-		if (data.has_value()) {
-			DOLOG("scsi::send: write command includes data\n");
+		if (data.first) {
+			DOLOG("scsi::send: write command includes data (%zu bytes)\n", data.second);
 
-			size_t expected_size = transfer_length * b->get_block_size();
-			if (expected_size == data.value().second) {
-				if (b->write(lba, transfer_length, data.value().first) == false) {
-					DOLOG("scsi::send: WRITE_xx, failed reading\n");
+			auto   backend_block_size = b->get_block_size();
+			size_t expected_size      = transfer_length * backend_block_size;
+			size_t received_size      = data.second;
+			size_t received_blocks    = received_size / backend_block_size;
+			if (received_blocks)
+				DOLOG("scsi::send: WRITE_xx to LBA %llu is %zu in bytes, %zu bytes\n", lba, lba * backend_block_size, received_size);
+			if (received_blocks > 0 && b->write(lba, received_blocks, data.first) == false) {
+				DOLOG("scsi::send: WRITE_xx, failed writing\n");
 
-					delete [] response.data.first;
-					response.data.first  = nullptr;
-					response.data.second = 0;
-
-					// TODO set sense_data
-				}
-
-				response.type = ir_empty_sense;
+				// TODO set sense_data
 			}
 			else {
-				DOLOG("scsi::send: write did not receive all/more data (expected: %zu, got: %zu)\n", expected_size, data.value().second);
-				// TODO set sense_data
+				if (received_size == expected_size) {
+					response.type = ir_empty_sense;
+					DOLOG("scsi::send: received_size == expected_size\n");
+				}
+				else {  // allow R2T packets to come in
+					response.type = ir_r2t;
+
+					response.r2t.buffer_lba      = lba;
+					response.r2t.bytes_left      = (transfer_length - received_blocks) * backend_block_size;
+					response.r2t.bytes_done      = received_blocks * backend_block_size;
+					DOLOG("scsi::send: starting R2T with %u bytes left (LBA: %llu, offset %u)\n", response.r2t.bytes_left, response.r2t.buffer_lba, response.r2t.bytes_done);
+				}
 			}
 		}
 		else {
-			response.type = ir_r2t;  // allow R2T packets to come in
+			DOLOG("scsi::send: WRITE without data\n");
+
+			if (transfer_length)
+				response.type = ir_r2t;  // allow R2T packets to come in
+			else
+				DOLOG("scsi::send: WRITE with 0 transfer_length\n");
 		}
 	}
 	else if (opcode == o_read_16 || opcode == o_read_10 || opcode == o_read_6) {  // 0x88, 0x28, 0x08
@@ -247,17 +271,17 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		if (opcode == o_read_16) {
 			lba             = (uint64_t(CDB[2]) << 56) | (uint64_t(CDB[3]) << 48) | (uint64_t(CDB[4]) << 40) | (uint64_t(CDB[5]) << 32) | (CDB[6] << 24) | (CDB[7] << 16) | (CDB[8] << 8) | CDB[9];
 			transfer_length = (CDB[10] << 24) | (CDB[11] << 16) | (CDB[12] << 8) | CDB[13];
-			DOLOG("scsi::send: READ_16, offset %llu, %u sectors\n", lba, transfer_length);
+			DOLOG("scsi::send: READ_16, LBA %zu, %u sectors\n", size_t(lba), transfer_length);
 		}
 		else if (opcode == o_read_10) {
 			lba             = (uint64_t(CDB[2]) << 24) | (uint64_t(CDB[3]) << 16) | (uint64_t(CDB[4]) << 8) | uint64_t(CDB[5]);
 			transfer_length =  (CDB[7] << 8) | CDB[8];
-			DOLOG("scsi::send: READ_10, offset %llu, %u sectors\n", lba, transfer_length);
+			DOLOG("scsi::send: READ_10, LBA %zu, %u sectors\n", size_t(lba), transfer_length);
 		}
 		else {
 			lba             = ((CDB[1] & 31) << 16) | (CDB[2] << 8) | CDB[3];
 			transfer_length = CDB[4];
-			DOLOG("scsi::send: READ_6, offset %llu, %u sectors\n", lba, transfer_length);
+			DOLOG("scsi::send: READ_6, LBA %zu, %u sectors\n", size_t(lba), transfer_length);
 		}
 
 		response.data.second = transfer_length * b->get_block_size();
@@ -272,6 +296,12 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 
 				// TODO set sense_data;
 			}
+			else {
+				DOLOG("scsi::send: READ %zu bytes (%u sectors)\n", response.data.second, transfer_length);
+			}
+		}
+		else {
+			DOLOG("scsi::send: 0 bytes request\n");
 		}
 		response.data_is_meta = false;
 	}
@@ -288,9 +318,6 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 	}
 
 	DOLOG("-> returning %zu bytes of sense data\n", response.sense_data.size());
-
-	if (data.has_value())
-		delete [] data.value().first;
 
 	return response;
 }
