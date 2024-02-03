@@ -1,13 +1,14 @@
 what it is
 ----------
 iESP is an iSCSI target for the ESP32 microcontroller (altough it runs fine on Linux as well).
-In theory this allows you to boot your vmware cluster from an SD-card.
+In theory this allows you to boot your VMWare cluster from an SD-card.
 
 
 requirements
 ------------
 * Either a Linux-box or an ESP32 microcontroller with an SD-card reader connected to it.
-* platformio
+* platformio (for ESP32)
+* cmake (for Linux)
 
 
 compiling
