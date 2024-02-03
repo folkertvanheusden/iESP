@@ -305,7 +305,7 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 		DOLOG("server::push_response: stream %zu sectors (opcode %02xh)\n", stream_parameters.n_sectors, pdu->get_opcode());
 
 		iscsi_pdu_scsi_cmd reply_to;
-		auto temp = reply_to.get_raw();
+		auto temp = pdu->get_raw();
 		reply_to.set(s, temp.data, temp.n);
 		delete [] temp.data;
 

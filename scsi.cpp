@@ -296,6 +296,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		response.io.is_inline               = false;
 		response.io.what.location.lba       = lba;
 		response.io.what.location.n_sectors = transfer_length;
+		response.io.what.data.first         = nullptr;
 
 		response.data_is_meta = false;
 	}
