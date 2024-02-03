@@ -36,7 +36,7 @@ retry:
 		init_file();
 
 	if (file.open(FILENAME, O_RDWR) == false) {
-		Serial.print(F("Cannot access test.dat on SD-card"));
+		Serial.println(F("Cannot access test.dat on SD-card"));
 		return;
 	}
 
