@@ -309,7 +309,7 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 
 	        auto use_pdu_data_size = stream_parameters.n_sectors * 512;
 		if (use_pdu_data_size > size_t(reply_to.get_ExpDatLen())) {
-			DOLOG("iscsi_pdu_scsi_data_in: requested less (%zu) than wat is available (%zu)\n", size_t(reply_to_copy.get_ExpDatLen()), use_pdu_data_size);
+			DOLOG("iscsi_pdu_scsi_data_in: requested less (%zu) than wat is available (%zu)\n", size_t(reply_to.get_ExpDatLen()), use_pdu_data_size);
 			use_pdu_data_size = reply_to.get_ExpDatLen();
 		}
 

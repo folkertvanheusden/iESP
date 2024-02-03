@@ -613,7 +613,6 @@ blob_t iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *const s, const iscsi_pdu
 		}
 		set_bits(&pdu_data_in.b2, 0, 1, true);  // S
 	}
-	DOLOG("iscsi_pdu_scsi_data_in::get: block %zu, last_block: %d, cur_len: %zu\n", count, last_block, pdu_data_in_data.n);
 	pdu_data_in.datalenH   = pdu_data_in_data.n >> 16;
 	pdu_data_in.datalenM   = pdu_data_in_data.n >>  8;
 	pdu_data_in.datalenL   = pdu_data_in_data.n      ;
