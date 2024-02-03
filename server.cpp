@@ -311,7 +311,7 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 
 	        auto use_pdu_data_size = stream_parameters.n_sectors * 512;
 		if (use_pdu_data_size > size_t(reply_to.get_ExpDatLen())) {
-			DOLOG("iscsi_pdu_scsi_data_in: requested less (%zu) than wat is available (%zu)\n", size_t(reply_to.get_ExpDatLen()), use_pdu_data_size);
+			DOLOG("server::push_response: requested less (%zu) than wat is available (%zu)\n", size_t(reply_to.get_ExpDatLen()), use_pdu_data_size);
 			use_pdu_data_size = reply_to.get_ExpDatLen();
 		}
 
@@ -322,8 +322,10 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 		uint32_t offset = 0;
 
 		for(uint32_t block_nr = 0; block_nr < stream_parameters.n_sectors; block_nr++) {
-			if (b->read(block_nr + stream_parameters.lba, 1, buffer.data) == false) {
-				// TODO
+			uint64_t cur_block_nr = block_nr + stream_parameters.lba;
+			if (b->read(cur_block_nr, 1, buffer.data) == false) {
+				DOLOG("server::push_response: reading block %zu from backend failed\n", size_t(cur_block_nr));
+				ok = false;
 				break;
 			}
 
@@ -331,7 +333,8 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 
 			if (WRITE(fd, out.data, out.n) == -1) {
 				delete [] out.data;
-				// TODO
+				DOLOG("server::push_response: problem sending block %zu to initiator\n", size_t(cur_block_nr));
+				ok = false;
 				break;
 			}
 
