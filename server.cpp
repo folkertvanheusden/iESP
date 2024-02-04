@@ -215,7 +215,8 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 
 		if (session == nullptr) {
 			DOLOG("server::push_response: DATA-OUT PDU references unknown TTT (%08x)\n", TTT);
-			delete [] data.value().first;
+			if (data.has_value())
+				delete [] data.value().first;
 			return false;
 		}
 		else if (data.has_value() && data.value().second > 0) {
