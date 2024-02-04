@@ -440,7 +440,7 @@ void server::handler()
 			auto now = millis();
 			if (now - prev_output >= 5000) {
 				prev_output = now;
-				Serial.printf("PDU/s: %.2f\r\n", pdu_count / double(now - start));
+				Serial.printf("%ld] PDU/s: %.2f\r\n", now, pdu_count / double(now - start));
 			}
 #endif
 
