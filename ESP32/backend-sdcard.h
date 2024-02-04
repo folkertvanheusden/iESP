@@ -7,8 +7,8 @@
 class backend_sdcard : public backend
 {
 private:
-	SdExFat   sd;
-	ExFatFile file;
+	SdFs      sd;
+	FsFile    file;
 	uint64_t  card_size   { 0 };
 	size_t    sector_size { 0 };
 

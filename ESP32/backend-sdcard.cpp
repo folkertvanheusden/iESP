@@ -17,14 +17,15 @@ backend_sdcard::backend_sdcard()
 	for(int sp=50; sp>=14; sp -= 4) {
 		Serial.printf("Trying %d MHz...\r\n", sp);
 
-		if (sd.begin(5, SD_SCK_MHZ(sp))) {
+		// is slower on the ESP32 if (sd.begin(SdSpiConfig(CS_SD, DEDICATED_SPI, SD_SCK_MHZ(sp)))) {
+		if (sd.begin(CS_SD, SD_SCK_MHZ(sp))) {
 			Serial.printf("Accessing SD card at %d MHz\r\n", sp);
 			ok = true;
 			break;
 		}
 	}
 	if (ok == false) {
-		Serial.println(F("SD-card mount failed (assuming CS is on pin 5)"));
+		Serial.printf("SD-card mount failed (assuming CS is on pin %d)", CS_SD);
 		sd.initErrorHalt(&Serial);
 		return;
 	}
