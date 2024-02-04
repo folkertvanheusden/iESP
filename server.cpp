@@ -410,11 +410,20 @@ void server::handler()
 		if (fd == -1)
 			continue;
 
+		std::string endpoint = get_endpoint_name(fd);
+
 		int flags = 1;
 		if (setsockopt(fd, SOL_TCP, TCP_NODELAY, (void *)&flags, sizeof(flags)) == -1)
 			DOLOG("server::handler: cannot disable Nagle algorithm\n");
 
-		DOLOG("server::handler: new session\n");
+#ifdef ESP32
+		Serial.printf("new session with %s\r\n", endpoint.c_str());
+		uint64_t pdu_count   = 0;
+		auto     prev_output = millis();
+		auto     start       = prev_output;
+#else
+		DOLOG("server::handler: new session with %s\n", endpoint.c_str());
+#endif
 
 		session *s  = nullptr;
 		bool     ok = true;
@@ -425,6 +434,15 @@ void server::handler()
 				DOLOG("server::handler: no PDU received, aborting socket connection\n");
 				break;
 			}
+
+#ifdef ESP32
+			pdu_count++;
+			auto now = millis();
+			if (now - prev_output >= 5000) {
+				prev_output = now;
+				Serial.printf("PDU/s: %.2f\r\n", pdu_count / double(now - start));
+			}
+#endif
 
 			auto parameters = select_parameters(pdu, s, &scsi_dev);
 			if (parameters) {
@@ -438,6 +456,11 @@ void server::handler()
 			delete pdu;
 		}
 		while(ok);
+#ifdef ESP32
+		Serial.println(F("session finished"));
+#else
+		DOLOG("session finished\n");
+#endif
 
 		close(fd);
 

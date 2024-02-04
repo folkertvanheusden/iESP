@@ -1,7 +1,12 @@
+#include <cstdarg>
 #include <cstdint>
+#include <netdb.h>
 #include <string>
 #include <unistd.h>
 #include <vector>
+#include <sys/socket.h>
+
+#include "log.h"
 
 
 ssize_t READ(const int fd, uint8_t *whereto, size_t len)
@@ -97,3 +102,43 @@ std::string to_hex(const uint8_t *const in, const size_t n)
 	return out;
 }
 #endif
+
+std::string myformat(const char *const fmt, ...)
+{
+        char *buffer = nullptr;
+        va_list ap;
+
+        va_start(ap, fmt);
+        if (vasprintf(&buffer, fmt, ap) == -1) {
+                va_end(ap);
+                DOLOG("myformat: failed to convert string with format \"%s\"\n", fmt);
+                return fmt;
+        }
+        va_end(ap);
+
+        std::string result = buffer;
+        free(buffer);
+
+        return result;
+}
+
+std::string get_endpoint_name(int fd)
+{
+        char host[256];
+        char serv[256];
+        struct sockaddr_in6 addr { 0 };
+        socklen_t addr_len = sizeof addr;
+
+        if (getpeername(fd, (struct sockaddr *)&addr, &addr_len) == -1) {
+                DOLOG("get_endpoint_name: failed to find name of fd %d\n", fd);
+		return "?:?";
+	}
+
+#ifdef ESP32
+	inet_ntop(addr.sin6_family, &addr, host, sizeof host);
+	return host;
+#else
+	getnameinfo((struct sockaddr *)&addr, addr_len, host, sizeof(host), serv, sizeof(serv), NI_NUMERICHOST | NI_NUMERICSERV);
+	return myformat("[%s]:%s", host, serv);
+#endif
+}
