@@ -11,6 +11,7 @@
 
 #include "backend-sdcard.h"
 #include "server.h"
+#include "version.h"
 
 
 std::atomic_bool stop { false };
@@ -25,14 +26,14 @@ void setup()
 
 	Serial.println(F("iESP, (C) 2023-2024 by Folkert van Heusden <mail@vanheusden.com>"));
 	Serial.println(F("Compiled on " __DATE__ " " __TIME__));
-
-	const int cpu_freq = 240;
-	Serial.printf("CPU frequency was %d, now setting to %d\r\n", getCpuFrequencyMhz(), cpu_freq);
-	setCpuFrequencyMhz(cpu_freq);
+	Serial.print(F("GIT hash: "));
+	Serial.println(version_str);
 
 	wifiManager = new WiFiManager();
 	wifiManager->setConfigPortalTimeout(120);
 	wifiManager->autoConnect();
+
+	esp_wifi_set_ps(WIFI_PS_NONE);
 
 	if (MDNS.begin("iESP"))
 		MDNS.addService("iscsi", "tcp", 3260);
