@@ -169,7 +169,7 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 			else {
 				pdu_obj->set_ahs_segment({ ahs_temp, ahs_len });
 			}
-			delete ahs_temp;
+			delete [] ahs_temp;
 		}
 
 		size_t data_length = pdu_obj->get_data_length();
