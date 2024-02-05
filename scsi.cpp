@@ -229,11 +229,17 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 			memcpy(&response.io.what.data.first[16], &CDB[10], 4);  // ALLOCATIN LENGTH
 		}
 	}
-	else if (opcode == o_write_10 || opcode == o_write_16) {
+	else if (opcode == o_write_6 || opcode == o_write_10 || opcode == o_write_16) {
 		uint64_t lba             = 0;
 		uint32_t transfer_length = 0;
 
-		if (opcode == o_write_10) {
+		if (opcode == o_write_6) {
+			lba             = ((CDB[1] & 31) << 16) | (CDB[2] << 8) | CDB[3];
+			transfer_length = CDB[4];
+			if (transfer_length == 0)
+				transfer_length = 256;
+		}
+		else if (opcode == o_write_10) {
 			lba             = (uint64_t(CDB[2]) << 24) | (CDB[3] << 16) | (CDB[4] << 8) | CDB[5];
 			transfer_length = (CDB[7] << 8) | CDB[8];
 		}
@@ -302,6 +308,8 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		else {
 			lba             = ((CDB[1] & 31) << 16) | (CDB[2] << 8) | CDB[3];
 			transfer_length = CDB[4];
+			if (transfer_length == 0)
+				transfer_length = 256;
 			DOLOG("scsi::send: READ_6, LBA %zu, %u sectors\n", size_t(lba), transfer_length);
 		}
 
