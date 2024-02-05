@@ -842,12 +842,12 @@ iscsi_pdu_text_reply::~iscsi_pdu_text_reply()
 
 bool iscsi_pdu_text_reply::set(const iscsi_pdu_text_request & reply_to, const iscsi_response_parameters *const parameters)
 {
+#if 0
 	const auto data = reply_to.get_data();
 	if (data.has_value() == false)
 		return false;
 	auto kvs_in = data_to_text_array(data.value().first, data.value().second);
 	delete [] data.value().first;
-
 	bool send_targets = false;
 
 	for(auto & kv: kvs_in) {
@@ -860,6 +860,7 @@ bool iscsi_pdu_text_reply::set(const iscsi_pdu_text_request & reply_to, const is
 
 		DOLOG(" text request, responding to: %s\n", kv.c_str());
 	}
+#endif
 
 	auto *temp_parameters = reinterpret_cast<const iscsi_response_parameters_text_req *>(parameters);
 	const std::vector<std::string> kvs {

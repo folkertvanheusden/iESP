@@ -128,7 +128,7 @@ std::string get_endpoint_name(int fd)
 {
         char host[256];
         char serv[256];
-        sockaddr_in6 addr { 0 };
+        sockaddr_in6 addr { };
         socklen_t addr_len = sizeof addr;
 
         if (getpeername(fd, reinterpret_cast<sockaddr *>(&addr), &addr_len) == -1) {
