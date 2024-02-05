@@ -11,7 +11,9 @@
 scsi::scsi(backend *const b) : b(b)
 {
 #ifdef ESP32
-	snprintf(serial, sizeof serial, "%08x",  ESP.getEfuseMac());
+	uint64_t temp { 0 };
+	esp_efuse_mac_get_default(reinterpret_cast<uint8_t *>(&temp));
+	snprintf(serial, sizeof serial, "%08x", temp);
 #else
 	snprintf(serial, sizeof serial, "12345678");
 
