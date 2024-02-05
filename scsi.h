@@ -50,6 +50,7 @@ public:
 		o_read_capacity_10 = 0x25,
 		o_read_10          = 0x28,
 		o_write_10         = 0x2a,
+		o_write_verify_10  = 0x2e,
 		o_read_16          = 0x88,
 		o_write_16         = 0x8a,
 		o_get_lba_status   = 0x9e,
