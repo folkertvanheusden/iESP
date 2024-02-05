@@ -865,7 +865,7 @@ bool iscsi_pdu_text_reply::set(const iscsi_pdu_text_request & reply_to, const is
 	auto *temp_parameters = reinterpret_cast<const iscsi_response_parameters_text_req *>(parameters);
 	const std::vector<std::string> kvs {
 		"TargetName=iqn.1993-11.com.vanheusden:test",  // FIXME
-		"TargetAddress=" + temp_parameters->listen_ip + ":3260",
+		"TargetAddress=" + temp_parameters->listen_ip + myformat(":%d", temp_parameters->listen_port),
 	};
 	auto temp = text_array_to_data(kvs);
 	text_reply_reply_data.first  = temp.first;
