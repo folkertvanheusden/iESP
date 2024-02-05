@@ -289,7 +289,7 @@ public:
 		uint32_t reserved  : 32;
 		uint32_t StatSN    : 32;
 		uint32_t ExpCmdSN  : 32;
-		uint32_t MaxStatSN : 32;
+		uint32_t MaxCmdSN  : 32;
 		uint8_t  statuscls :  8;  // status-class
 		uint8_t  statusdet :  8;  // status-detail
 		uint16_t reserved2 : 16;

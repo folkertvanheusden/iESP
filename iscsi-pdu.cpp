@@ -212,6 +212,9 @@ std::optional<iscsi_response_set> iscsi_pdu_login_request::get_response(session 
 	auto kvs_in = data_to_text_array(data.first, data.second);
 	uint32_t max_burst = ~0;
 	for(auto & kv: kvs_in) {
+#ifndef NDEBUG
+		DOLOG("iscsi_pdu_login_request::get_response: kv %s\n", kv.c_str());
+#endif
 		auto parts = split(kv, "=");
 		if (parts.size() < 2)
 			continue;
@@ -252,32 +255,62 @@ iscsi_pdu_login_reply::~iscsi_pdu_login_reply()
 
 bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 {
-	const std::vector<std::string> kvs {
-		"TargetPortalGroupTag=1",
-		"HeaderDigest=None",
-		"DataDigest=None",
-		"DefaultTime2Wait=1",
-		"DefaultTime2Retain=0",
-		"IFMarker=No",
-		"OFMarker=No",
-//		"AuthMethod=None",
-		"ErrorRecoveryLevel=0",
-		"MaxConnections=1",
-//		"TargetName=iqn.1993-11.com.vanheusden:test",
-//		"TargetAlias=Bob-s disk",  // TODO
-		"ImmediateData=Yes",
-		"MaxRecvDataSegmentLength=1024",
-		"MaxBurstLength=512",
-		"FirstBurstLength=512",
-		"TargetPortalGroupTag=1",
-		"InitialR2T=No",
-		"MaxOutstandingR2T=1",
-		"DataPDUInOrder=Yes",
-		"DataSequenceInOrder=Yes",
-	};
-	auto temp = text_array_to_data(kvs);
-	login_reply_reply_data.first  = temp.first;
-	login_reply_reply_data.second = temp.second;
+	bool discovery = false;
+	const auto data = reply_to.get_data();
+	if (data.has_value()) {
+		auto kvs_in = data_to_text_array(data.value().first, data.value().second);
+		delete [] data.value().first;
+
+		for(auto & kv: kvs_in) {
+			auto parts = split(kv, "=");
+			if (parts.size() < 2)
+				return false;
+
+			if (parts[0] == "SessionType" && parts[1] == "Discovery")
+				discovery = true;
+		}
+	}
+
+	if (discovery) {
+		DOLOG("iscsi_pdu_login_reply::set: discovery mode\n");
+
+		const std::vector<std::string> kvs {
+			"TargetPortalGroupTag=1",
+			"AuthMethod=None",
+		};
+		auto temp = text_array_to_data(kvs);
+		login_reply_reply_data.first  = temp.first;
+		login_reply_reply_data.second = temp.second;
+	}
+	else {
+		const std::vector<std::string> kvs {
+				"TargetPortalGroupTag=1",
+				"HeaderDigest=None",
+				"DataDigest=None",
+				"DefaultTime2Wait=1",
+				"DefaultTime2Retain=0",
+				"IFMarker=No",
+				"OFMarker=No",
+				//		"AuthMethod=None",
+				"ErrorRecoveryLevel=0",
+				"MaxConnections=1",
+				//		"TargetName=iqn.1993-11.com.vanheusden:test",
+				//		"TargetAlias=Bob-s disk",  // TODO
+				"ImmediateData=Yes",
+				"MaxRecvDataSegmentLength=1024",
+				"MaxBurstLength=512",
+				"FirstBurstLength=512",
+				"TargetPortalGroupTag=1",
+				"InitialR2T=No",
+				"MaxOutstandingR2T=1",
+				"DataPDUInOrder=Yes",
+				"DataSequenceInOrder=Yes",
+		};
+
+		auto temp = text_array_to_data(kvs);
+		login_reply_reply_data.first  = temp.first;
+		login_reply_reply_data.second = temp.second;
+	}
 
 	*login_reply = { };
 	set_bits(&login_reply->b1, 7, 1, false);  // filler 1
@@ -291,19 +324,20 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 
 	login_reply->versionmax = reply_to.get_versionmin();
 	login_reply->versionact = reply_to.get_versionmin();
-	login_reply->ahslen     = 0;
 	login_reply->datalenH   = login_reply_reply_data.second >> 16;
 	login_reply->datalenM   = login_reply_reply_data.second >>  8;
 	login_reply->datalenL   = login_reply_reply_data.second      ;
 	memcpy(login_reply->ISID, reply_to.get_ISID(), 6);
-	do {
-		my_getrandom(&login_reply->TSIH, sizeof login_reply->TSIH);
+	if (!discovery) {
+		do {
+			my_getrandom(&login_reply->TSIH, sizeof login_reply->TSIH);
+		}
+		while(login_reply->TSIH == 0);
 	}
-	while(login_reply->TSIH == 0);
 	login_reply->Itasktag   = reply_to.get_Itasktag();
-	login_reply->StatSN     = htonl(reply_to.get_ExpStatSN());
+	login_reply->StatSN     = htonl(discovery ? 0 : reply_to.get_ExpStatSN());
 	login_reply->ExpCmdSN   = htonl(reply_to.get_CmdSN());
-	login_reply->MaxStatSN  = htonl(reply_to.get_ExpStatSN());
+	login_reply->MaxCmdSN   = htonl(reply_to.get_CmdSN() + 1);
 
 	return true;
 }
@@ -318,7 +352,7 @@ std::vector<blob_t> iscsi_pdu_login_reply::get()
 	memcpy(out, login_reply, sizeof *login_reply);
 	memcpy(&out[sizeof *login_reply], login_reply_reply_data.first, login_reply_reply_data.second);
 
-	assert((out_size & ~3) == out_size);
+	assert((out_size & 3) == 0);
 	return return_helper(out, out_size);
 }
 
@@ -842,7 +876,6 @@ iscsi_pdu_text_reply::~iscsi_pdu_text_reply()
 
 bool iscsi_pdu_text_reply::set(const iscsi_pdu_text_request & reply_to, const iscsi_response_parameters *const parameters)
 {
-#if 0
 	const auto data = reply_to.get_data();
 	if (data.has_value() == false)
 		return false;
@@ -860,16 +893,17 @@ bool iscsi_pdu_text_reply::set(const iscsi_pdu_text_request & reply_to, const is
 
 		DOLOG(" text request, responding to: %s\n", kv.c_str());
 	}
-#endif
 
-	auto *temp_parameters = reinterpret_cast<const iscsi_response_parameters_text_req *>(parameters);
-	const std::vector<std::string> kvs {
-		"TargetName=iqn.1993-11.com.vanheusden:test",  // FIXME
-		"TargetAddress=" + temp_parameters->listen_ip + myformat(":%d", temp_parameters->listen_port),
-	};
-	auto temp = text_array_to_data(kvs);
-	text_reply_reply_data.first  = temp.first;
-	text_reply_reply_data.second = temp.second;
+	if (send_targets) {
+		auto *temp_parameters = reinterpret_cast<const iscsi_response_parameters_text_req *>(parameters);
+		const std::vector<std::string> kvs {
+			"TargetName=iqn.1993-11.com.vanheusden:test",  // FIXME
+			"TargetAddress=" + temp_parameters->listen_ip + myformat(":%d", temp_parameters->listen_port),
+		};
+		auto temp = text_array_to_data(kvs);
+		text_reply_reply_data.first  = temp.first;
+		text_reply_reply_data.second = temp.second;
+	}
 
 	*text_reply = { };
 	set_bits(&text_reply->b1, 0, 6, o_text_resp);  // opcode, 0x24
