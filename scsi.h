@@ -32,7 +32,8 @@ struct scsi_response
 class scsi
 {
 private:
-	backend *const b { nullptr };
+	backend *const b         { nullptr };
+	char           serial[9] { 0       };
 
 public:
 	scsi(backend *const b);

@@ -10,6 +10,17 @@
 
 scsi::scsi(backend *const b) : b(b)
 {
+#ifdef ESP32
+	snprintf(serial, sizeof serial, "%08x",  ESP.getEfuseMac());
+#else
+	snprintf(serial, sizeof serial, "12345678");
+
+	FILE *fh = fopen("/var/lib/dbus/machine-id", "r");
+	if (fh) {
+		fgets(serial, sizeof serial, fh);
+		fclose(fh);
+	}
+#endif
 }
 
 scsi::~scsi()
@@ -83,7 +94,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 				memcpy(&response.io.what.data.first[8],  "vnHeusdn", 8);
 				memcpy(&response.io.what.data.first[16], "iESP", 4);  // TODO
 				memcpy(&response.io.what.data.first[32], "1.0", 3);  // TODO
-				memcpy(&response.io.what.data.first[36], "12345678", 8);  // TODO
+				memcpy(&response.io.what.data.first[36], serial, 8);
 				response.io.what.data.first[58] = 0x04;  // SBC-3
 				response.io.what.data.first[59] = 0xc0;
 				response.io.what.data.first[60] = 0x09;  // iSCSI
