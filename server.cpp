@@ -14,6 +14,7 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <sys/socket.h>
+#include <sys/types.h>
 #ifdef ESP32
 #ifndef SOL_TCP
 #define SOL_TCP 6
@@ -427,7 +428,11 @@ void server::handler()
 		std::string endpoint = get_endpoint_name(fd);
 
 		int flags = 1;
+#if defined(__FreeBSD__)
+		if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (void *)&flags, sizeof(flags)) == -1)
+#else
 		if (setsockopt(fd, SOL_TCP, TCP_NODELAY, (void *)&flags, sizeof(flags)) == -1)
+#endif
 			DOLOG("server::handler: cannot disable Nagle algorithm\n");
 
 #ifdef ESP32

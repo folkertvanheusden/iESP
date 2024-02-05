@@ -4,7 +4,9 @@
 #include <string>
 #include <unistd.h>
 #include <vector>
+#include <netinet/in.h>
 #include <sys/socket.h>
+#include <sys/types.h>
 
 #include "log.h"
 
@@ -126,10 +128,10 @@ std::string get_endpoint_name(int fd)
 {
         char host[256];
         char serv[256];
-        struct sockaddr_in6 addr { 0 };
+        sockaddr_in6 addr { 0 };
         socklen_t addr_len = sizeof addr;
 
-        if (getpeername(fd, (struct sockaddr *)&addr, &addr_len) == -1) {
+        if (getpeername(fd, reinterpret_cast<sockaddr *>(&addr), &addr_len) == -1) {
                 DOLOG("get_endpoint_name: failed to find name of fd %d\n", fd);
 		return "?:?";
 	}
@@ -138,7 +140,7 @@ std::string get_endpoint_name(int fd)
 	inet_ntop(addr.sin6_family, &addr, host, sizeof host);
 	return host;
 #else
-	getnameinfo((struct sockaddr *)&addr, addr_len, host, sizeof(host), serv, sizeof(serv), NI_NUMERICHOST | NI_NUMERICSERV);
+	getnameinfo(reinterpret_cast<sockaddr *>(&addr), addr_len, host, sizeof(host), serv, sizeof(serv), NI_NUMERICHOST | NI_NUMERICSERV);
 	return myformat("[%s]:%s", host, serv);
 #endif
 }

@@ -1,4 +1,4 @@
-#ifdef linux
+#if defined(linux) || defined(__FreeBSD__)
 #include <cstdint>
 #include <sys/random.h>
 

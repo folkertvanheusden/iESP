@@ -1,6 +1,5 @@
 #include <cinttypes>
 #include <cstring>
-#include <error.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
