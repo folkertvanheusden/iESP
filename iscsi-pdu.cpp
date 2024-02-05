@@ -83,13 +83,15 @@ bool iscsi_pdu_bhs::set_ahs_segment(std::pair<const uint8_t *, std::size_t> ahs_
 		if (offset + 3 + ahs_length > ahs_in.second)
 			break;
 
-		iscsi_pdu_ahs *instance = new iscsi_pdu_ahs();
-		if (instance->set(&ahs_in.first[offset], ahs_length) == false) {
-			delete instance;
-			break;
-		}
+		if (ahs_length > 0) {
+			iscsi_pdu_ahs *instance = new iscsi_pdu_ahs();
+			if (instance->set(&ahs_in.first[offset], ahs_length) == false) {
+				delete instance;
+				break;
+			}
 
-		ahs_list.push_back(instance);
+			ahs_list.push_back(instance);
+		}
 	}
 
 	return offset == ahs_in.second;
