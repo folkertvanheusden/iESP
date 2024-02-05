@@ -223,12 +223,12 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		uint32_t transfer_length = 0;
 
 		if (opcode == o_write_10) {
-			lba             = (CDB[2] << 24) | (CDB[3] << 16) | (CDB[4] << 8) | CDB[5];
+			lba             = (uint64_t(CDB[2]) << 24) | (CDB[3] << 16) | (CDB[4] << 8) | CDB[5];
 			transfer_length = (CDB[7] << 8) | CDB[8];
 		}
 		else if (opcode == o_write_16) {
 			lba             = (uint64_t(CDB[2]) << 56) | (uint64_t(CDB[3]) << 48) | (uint64_t(CDB[4]) << 40) | (uint64_t(CDB[5]) << 32) | (uint64_t(CDB[6]) << 24) | (CDB[7] << 16) | (CDB[8] << 8) | CDB[9];
-			transfer_length = (CDB[10] << 24) | (CDB[11] << 16) | (CDB[12] << 8) | CDB[13];
+			transfer_length = (uint64_t(CDB[10]) << 24) | (CDB[11] << 16) | (CDB[12] << 8) | CDB[13];
 		}
 		else {
 			DOLOG("scsi::send: WRITE_1x internal error\n");
@@ -280,7 +280,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 
 		if (opcode == o_read_16) {
 			lba             = (uint64_t(CDB[2]) << 56) | (uint64_t(CDB[3]) << 48) | (uint64_t(CDB[4]) << 40) | (uint64_t(CDB[5]) << 32) | (uint64_t(CDB[6]) << 24) | (CDB[7] << 16) | (CDB[8] << 8) | CDB[9];
-			transfer_length = (CDB[10] << 24) | (CDB[11] << 16) | (CDB[12] << 8) | CDB[13];
+			transfer_length = (uint64_t(CDB[10]) << 24) | (CDB[11] << 16) | (CDB[12] << 8) | CDB[13];
 			DOLOG("scsi::send: READ_16, LBA %zu, %u sectors\n", size_t(lba), transfer_length);
 		}
 		else if (opcode == o_read_10) {
