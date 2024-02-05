@@ -1,4 +1,5 @@
 #include <cassert>
+#include <cinttypes>
 #include <cstdio>
 #include <cstring>
 
@@ -233,7 +234,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 			DOLOG("scsi::send: WRITE_1x internal error\n");
 		}
 
-		DOLOG("scsi::send: WRITE_1%c, offset %llu, %u sectors\n", opcode == o_write_10 ? '0' : '6', lba, transfer_length);
+		DOLOG("scsi::send: WRITE_1%c, offset %" PRIu64 ", %u sectors\n", opcode == o_write_10 ? '0' : '6', lba, transfer_length);
 
 		if (data.first) {
 			DOLOG("scsi::send: write command includes data (%zu bytes)\n", data.second);
@@ -243,7 +244,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 			size_t received_size      = data.second;
 			size_t received_blocks    = received_size / backend_block_size;
 			if (received_blocks)
-				DOLOG("scsi::send: WRITE_xx to LBA %llu is %zu in bytes, %zu bytes\n", lba, lba * backend_block_size, received_size);
+				DOLOG("scsi::send: WRITE_xx to LBA %" PRIu64 " is %zu in bytes, %zu bytes\n", lba, lba * backend_block_size, received_size);
 			if (received_blocks > 0 && b->write(lba, received_blocks, data.first) == false) {
 				DOLOG("scsi::send: WRITE_xx, failed writing\n");
 
@@ -260,7 +261,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 					response.r2t.buffer_lba      = lba;
 					response.r2t.bytes_left      = (transfer_length - received_blocks) * backend_block_size;
 					response.r2t.bytes_done      = received_blocks * backend_block_size;
-					DOLOG("scsi::send: starting R2T with %u bytes left (LBA: %llu, offset %u)\n", response.r2t.bytes_left, response.r2t.buffer_lba, response.r2t.bytes_done);
+					DOLOG("scsi::send: starting R2T with %u bytes left (LBA: %" PRIu64 ", offset %u)\n", response.r2t.bytes_left, response.r2t.buffer_lba, response.r2t.bytes_done);
 				}
 			}
 		}

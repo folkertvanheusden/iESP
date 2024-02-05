@@ -1,3 +1,4 @@
+#include <cinttypes>
 #include <cstring>
 #include <error.h>
 #include <fcntl.h>
@@ -39,7 +40,7 @@ bool backend_file::write(const uint64_t block_nr, const uint32_t n_blocks, const
 	auto   block_size = get_block_size();
 	off_t  offset     = block_nr * block_size;
 	size_t n_bytes    = n_blocks * block_size;
-	DOLOG("backend_file::write: block %llu (%lu), %d blocks, block size: %d\n", block_nr, offset, n_blocks, block_size);
+	DOLOG("backend_file::write: block %" PRIu64 " (%lu), %d blocks, block size: %" PRIu64 "\n", block_nr, offset, n_blocks, block_size);
 	int rc = pwrite(fd, data, n_bytes, offset);
 	if (rc == -1)
 		DOLOG("backend_file::write: ERROR writing; %s\n", strerror(errno));
@@ -51,7 +52,7 @@ bool backend_file::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_
 	auto   block_size = get_block_size();
 	off_t  offset     = block_nr * block_size;
 	size_t n_bytes    = n_blocks * block_size;
-	DOLOG("backend_file::read: block %llu (%lu), %d blocks (%zu), block size: %d\n", block_nr, offset, n_blocks, n_bytes, block_size);
+	DOLOG("backend_file::read: block %" PRIu64 " (%lu), %d blocks (%zu), block size: %" PRIu64 "\n", block_nr, offset, n_blocks, n_bytes, block_size);
 	int rc = pread(fd, data, n_bytes, offset);
 	if (rc == -1)
 		DOLOG("backend_file::read: ERROR reading; %s\n", strerror(errno));
