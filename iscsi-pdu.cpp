@@ -283,28 +283,16 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 		login_reply_reply_data.second = temp.second;
 	}
 	else {
+		DOLOG("iscsi_pdu_login_reply::set: login mode\n");
+
 		const std::vector<std::string> kvs {
-				"TargetPortalGroupTag=1",
-				"HeaderDigest=None",
-				"DataDigest=None",
-				"DefaultTime2Wait=1",
-				"DefaultTime2Retain=0",
-				"IFMarker=No",
-				"OFMarker=No",
-				//		"AuthMethod=None",
-				"ErrorRecoveryLevel=0",
-				"MaxConnections=1",
-				//		"TargetName=iqn.1993-11.com.vanheusden:test",
-				//		"TargetAlias=Bob-s disk",  // TODO
-				"ImmediateData=Yes",
-				"MaxRecvDataSegmentLength=1024",
-				"MaxBurstLength=512",
-				"FirstBurstLength=512",
-				"TargetPortalGroupTag=1",
-				"InitialR2T=No",
-				"MaxOutstandingR2T=1",
-				"DataPDUInOrder=Yes",
-				"DataSequenceInOrder=Yes",
+			"HeaderDigest=None",
+			"DataDigest=None",
+			"DefaultTime2Wait=2",
+			"DefaultTime2Retain=0",
+			"ErrorRecoveryLevel=0",
+			"TargetPortalGroupTag=1",
+			"MaxRecvDataSegmentLength=4096",
 		};
 
 		auto temp = text_array_to_data(kvs);
@@ -897,7 +885,7 @@ bool iscsi_pdu_text_reply::set(const iscsi_pdu_text_request & reply_to, const is
 	if (send_targets) {
 		auto *temp_parameters = reinterpret_cast<const iscsi_response_parameters_text_req *>(parameters);
 		const std::vector<std::string> kvs {
-			"TargetName=iqn.1993-11.com.vanheusden:test",  // FIXME
+			"TargetName=iqn.1993-11.com.vanheusden:test",
 			"TargetAddress=" + temp_parameters->listen_ip + myformat(":%d", temp_parameters->listen_port),
 		};
 		auto temp = text_array_to_data(kvs);
