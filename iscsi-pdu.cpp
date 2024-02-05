@@ -885,8 +885,8 @@ bool iscsi_pdu_text_reply::set(const iscsi_pdu_text_request & reply_to, const is
 	if (send_targets) {
 		auto *temp_parameters = reinterpret_cast<const iscsi_response_parameters_text_req *>(parameters);
 		const std::vector<std::string> kvs {
-			"TargetName=iqn.1993-11.com.vanheusden:test",
-			"TargetAddress=" + temp_parameters->listen_ip + myformat(":%d", temp_parameters->listen_port),
+			"TargetName=test",
+			"TargetAddress=" + temp_parameters->listen_ip + myformat(":%d", temp_parameters->listen_port) + ",1",
 		};
 		auto temp = text_array_to_data(kvs);
 		text_reply_reply_data.first  = temp.first;
@@ -904,7 +904,8 @@ bool iscsi_pdu_text_reply::set(const iscsi_pdu_text_request & reply_to, const is
 	text_reply->TTT        = reply_to.get_TTT();
 	text_reply->Itasktag   = reply_to.get_Itasktag();
 	text_reply->StatSN     = htonl(reply_to.get_ExpStatSN());
-	text_reply->ExpCmdSN   = htonl(reply_to.get_CmdSN());
+	text_reply->ExpCmdSN   = htonl(reply_to.get_CmdSN() + 1);
+	text_reply->MaxCmdSN   = htonl(reply_to.get_CmdSN() + 1);
 
 	return true;
 }
@@ -917,7 +918,8 @@ std::vector<blob_t> iscsi_pdu_text_reply::get()
 	size_t out_size = sizeof(*text_reply) + data_size_padded;
 	uint8_t *out = new uint8_t[out_size]();
 	memcpy(out, text_reply, sizeof *text_reply);
-	memcpy(&out[sizeof *text_reply], text_reply_reply_data.first, text_reply_reply_data.second);
+	if (text_reply_reply_data.second)
+		memcpy(&out[sizeof *text_reply], text_reply_reply_data.first, text_reply_reply_data.second);
 
 	return { { out, out_size } };
 }
