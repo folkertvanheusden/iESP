@@ -483,7 +483,7 @@ bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std
 	pdu_response->StatSN     = htonl(reply_to.get_ExpStatSN());
 	pdu_response->ExpCmdSN   = htonl(reply_to.get_CmdSN() + 1);
 	pdu_response->MaxCmdSN   = htonl(reply_to.get_CmdSN() + 1);
-	pdu_response->ExpDataSN  = htonl(1);  // TODO
+	pdu_response->ExpDataSN  = htonl(0);
 	if (ResidualCt.has_value()) {
 		set_bits(&pdu_response->b2, 1, 1, true);  // U (residual underflow)
 		pdu_response->ResidualCt = ResidualCt.value();
