@@ -43,30 +43,42 @@ bool server::begin()
 {
 	// setup listening socket for viewers
 	listen_fd = socket(AF_INET, SOCK_STREAM, 0);
-	if (listen_fd == -1)
+	if (listen_fd == -1) {
+		DOLOG("server::begin: failed to create socket: %s\n", strerror(errno));
 		return false;
+	}
 
         int reuse_addr = 1;
-        if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<char *>(&reuse_addr), sizeof reuse_addr) == -1)
+        if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<char *>(&reuse_addr), sizeof reuse_addr) == -1) {
+		DOLOG("server::begin: failed to set socket to reuse address: %s\n", strerror(errno));
 		return false;
+	}
 
 #ifdef linux
 	int q_size = SOMAXCONN;
-	if (setsockopt(listen_fd, SOL_TCP, TCP_FASTOPEN, &q_size, sizeof q_size))
+	if (setsockopt(listen_fd, SOL_TCP, TCP_FASTOPEN, &q_size, sizeof q_size)) {
+		DOLOG("server::begin: failed to set \"TCP fast open\": %s\n", strerror(errno));
 		return false;
+	}
 #endif
 
         sockaddr_in server_addr { };
         server_addr.sin_family = AF_INET;
         server_addr.sin_port = htons(listen_port);
-	if (inet_aton(listen_ip.c_str(), &reinterpret_cast<sockaddr_in *>(&server_addr)->sin_addr) == 0)
+	if (inet_aton(listen_ip.c_str(), &reinterpret_cast<sockaddr_in *>(&server_addr)->sin_addr) == 0) {
+		DOLOG("server::begin: failed to translate listen address (%s): %s\n", listen_ip.c_str(), strerror(errno));
 		return false;
+	}
 
-        if (bind(listen_fd, reinterpret_cast<sockaddr *>(&server_addr), sizeof server_addr) == -1)
+        if (bind(listen_fd, reinterpret_cast<sockaddr *>(&server_addr), sizeof server_addr) == -1) {
+		DOLOG("server::begin: failed to bind socket to %s:%d: %s\n", listen_ip.c_str(), listen_port, strerror(errno));
 		return false;
+	}
 
-        if (listen(listen_fd, 4) == -1)
+        if (listen(listen_fd, 4) == -1) {
+		DOLOG("server::begin: failed to setup listen queue: %s\n", strerror(errno));
                 return false;
+	}
 
 	return true;
 }
@@ -304,7 +316,7 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 	if (response_set.value().to_stream.has_value()) {
 		auto & stream_parameters = response_set.value().to_stream.value();
 
-		DOLOG("server::push_response: stream %zu sectors, LBA: %zu\n", stream_parameters.n_sectors, size_t(stream_parameters.lba));
+		DOLOG("server::push_response: stream %u sectors, LBA: %zu\n", stream_parameters.n_sectors, size_t(stream_parameters.lba));
 
 		iscsi_pdu_scsi_cmd reply_to;
 		auto temp = pdu->get_raw();
@@ -313,7 +325,7 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 
 	        auto use_pdu_data_size = stream_parameters.n_sectors * 512;
 		if (use_pdu_data_size > size_t(reply_to.get_ExpDatLen())) {
-			DOLOG("server::push_response: requested less (%zu) than wat is available (%zu)\n", size_t(reply_to.get_ExpDatLen()), use_pdu_data_size);
+			DOLOG("server::push_response: requested less (%zu) than wat is available (%u)\n", size_t(reply_to.get_ExpDatLen()), use_pdu_data_size);
 			use_pdu_data_size = reply_to.get_ExpDatLen();
 		}
 
@@ -407,8 +419,10 @@ void server::handler()
 			break;
 
 		int fd = accept(listen_fd, nullptr, nullptr);
-		if (fd == -1)
+		if (fd == -1) {
+			DOLOG("server::handler: accept() failed: %s\n", strerror(errno));
 			continue;
+		}
 
 		std::string endpoint = get_endpoint_name(fd);
 
