@@ -134,7 +134,7 @@ private:
 		// bool     I         :  1;
 		// bool     filler    :  1;
 
-		uint32_t ospecf    : 24;  // opcode specific fields: TODO bit F!
+		uint32_t ospecf    : 24;  // opcode specific fields
 
 		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
 		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
