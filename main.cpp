@@ -25,7 +25,10 @@ int main(int argc, char *argv[])
 	server s(&bf, "192.168.64.206", 3260);
 	// server s(&bf, "192.168.65.245", 3260);
 	//server s(&bf, "127.0.0.1", 3260);
-	s.begin();
+	if (s.begin() == false) {
+		fprintf(stderr, "Failed to initialize\n");
+		return 1;
+	}
 
 	s.handler();
 
