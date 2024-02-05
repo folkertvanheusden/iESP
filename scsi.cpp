@@ -229,7 +229,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 			memcpy(&response.io.what.data.first[16], &CDB[10], 4);  // ALLOCATIN LENGTH
 		}
 	}
-	else if (opcode == o_write_6 || opcode == o_write_10 || opcode == o_write_16) {
+	else if (opcode == o_write_6 || opcode == o_write_10 || opcode == o_write_verify_10 || opcode == o_write_16) {
 		uint64_t lba             = 0;
 		uint32_t transfer_length = 0;
 
@@ -239,7 +239,8 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 			if (transfer_length == 0)
 				transfer_length = 256;
 		}
-		else if (opcode == o_write_10) {
+		else if (opcode == o_write_10 || opcode == o_write_verify_10) {
+			// NOTE: the verify part is not implemented, o_write_verify_10 is just a dumb write
 			lba             = (uint64_t(CDB[2]) << 24) | (CDB[3] << 16) | (CDB[4] << 8) | CDB[5];
 			transfer_length = (CDB[7] << 8) | CDB[8];
 		}
