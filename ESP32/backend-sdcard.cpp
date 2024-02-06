@@ -63,6 +63,14 @@ backend_sdcard::~backend_sdcard()
 	sd.end();
 }
 
+bool backend_sdcard::sync()
+{
+	if (file.sync() == false)
+		Serial.println(F("SD card backend: sync failed"));
+
+	return true;
+}
+
 void backend_sdcard::init_file()
 {
 	Serial.println(F("Creating " FILENAME "..."));

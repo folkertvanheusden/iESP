@@ -12,7 +12,7 @@ backend_file::backend_file(const std::string & filename)
 {
 	fd = open(filename.c_str(), O_RDWR);
 	if (fd == -1)
-		DOLOG("backend_file:: cannot access file %s\n", filename.c_str());
+		DOLOG("backend_file:: cannot access file %s: %s\n", filename.c_str(), strerror(errno));
 }
 
 backend_file::~backend_file()
@@ -24,7 +24,7 @@ uint64_t backend_file::get_size_in_blocks() const
 {
 	struct stat st { };
 	if (fstat(fd, &st) == -1)
-		DOLOG("backend_file::get_size_in_blocks: fstat failed\n");
+		DOLOG("backend_file::get_size_in_blocks: fstat failed: %s\n", strerror(errno));
 
 	return st.st_size / get_block_size();
 }
@@ -32,6 +32,16 @@ uint64_t backend_file::get_size_in_blocks() const
 uint64_t backend_file::get_block_size() const
 {
 	return 512;
+}
+
+bool backend_file::sync()
+{
+	if (fsync(fd) == 0)
+		return true;
+
+	DOLOG("backend_file::sync: failed: %s\n", strerror(errno));
+
+	return false;
 }
 
 bool backend_file::write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data)
