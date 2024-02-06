@@ -255,21 +255,7 @@ iscsi_pdu_login_reply::~iscsi_pdu_login_reply()
 
 bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 {
-	bool discovery = false;
-	const auto data = reply_to.get_data();
-	if (data.has_value()) {
-		auto kvs_in = data_to_text_array(data.value().first, data.value().second);
-		delete [] data.value().first;
-
-		for(auto & kv: kvs_in) {
-			auto parts = split(kv, "=");
-			if (parts.size() < 2)
-				return false;
-
-			if (parts[0] == "SessionType" && parts[1] == "Discovery")
-				discovery = true;
-		}
-	}
+	bool discovery = reply_to.get_NSG() == 1;
 
 	if (discovery) {
 		DOLOG("iscsi_pdu_login_reply::set: discovery mode\n");
@@ -278,6 +264,8 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 			"TargetPortalGroupTag=1",
 			"AuthMethod=None",
 		};
+		for(auto & kv : kvs)
+			DOLOG("iscsi_pdu_login_reply::set: send KV \"%s\"\n", kv.c_str());
 		auto temp = text_array_to_data(kvs);
 		login_reply_reply_data.first  = temp.first;
 		login_reply_reply_data.second = temp.second;
@@ -289,12 +277,12 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 			"HeaderDigest=None",
 			"DataDigest=None",
 			"DefaultTime2Wait=2",
-			"DefaultTime2Retain=0",
+			"DefaultTime2Retain=20",
 			"ErrorRecoveryLevel=0",
-			"TargetPortalGroupTag=1",
 			"MaxRecvDataSegmentLength=4096",
 		};
-
+		for(auto & kv : kvs)
+			DOLOG("iscsi_pdu_login_reply::set: send KV \"%s\"\n", kv.c_str());
 		auto temp = text_array_to_data(kvs);
 		login_reply_reply_data.first  = temp.first;
 		login_reply_reply_data.second = temp.second;
