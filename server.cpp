@@ -330,17 +330,30 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 			use_pdu_data_size = reply_to.get_ExpDatLen();
 		}
 
-		blob_t buffer;
-		buffer.n    = 512;
+		blob_t buffer { nullptr, 0 };
+#ifdef ESP32
+		size_t heap_free = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+		if (heap_free >= 5120)
+			buffer.n = std::min((heap_free - 2048) / 2, s->get_ack_interval());
+		if (buffer.n < 512)
+			buffer.n = 512;
 		buffer.data = new uint8_t[buffer.n]();
+#else
+		buffer.n    = std::max(512u, s->get_ack_interval());
+		buffer.data = new uint8_t[buffer.n]();
+#endif
+		uint32_t block_group_size = buffer.n / 512;
 
 		uint32_t offset = 0;
 
-		for(uint32_t block_nr = 0; block_nr < stream_parameters.n_sectors; block_nr++) {
+		for(uint32_t block_nr = 0; block_nr < stream_parameters.n_sectors; block_nr += block_group_size) {
+			uint32_t n_left = std::min(block_group_size, stream_parameters.n_sectors - block_nr);
+			buffer.n = n_left * 512;
+
 			uint64_t cur_block_nr = block_nr + stream_parameters.lba;
-			DOLOG("server::push_response: reading block %zu from backend\n", size_t(cur_block_nr));
-			if (b->read(cur_block_nr, 1, buffer.data) == false) {
-				DOLOG("server::push_response: reading block %zu from backend failed\n", size_t(cur_block_nr));
+			DOLOG("server::push_response: reading %u block(s) %zu from backend\n", n_left, size_t(cur_block_nr));
+			if (b->read(cur_block_nr, n_left, buffer.data) == false) {
+				DOLOG("server::push_response: reading %u block(s) %zu from backend failed\n", n_left, size_t(cur_block_nr));
 				ok = false;
 				break;
 			}
