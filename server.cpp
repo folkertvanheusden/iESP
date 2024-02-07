@@ -240,13 +240,12 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 			assert((data.value().second % block_size) == 0);
 
 			bool rc = b->write(session->buffer_lba + offset / block_size, data.value().second / block_size, data.value().first);
-			if (rc == false)
-				DOLOG("server::push_response: DATA-OUT problem writing to backend\n");
-
 			delete [] data.value().first;
 
-			if (rc == false)
+			if (rc == false) {
+				DOLOG("server::push_response: DATA-OUT problem writing to backend\n");
 				return rc;
+			}
 
 			session->bytes_done += data.value().second;
 			session->bytes_left -= data.value().second;
@@ -450,7 +449,7 @@ void server::handler()
 
 #ifdef ESP32
 		Serial.printf("new session with %s\r\n", endpoint.c_str());
-		uint64_t pdu_count   = 0;
+		uint32_t pdu_count   = 0;
 		auto     prev_output = millis();
 		auto     start       = prev_output;
 #else
@@ -466,16 +465,6 @@ void server::handler()
 				DOLOG("server::handler: no PDU received, aborting socket connection\n");
 				break;
 			}
-
-#ifdef ESP32
-			pdu_count++;
-			auto now = millis();
-			if (now - prev_output >= 5000) {
-				prev_output = now;
-				Serial.printf("%ld] PDU/s: %.2f (%zu in total)\r\n", now, pdu_count / double(now - start), pdu_count);
-			}
-#endif
-
 			auto parameters = select_parameters(pdu, s, &scsi_dev);
 			if (parameters) {
 				push_response(fd, s, pdu, parameters);
@@ -484,6 +473,16 @@ void server::handler()
 			else {
 				ok = false;
 			}
+
+#ifdef ESP32
+			pdu_count++;
+			auto now = millis();
+			if (now - prev_output >= 5000) {
+				prev_output = now;
+				Serial.printf("%ld] PDU/s: %.2f (%zu)\r\n", now, pdu_count / double(now - start), pdu_count);
+				pdu_count = 0;
+			}
+#endif
 
 			delete pdu;
 		}
