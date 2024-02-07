@@ -5,8 +5,6 @@
 #include <csignal>
 #include <cstdio>
 #include <ESPmDNS.h>
-#include <SPI.h>
-#include <LittleFS.h>
 #include <WiFiManager.h>
 
 #include "backend-sdcard.h"
