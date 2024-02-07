@@ -5,15 +5,14 @@
 #include <csignal>
 #include <cstdio>
 #include <SPI.h>
-#include <WiFiPicker.h>
+#include <WiFi.h>
 
 #include "backend-sdcard.h"
 #include "random.h"
 #include "server.h"
 #include "version.h"
+#include "wifi.h"
 
-
-WiFiPicker *wp { nullptr };
 
 std::atomic_bool stop { false };
 
@@ -30,8 +29,14 @@ void setup()
 	Serial.print(F("GIT hash: "));
 	Serial.println(version_str);
 
-	wp = new WiFiPicker();
-	wp->start();
+	WiFi.mode(WIFI_STA);
+	WiFi.begin(ssid, wifi_pw);
+ 
+	while (WiFi.status() != WL_CONNECTED){
+		delay(500);
+		Serial.print(".");
+	}
+	Serial.println(F(""));
 
 	Serial.print(F("Will listen on (in a bit): "));
 	Serial.println(WiFi.localIP());

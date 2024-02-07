@@ -143,7 +143,6 @@ std::string myformat(const char *const fmt, ...)
         va_end(ap);
 
         std::string result = buffer;
-        free(buffer);
 
         return result;
 #endif
