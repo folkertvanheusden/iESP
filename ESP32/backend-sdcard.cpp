@@ -65,6 +65,8 @@ backend_sdcard::~backend_sdcard()
 
 bool backend_sdcard::sync()
 {
+	n_syncs++;
+
 	if (file.sync() == false)
 		Serial.println(F("SD card backend: sync failed"));
 
@@ -119,6 +121,7 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 	}
 
 	size_t n_bytes_to_write = n_blocks * iscsi_block_size;
+	bytes_written += n_bytes_to_write;
 
 	bool rc = file.write(data, n_bytes_to_write) == n_bytes_to_write;
 	if (!rc)
@@ -139,6 +142,7 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 	}
 
 	size_t n_bytes_to_read = n_blocks * iscsi_block_size;
+	bytes_read += n_bytes_to_read;
 
 	bool rc = file.read(data, n_bytes_to_read) == n_bytes_to_read;
 	if (!rc)

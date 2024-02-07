@@ -128,7 +128,11 @@ std::string get_endpoint_name(int fd)
 {
         char host[256];
         char serv[256];
+#ifdef ESP32
+        sockaddr_in addr { };
+#else
         sockaddr_in6 addr { };
+#endif
         socklen_t addr_len = sizeof addr;
 
         if (getpeername(fd, reinterpret_cast<sockaddr *>(&addr), &addr_len) == -1) {
@@ -137,8 +141,8 @@ std::string get_endpoint_name(int fd)
 	}
 
 #ifdef ESP32
-	inet_ntop(addr.sin6_family, &addr, host, sizeof host);
-	return host;
+	inet_ntop(addr.sin_family, &addr.sin_addr.s_addr, host, sizeof host);
+	return host + myformat(":%d", addr.sin_port);
 #else
 	getnameinfo(reinterpret_cast<sockaddr *>(&addr), addr_len, host, sizeof(host), serv, sizeof(serv), NI_NUMERICHOST | NI_NUMERICSERV);
 	return myformat("[%s]:%s", host, serv);

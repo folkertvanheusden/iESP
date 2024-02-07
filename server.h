@@ -13,6 +13,8 @@ private:
 	const std::string listen_ip;
 	const int         listen_port { 3260    };
 	int               listen_fd   { -1      };
+	uint64_t          bytes_recv  { 0       };
+	uint64_t          bytes_send  { 0       };
 
 	iscsi_pdu_bhs *receive_pdu  (const int fd, session **const s);
 	bool           push_response(const int fd, session *const s, iscsi_pdu_bhs *const pdu, iscsi_response_parameters *const parameters);

@@ -115,6 +115,8 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 		return nullptr;
 	}
 
+	bytes_recv += sizeof pdu;
+
 	iscsi_pdu_bhs bhs;
 	if (bhs.set(*s, pdu, sizeof pdu) == false) {
 		DOLOG("server::receive_pdu: BHS validation error\n");
@@ -183,6 +185,8 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 				pdu_obj->set_ahs_segment({ ahs_temp, ahs_len });
 			}
 			delete [] ahs_temp;
+
+			bytes_recv += ahs_len;
 		}
 
 		size_t data_length = pdu_obj->get_data_length();
@@ -200,6 +204,8 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 				pdu_obj->set_data({ data_temp, data_length });
 			}
 			delete [] data_temp;
+
+			bytes_recv += padded_data_length;
 		}
 		
 		if (!ok) {
@@ -304,6 +310,7 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 				ok = WRITE(fd, blobs.data, blobs.n) != -1;
 				if (!ok)
 					DOLOG("server::push_response: sending PDU to peer failed (%s)\n", strerror(errno));
+				bytes_send += blobs.n;
 			}
 
 			delete [] blobs.data;
@@ -365,6 +372,7 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 				ok = false;
 				break;
 			}
+			bytes_send += out.n;
 
 			delete [] out.data;
 
@@ -477,10 +485,16 @@ void server::handler()
 #ifdef ESP32
 			pdu_count++;
 			auto now = millis();
-			if (now - prev_output >= 5000) {
+			auto took = now - prev_output;
+			if (took >= 5000) {
 				prev_output = now;
-				Serial.printf("%ld] PDU/s: %.2f (%zu)\r\n", now, pdu_count / double(now - start), pdu_count);
-				pdu_count = 0;
+				double dtook = took / 1000.;
+				uint64_t bytes_read = 0, bytes_written = 0, n_syncs = 0;
+				b->get_and_reset_stats(&bytes_read, &bytes_written, &n_syncs);
+				Serial.printf("%ld] PDU/s: %.2f (%zu), send: %" PRIu64 " (%.2f/s), recv: %" PRIu64 " (%.2f/s), written: %.2f/s, read: %.2f/s, syncs: %.2f/s\r\n", now, pdu_count / dtook, pdu_count, bytes_send, bytes_send / dtook, bytes_recv, bytes_recv / dtook, bytes_written / dtook, bytes_read / dtook, n_syncs / dtook);
+				pdu_count  = 0;
+				bytes_send = 0;
+				bytes_recv = 0;
 			}
 #endif
 
@@ -493,8 +507,9 @@ void server::handler()
 		DOLOG("session finished\n");
 #endif
 
-		close(fd);
+		b->sync();
 
+		close(fd);
 		delete s;
 	}
 }
