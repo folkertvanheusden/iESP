@@ -4,7 +4,12 @@
 #include <string>
 #include <utility>
 #include <vector>
+#if defined(RP2040W)
+#include <lwip/tcp.h>
+#include <lwip/sys.h>
+#else
 #include <arpa/inet.h>
+#endif
 #include <sys/types.h>
 
 #include "gen.h"

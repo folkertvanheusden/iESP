@@ -1,7 +1,6 @@
 #include <cassert>
 #include <cstring>
 #include <vector>
-#include <arpa/inet.h>
 
 #include "iscsi.h"
 #include "iscsi-pdu.h"

@@ -1,11 +1,19 @@
 #include <cstdarg>
 #include <cstdint>
-#include <netdb.h>
 #include <string>
 #include <unistd.h>
 #include <vector>
+#if defined(RP2040W)
+#include <lwip/arch.h>
+#include <lwip/netdb.h>
+#include <lwip/sockets.h>
+//#include <lwip/sys.h>
+#include <lwip/tcp.h>
+#else
+#include <netdb.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#endif
 #include <sys/types.h>
 
 #include "log.h"
@@ -107,9 +115,9 @@ std::string to_hex(const uint8_t *const in, const size_t n)
 
 std::string myformat(const char *const fmt, ...)
 {
+#ifdef linux
         char *buffer = nullptr;
         va_list ap;
-
         va_start(ap, fmt);
         if (vasprintf(&buffer, fmt, ap) == -1) {
                 va_end(ap);
@@ -122,13 +130,34 @@ std::string myformat(const char *const fmt, ...)
         free(buffer);
 
         return result;
+#else
+	char buffer[256];
+
+        va_list ap;
+        va_start(ap, fmt);
+        if (vsnprintf(buffer, sizeof buffer, fmt, ap) == -1) {
+                va_end(ap);
+                DOLOG("myformat: failed to convert string with format \"%s\"\n", fmt);
+                return fmt;
+        }
+        va_end(ap);
+
+        std::string result = buffer;
+        free(buffer);
+
+        return result;
+#endif
 }
 
 std::string get_endpoint_name(int fd)
 {
         char host[256];
         char serv[256];
+#ifdef linux
         sockaddr_in6 addr { };
+#else
+        sockaddr_in addr { };
+#endif
         socklen_t addr_len = sizeof addr;
 
         if (getpeername(fd, reinterpret_cast<sockaddr *>(&addr), &addr_len) == -1) {
@@ -136,8 +165,8 @@ std::string get_endpoint_name(int fd)
 		return "?:?";
 	}
 
-#ifdef ESP32
-	inet_ntop(addr.sin6_family, &addr, host, sizeof host);
+#if defined(ESP32) || defined(RP2040W)
+	inet_ntop(addr.sin_family, &addr, host, sizeof host);
 	return host;
 #else
 	getnameinfo(reinterpret_cast<sockaddr *>(&addr), addr_len, host, sizeof(host), serv, sizeof(serv), NI_NUMERICHOST | NI_NUMERICSERV);

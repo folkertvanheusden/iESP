@@ -6,16 +6,24 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
-#ifndef ESP32
+#if !defined(ESP32) && !defined(RP2040W)
 #include <poll.h>
 #endif
 #include <unistd.h>
+#if defined(RP2040W)
+#include <Arduino.h>
+#include <lwip/inet.h>
+#include <lwip/sockets.h>
+#include <lwip/sys.h>
+#include <lwip/tcp.h>
+#else
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <sys/socket.h>
+#endif
 #include <sys/types.h>
-#ifdef ESP32
+#if defined(ESP32)
 #ifndef SOL_TCP
 #define SOL_TCP 6
 #endif
@@ -89,7 +97,7 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 	if (*s == nullptr)
 		*s = new session();
 
-#ifndef ESP32
+#if !defined(ESP32) && !defined(RP2040W)
 	pollfd fds[] { { fd, POLLIN, 0 } };
 
 	for(;;) {
@@ -121,7 +129,7 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 		return nullptr;
 	}
 
-#ifdef ESP32
+#if defined(ESP32) || defined(RP2040W)
 //	slow!
 //	Serial.print(millis());
 //	Serial.print(' ');
@@ -336,11 +344,12 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 			buffer.n = std::min((heap_free - 2048) / 2, s->get_ack_interval());
 		if (buffer.n < 512)
 			buffer.n = 512;
-		buffer.data = new uint8_t[buffer.n]();
+#elif defined(RP2040W)
+		buffer.n    = std::min(uint32_t(4096), s->get_ack_interval());
 #else
-		buffer.n    = std::max(512u, s->get_ack_interval());
-		buffer.data = new uint8_t[buffer.n]();
+		buffer.n    = std::max(uint32_t(512), s->get_ack_interval());
 #endif
+		buffer.data = new uint8_t[buffer.n]();
 		uint32_t block_group_size = buffer.n / 512;
 
 		uint32_t offset = 0;
@@ -410,12 +419,12 @@ void server::handler()
 {
 	scsi scsi_dev(b);
 
-#ifndef ESP32
+#if !defined(ESP32) && !defined(RP2040W)
 	pollfd fds[] { { listen_fd, POLLIN, 0 } };
 #endif
 
 	while(!stop) {
-#ifndef ESP32
+#if !defined(ESP32) && !defined(RP2040W)
 		while(!stop) {
 			int rc = poll(fds, 1, 100);
 			if (rc == -1) {
@@ -440,14 +449,14 @@ void server::handler()
 		std::string endpoint = get_endpoint_name(fd);
 
 		int flags = 1;
-#if defined(__FreeBSD__)
+#if defined(__FreeBSD__) || defined(RP2040W)
 		if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (void *)&flags, sizeof(flags)) == -1)
 #else
 		if (setsockopt(fd, SOL_TCP, TCP_NODELAY, (void *)&flags, sizeof(flags)) == -1)
 #endif
 			DOLOG("server::handler: cannot disable Nagle algorithm\n");
 
-#ifdef ESP32
+#if defined(ESP32) || defined(RP2040W)
 		Serial.printf("new session with %s\r\n", endpoint.c_str());
 		uint32_t pdu_count   = 0;
 		auto     prev_output = millis();
@@ -474,7 +483,7 @@ void server::handler()
 				ok = false;
 			}
 
-#ifdef ESP32
+#if defined(ESP32) || defined(RP2040W)
 			pdu_count++;
 			auto now = millis();
 			if (now - prev_output >= 5000) {
@@ -487,7 +496,7 @@ void server::handler()
 			delete pdu;
 		}
 		while(ok);
-#ifdef ESP32
+#if defined(ESP32) || defined(RP2040W)
 		Serial.println(F("session finished"));
 #else
 		DOLOG("session finished\n");
