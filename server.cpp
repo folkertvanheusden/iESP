@@ -460,6 +460,8 @@ void server::handler()
 		uint32_t pdu_count   = 0;
 		auto     prev_output = millis();
 		auto     start       = prev_output;
+		unsigned long busy   = 0;
+		const long interval  = 5000;
 #else
 		DOLOG("server::handler: new session with %s\n", endpoint.c_str());
 #endif
@@ -473,6 +475,10 @@ void server::handler()
 				DOLOG("server::handler: no PDU received, aborting socket connection\n");
 				break;
 			}
+
+#ifdef ESP32
+			auto tx_start = millis();
+#endif
 			auto parameters = select_parameters(pdu, s, &scsi_dev);
 			if (parameters) {
 				push_response(fd, s, pdu, parameters);
@@ -482,23 +488,30 @@ void server::handler()
 				ok = false;
 			}
 
+			delete pdu;
+#ifdef ESP32
+			auto tx_end = millis();
+			busy += tx_end - tx_start;
+#endif
+
 #ifdef ESP32
 			pdu_count++;
 			auto now = millis();
 			auto took = now - prev_output;
-			if (took >= 5000) {
+			if (took >= interval) {
 				prev_output = now;
-				double dtook = took / 1000.;
-				uint64_t bytes_read = 0, bytes_written = 0, n_syncs = 0;
+				double   dtook = took / 1000.;
+				uint64_t bytes_read    = 0;
+				uint64_t bytes_written = 0;
+				uint64_t n_syncs       = 0;
 				b->get_and_reset_stats(&bytes_read, &bytes_written, &n_syncs);
-				Serial.printf("%ld] PDU/s: %.2f (%zu), send: %" PRIu64 " (%.2f/s), recv: %" PRIu64 " (%.2f/s), written: %.2f/s, read: %.2f/s, syncs: %.2f/s\r\n", now, pdu_count / dtook, pdu_count, bytes_send, bytes_send / dtook, bytes_recv, bytes_recv / dtook, bytes_written / dtook, bytes_read / dtook, n_syncs / dtook);
+				Serial.printf("%ld] PDU/s: %.2f (%zu), send: %" PRIu64 " (%.2f/s), recv: %" PRIu64 " (%.2f/s), written: %.2f/s, read: %.2f/s, syncs: %.2f/s, load: %.2f%%\r\n", now, pdu_count / dtook, pdu_count, bytes_send, bytes_send / dtook, bytes_recv, bytes_recv / dtook, bytes_written / dtook, bytes_read / dtook, n_syncs / dtook, busy * 100.0 / interval);
 				pdu_count  = 0;
 				bytes_send = 0;
 				bytes_recv = 0;
+				busy       = 0;
 			}
 #endif
-
-			delete pdu;
 		}
 		while(ok);
 #ifdef ESP32
