@@ -49,6 +49,7 @@ bool com_arduino::begin()
 
 	Serial.printf("Starting server on port %d\r\n", port);
 	server = new WiFiServer(port);
+	server->begin();
 
 	return true;
 }
