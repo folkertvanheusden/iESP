@@ -3,6 +3,7 @@
 #include <cstdio>
 
 #include "backend-file.h"
+#include "com-sockets.h"
 #include "log.h"
 #include "server.h"
 
@@ -22,14 +23,13 @@ int main(int argc, char *argv[])
 
 	backend_file bf("test.dat");
 
-	server s(&bf, "192.168.64.206", 3260);
-	// server s(&bf, "192.168.65.245", 3260);
-	//server s(&bf, "127.0.0.1", 3260);
-	if (s.begin() == false) {
-		fprintf(stderr, "Failed to initialize\n");
+	com_sockets c("192.168.64.206", 3260, &stop);
+	if (c.begin() == false) {
+		fprintf(stderr, "Failed to communication layer\n");
 		return 1;
 	}
 
+	server s(&bf, &c);
 	s.handler();
 
 	return 0;

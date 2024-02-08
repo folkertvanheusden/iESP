@@ -332,11 +332,11 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		DOLOG("scsi::send: REPORT_LUNS, report: %02xh\n", CDB[2]);
 
 		response.io.is_inline           = true;
-		response.io.what.data.second    = 24;
+		response.io.what.data.second    = 9;
 		response.io.what.data.first     = new uint8_t[response.io.what.data.second]();
-		response.io.what.data.first[3]  = 0x10;
-		response.io.what.data.first[9]  = 0x10;  // lun list length of 2
-		response.io.what.data.first[23] = 1;  // LUN1 id
+		response.io.what.data.first[3]  = 0x01;
+		// 4...7 reserved
+		response.io.what.data.first[8]  = 1;  // LUN1 id
 	}
 	else {
 		DOLOG("scsi::send: opcode %02xh not implemented\n", opcode);

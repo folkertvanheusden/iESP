@@ -3,13 +3,7 @@
 #include <string>
 #include <unistd.h>
 #include <vector>
-#if defined(RP2040W)
-#include <lwip/arch.h>
-#include <lwip/netdb.h>
-#include <lwip/sockets.h>
-//#include <lwip/sys.h>
-#include <lwip/tcp.h>
-#else
+#if !defined(RP2040W)
 #include <netdb.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -145,30 +139,5 @@ std::string myformat(const char *const fmt, ...)
         std::string result = buffer;
 
         return result;
-#endif
-}
-
-std::string get_endpoint_name(int fd)
-{
-        char host[256];
-        char serv[256];
-#ifdef linux
-        sockaddr_in6 addr { };
-#else
-        sockaddr_in addr { };
-#endif
-        socklen_t addr_len = sizeof addr;
-
-        if (getpeername(fd, reinterpret_cast<sockaddr *>(&addr), &addr_len) == -1) {
-                DOLOG("get_endpoint_name: failed to find name of fd %d\n", fd);
-		return "?:?";
-	}
-
-#if defined(ESP32) || defined(RP2040W)
-	inet_ntop(addr.sin_family, &addr, host, sizeof host);
-	return host;
-#else
-	getnameinfo(reinterpret_cast<sockaddr *>(&addr), addr_len, host, sizeof(host), serv, sizeof(serv), NI_NUMERICHOST | NI_NUMERICSERV);
-	return myformat("[%s]:%s", host, serv);
 #endif
 }

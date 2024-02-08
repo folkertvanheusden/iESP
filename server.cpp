@@ -10,13 +10,7 @@
 #include <poll.h>
 #endif
 #include <unistd.h>
-#if defined(RP2040W)
-#include <Arduino.h>
-#include <lwip/inet.h>
-#include <lwip/sockets.h>
-#include <lwip/sys.h>
-#include <lwip/tcp.h>
-#else
+#if !defined(RP2040W)
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -37,96 +31,33 @@
 
 extern std::atomic_bool stop;
 
-server::server(backend *const b, const std::string & listen_ip, const int listen_port):
+server::server(backend *const b, com *const c):
 	b(b),
-	listen_ip(listen_ip), listen_port(listen_port)
+	c(c)
 {
 }
 
 server::~server()
 {
-	close(listen_fd);
 }
 
-bool server::begin()
-{
-	// setup listening socket for viewers
-	listen_fd = socket(AF_INET, SOCK_STREAM, 0);
-	if (listen_fd == -1) {
-		DOLOG("server::begin: failed to create socket: %s\n", strerror(errno));
-		return false;
-	}
-
-        int reuse_addr = 1;
-        if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<char *>(&reuse_addr), sizeof reuse_addr) == -1) {
-		DOLOG("server::begin: failed to set socket to reuse address: %s\n", strerror(errno));
-		return false;
-	}
-
-#ifdef linux
-	int q_size = SOMAXCONN;
-	if (setsockopt(listen_fd, SOL_TCP, TCP_FASTOPEN, &q_size, sizeof q_size)) {
-		DOLOG("server::begin: failed to set \"TCP fast open\": %s\n", strerror(errno));
-		return false;
-	}
-#endif
-
-        sockaddr_in server_addr { };
-        server_addr.sin_family = AF_INET;
-        server_addr.sin_port = htons(listen_port);
-	if (inet_aton(listen_ip.c_str(), &reinterpret_cast<sockaddr_in *>(&server_addr)->sin_addr) == 0) {
-		DOLOG("server::begin: failed to translate listen address (%s): %s\n", listen_ip.c_str(), strerror(errno));
-		return false;
-	}
-
-        if (bind(listen_fd, reinterpret_cast<sockaddr *>(&server_addr), sizeof server_addr) == -1) {
-		DOLOG("server::begin: failed to bind socket to %s:%d: %s\n", listen_ip.c_str(), listen_port, strerror(errno));
-		return false;
-	}
-
-        if (listen(listen_fd, 4) == -1) {
-		DOLOG("server::begin: failed to setup listen queue: %s\n", strerror(errno));
-                return false;
-	}
-
-	return true;
-}
-
-iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
+std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, session **const s)
 {
 	if (*s == nullptr)
 		*s = new session();
 
-#if !defined(ESP32) && !defined(RP2040W)
-	pollfd fds[] { { fd, POLLIN, 0 } };
-
-	for(;;) {
-		int rc = poll(fds, 1, 100);
-		if (rc == -1) {
-			DOLOG("server::receive_pdu: poll failed with error %s\n", strerror(errno));
-			return nullptr;
-		}
-
-		if (stop == true) {
-			DOLOG("server::receive_pdu: abort due external stop\n");
-			return nullptr;
-		}
-
-		if (rc >= 1)
-			break;
-	}
-#endif
-
 	uint8_t pdu[48] { 0 };
-	if (READ(fd, pdu, sizeof pdu) == -1) {
+	if (cc->recv(pdu, sizeof pdu) == false) {
 		DOLOG("server::receive_pdu: PDU receive error\n");
-		return nullptr;
+		return { nullptr, false };
 	}
+
+	bytes_recv += sizeof pdu;
 
 	iscsi_pdu_bhs bhs;
 	if (bhs.set(*s, pdu, sizeof pdu) == false) {
 		DOLOG("server::receive_pdu: BHS validation error\n");
-		return nullptr;
+		return { nullptr, false };
 	}
 
 #if defined(ESP32) || defined(RP2040W)
@@ -138,7 +69,8 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 	DOLOG("opcode: %02xh / %s\n", bhs.get_opcode(), pdu_opcode_to_string(bhs.get_opcode()).c_str());
 #endif
 
-	iscsi_pdu_bhs *pdu_obj = nullptr;
+	iscsi_pdu_bhs *pdu_obj   = nullptr;
+	bool           pdu_error = false;
 
 	switch(bhs.get_opcode()) {
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_login_req:
@@ -167,6 +99,8 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 			break;
 		default:
 			DOLOG("server::receive_pdu: opcode %02xh not implemented\n", bhs.get_opcode());
+			pdu_obj = new iscsi_pdu_bhs();
+			pdu_error = true;
 			break;
 	}
 
@@ -178,12 +112,26 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 			DOLOG("server::receive_pdu: initialize PDU: validation failed\n");
 		}
 
+#if defined(ESP32) || !defined(NDEBUG)
+		if (bhs.get_opcode() == iscsi_pdu_bhs::iscsi_bhs_opcode::o_login_req) {
+			auto initiator = reinterpret_cast<iscsi_pdu_login_request *>(pdu_obj)->get_initiator();
+			if (initiator.has_value()) {
+#ifdef ESP32
+				Serial.print(F("Initiator: "));
+				Serial.println(initiator.value().c_str());
+#else
+				DOLOG("server::receive_pdu: initiator: %s\n", initiator.value().c_str());
+#endif
+			}
+		}
+#endif
+
 		size_t ahs_len = pdu_obj->get_ahs_length();
 		if (ahs_len) {
 			DOLOG("server::receive_pdu: read %zu ahs bytes\n", ahs_len);
 
 			uint8_t *ahs_temp = new uint8_t[ahs_len]();
-			if (READ(fd, ahs_temp, ahs_len) == -1) {
+			if (cc->recv(ahs_temp, ahs_len) == false) {
 				ok = false;
 				DOLOG("server::receive_pdu: AHS receive error\n");
 			}
@@ -191,6 +139,8 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 				pdu_obj->set_ahs_segment({ ahs_temp, ahs_len });
 			}
 			delete [] ahs_temp;
+
+			bytes_recv += ahs_len;
 		}
 
 		size_t data_length = pdu_obj->get_data_length();
@@ -200,7 +150,7 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 			DOLOG("server::receive_pdu: read %zu data bytes (%zu with padding)\n", data_length, padded_data_length);
 
 			uint8_t *data_temp = new uint8_t[padded_data_length]();
-			if (READ(fd, data_temp, padded_data_length) == -1) {
+			if (cc->recv(data_temp, padded_data_length) == false) {
 				ok = false;
 				DOLOG("server::receive_pdu: data receive error\n");
 			}
@@ -208,6 +158,8 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 				pdu_obj->set_data({ data_temp, data_length });
 			}
 			delete [] data_temp;
+
+			bytes_recv += padded_data_length;
 		}
 		
 		if (!ok) {
@@ -217,10 +169,10 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 		}
 	}
 
-	return pdu_obj;
+	return { pdu_obj, pdu_error };
 }
 
-bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const pdu, iscsi_response_parameters *const parameters)
+bool server::push_response(com_client *const cc, session *const s, iscsi_pdu_bhs *const pdu, iscsi_response_parameters *const parameters)
 {
 	bool ok = true;
 
@@ -309,9 +261,10 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 			assert((blobs.n & 3) == 0);
 
 			if (ok) {
-				ok = WRITE(fd, blobs.data, blobs.n) != -1;
+				ok = cc->send(blobs.data, blobs.n);
 				if (!ok)
 					DOLOG("server::push_response: sending PDU to peer failed (%s)\n", strerror(errno));
+				bytes_send += blobs.n;
 			}
 
 			delete [] blobs.data;
@@ -368,12 +321,13 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 
 			blob_t out = iscsi_pdu_scsi_data_in::gen_data_in_pdu(s, reply_to, buffer, use_pdu_data_size, offset);
 
-			if (WRITE(fd, out.data, out.n) == -1) {
+			if (cc->send(out.data, out.n) == false) {
 				delete [] out.data;
 				DOLOG("server::push_response: problem sending block %zu to initiator\n", size_t(cur_block_nr));
 				ok = false;
 				break;
 			}
+			bytes_send += out.n;
 
 			delete [] out.data;
 
@@ -398,7 +352,7 @@ iscsi_response_parameters *server::select_parameters(iscsi_pdu_bhs *const pdu, s
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_nop_out:
 			return new iscsi_response_parameters_nop_out(ses);
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_text_req:
-			return new iscsi_response_parameters_text_req(ses, listen_ip, listen_port);
+			return new iscsi_response_parameters_text_req(ses, c->get_local_address());
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_logout_req:
 			return new iscsi_response_parameters_logout_req(ses);
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_r2t:
@@ -419,48 +373,22 @@ void server::handler()
 {
 	scsi scsi_dev(b);
 
-#if !defined(ESP32) && !defined(RP2040W)
-	pollfd fds[] { { listen_fd, POLLIN, 0 } };
-#endif
-
 	while(!stop) {
-#if !defined(ESP32) && !defined(RP2040W)
-		while(!stop) {
-			int rc = poll(fds, 1, 100);
-			if (rc == -1) {
-				DOLOG("server::handler: poll failed with error %s\n", strerror(errno));
-				break;
-			}
-
-			if (rc >= 1)
-				break;
-		}
-#endif
-
-		if (stop)
-			break;
-
-		int fd = accept(listen_fd, nullptr, nullptr);
-		if (fd == -1) {
+		com_client *cc = c->accept();
+		if (cc == nullptr) {
 			DOLOG("server::handler: accept() failed: %s\n", strerror(errno));
 			continue;
 		}
 
-		std::string endpoint = get_endpoint_name(fd);
-
-		int flags = 1;
-#if defined(__FreeBSD__) || defined(RP2040W)
-		if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (void *)&flags, sizeof(flags)) == -1)
-#else
-		if (setsockopt(fd, SOL_TCP, TCP_NODELAY, (void *)&flags, sizeof(flags)) == -1)
-#endif
-			DOLOG("server::handler: cannot disable Nagle algorithm\n");
+		std::string endpoint = cc->get_endpoint_name();
 
 #if defined(ESP32) || defined(RP2040W)
 		Serial.printf("new session with %s\r\n", endpoint.c_str());
 		uint32_t pdu_count   = 0;
 		auto     prev_output = millis();
 		auto     start       = prev_output;
+		unsigned long busy   = 0;
+		const long interval  = 5000;
 #else
 		DOLOG("server::handler: new session with %s\n", endpoint.c_str());
 #endif
@@ -469,31 +397,70 @@ void server::handler()
 		bool     ok = true;
 
 		do {
-			iscsi_pdu_bhs *pdu = receive_pdu(fd, &s);
+			auto incoming = receive_pdu(cc, &s);
+			iscsi_pdu_bhs *pdu = incoming.first;
 			if (!pdu) {
 				DOLOG("server::handler: no PDU received, aborting socket connection\n");
 				break;
 			}
-			auto parameters = select_parameters(pdu, s, &scsi_dev);
-			if (parameters) {
-				push_response(fd, s, pdu, parameters);
-				delete parameters;
+
+#ifdef ESP32
+			auto tx_start = micros();
+#endif
+
+			if (incoming.second) {  // something wrong with the received PDU?
+				DOLOG("server::handler: invalid PDU received\n");
+
+				std::optional<blob_t> reject = generate_reject_pdu(*pdu);
+				if (reject.has_value() == false) {
+					DOLOG("server::handler: cannot generate reject PDU\n");
+					continue;
+				}
+
+				bool rc = cc->send(reject.value().data, reject.value().n);
+				delete [] reject.value().data;
+				if (rc == false) {
+					DOLOG("server::handler: cannot transmit reject PDU\n");
+					break;
+				}
+
+				DOLOG("server::handler: transmitted reject PDU\n");
 			}
 			else {
-				ok = false;
+				auto parameters = select_parameters(pdu, s, &scsi_dev);
+				if (parameters) {
+					push_response(cc, s, pdu, parameters);
+					delete parameters;
+				}
+				else {
+					ok = false;
+				}
+
+				delete pdu;
 			}
+#ifdef ESP32
+			auto tx_end = micros();
+			busy += tx_end - tx_start;
+#endif
 
 #if defined(ESP32) || defined(RP2040W)
 			pdu_count++;
 			auto now = millis();
-			if (now - prev_output >= 5000) {
+			auto took = now - prev_output;
+			if (took >= interval) {
 				prev_output = now;
-				Serial.printf("%ld] PDU/s: %.2f (%zu)\r\n", now, pdu_count / double(now - start), pdu_count);
-				pdu_count = 0;
+				double   dtook = took / 1000.;
+				uint64_t bytes_read    = 0;
+				uint64_t bytes_written = 0;
+				uint64_t n_syncs       = 0;
+				b->get_and_reset_stats(&bytes_read, &bytes_written, &n_syncs);
+				Serial.printf("%ld] PDU/s: %.2f (%zu), send: %" PRIu64 " (%.2f/s), recv: %" PRIu64 " (%.2f/s), written: %.2f/s, read: %.2f/s, syncs: %.2f/s, load: %.2f%%\r\n", now, pdu_count / dtook, pdu_count, bytes_send, bytes_send / dtook, bytes_recv, bytes_recv / dtook, bytes_written / dtook, bytes_read / dtook, n_syncs / dtook, busy * 0.1 / interval);
+				pdu_count  = 0;
+				bytes_send = 0;
+				bytes_recv = 0;
+				busy       = 0;
 			}
 #endif
-
-			delete pdu;
 		}
 		while(ok);
 #if defined(ESP32) || defined(RP2040W)
@@ -502,8 +469,9 @@ void server::handler()
 		DOLOG("session finished\n");
 #endif
 
-		close(fd);
+		b->sync();
 
+		delete cc;
 		delete s;
 	}
 }

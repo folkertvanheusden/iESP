@@ -78,12 +78,11 @@ struct iscsi_response_parameters_login_req : public iscsi_response_parameters_bh
 
 struct iscsi_response_parameters_text_req : public iscsi_response_parameters_bhs
 {
-	const std::string listen_ip;
-	const int         listen_port;
+	const std::string listen_address;
 
-	iscsi_response_parameters_text_req(session *const ses, const std::string & listen_ip, const int listen_port) :
+	iscsi_response_parameters_text_req(session *const ses, const std::string & listen_address):
 		iscsi_response_parameters_bhs(ses),
-		listen_ip(listen_ip), listen_port(listen_port) {
+		listen_address(listen_address) {
 	}
 };
 
@@ -156,7 +155,7 @@ protected:
 	std::vector<iscsi_pdu_ahs *> ahs_list;
 	std::pair<uint8_t *, size_t> data     { nullptr, 0 };
 
-	std::vector<blob_t> return_helper(void *const data, size_t n);
+	std::vector<blob_t> return_helper(void *const data, size_t n) const;
 
 public:
 	iscsi_pdu_bhs();
@@ -186,9 +185,9 @@ public:
 	};
 
 	virtual bool set(session *const s, const uint8_t *const in, const size_t n);
-	virtual std::vector<blob_t> get();
+	virtual std::vector<blob_t> get() const;
 
-	size_t           get_ahs_length()  const { return bhs->ahslen;         }
+	size_t           get_ahs_length()  const { return bhs->ahslen * 4;                                              }
 	bool             set_ahs_segment(std::pair<const uint8_t *, std::size_t> ahs_in);
 
 	iscsi_bhs_opcode get_opcode()      const { return iscsi_bhs_opcode(get_bits(bhs->b1, 0, 6));                    }
@@ -209,6 +208,8 @@ struct iscsi_response_set
 };
 
 std::string pdu_opcode_to_string(const iscsi_pdu_bhs::iscsi_bhs_opcode opcode);
+
+std::optional<blob_t> generate_reject_pdu(const iscsi_pdu_bhs & about);
 
 class iscsi_pdu_login_request : public iscsi_pdu_bhs  // login request 0x03
 {
@@ -244,12 +245,14 @@ public:
 
 	__login_req__ *login_req __attribute__((packed)) { reinterpret_cast<__login_req__ *>(pdu_bytes) };
 
+	std::optional<std::string> initiator;
+
 public:
 	iscsi_pdu_login_request();
 	virtual ~iscsi_pdu_login_request();
 
 	bool set(session *const s, const uint8_t *const in, const size_t n) override;
-	std::vector<blob_t> get() override;
+	std::vector<blob_t> get() const override;
 
 	const uint8_t *get_ISID()       const { return login_req->ISID;         }
 	      uint16_t get_CID()        const { return login_req->CID;          }
@@ -262,6 +265,7 @@ public:
 	      uint8_t  get_versionmin() const { return login_req->versionmin;   }
 	      uint32_t get_Itasktag()   const { return login_req->Itasktag;     }
 	      uint32_t get_ExpStatSN()  const { return ntohl(login_req->ExpStatSN); }
+	std::optional<std::string> get_initiator() const { return initiator;    }
 
 	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters) override;
 };
@@ -310,7 +314,7 @@ public:
 	virtual ~iscsi_pdu_login_reply();
 
 	bool set(const iscsi_pdu_login_request & reply_to);
-	std::vector<blob_t> get() override;
+	std::vector<blob_t> get() const override;
 };
 
 class iscsi_pdu_scsi_cmd : public iscsi_pdu_bhs  // 0x01
@@ -350,7 +354,7 @@ public:
 
 	bool set(session *const s, const uint8_t *const in, const size_t n) override;
 	blob_t get_raw() const override;
-	std::vector<blob_t> get() override;
+	std::vector<blob_t> get() const override;
 
 	const uint8_t * get_CDB()       const { return cdb_pdu_req->CDB;              }
 	      uint32_t  get_Itasktag()  const { return cdb_pdu_req->Itasktag;         }
@@ -413,7 +417,7 @@ public:
 	virtual ~iscsi_pdu_scsi_data_in();
 
 	bool set(session *const s, const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data, const bool has_sense);
-	std::vector<blob_t> get() override;
+	std::vector<blob_t> get() const override;
         uint32_t get_TTT() const { return pdu_data_in->TTT; }
 
 	static blob_t gen_data_in_pdu(session *const s, const iscsi_pdu_scsi_cmd & reply_to, const blob_t & pdu_data_in_data, const size_t use_pdu_data_size, const size_t offset_in_data);
@@ -460,7 +464,7 @@ public:
 	virtual ~iscsi_pdu_scsi_data_out();
 
 	bool set(session *const s, const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data);
-	std::vector<blob_t> get() override;
+	std::vector<blob_t> get() const override;
 
 	uint32_t get_BufferOffset() const { return ntohl(pdu_data_out->bufferoff); }
         uint32_t get_TTT()          const { return pdu_data_out->TTT;              }
@@ -514,7 +518,7 @@ public:
 
 	bool set(const iscsi_pdu_scsi_cmd & reply_to, const std::vector<uint8_t> & scsi_sense_data, std::optional<uint32_t> ResidualCt);
 
-	std::vector<blob_t> get() override;
+	std::vector<blob_t> get() const override;
 };
 
 class iscsi_pdu_nop_out : public iscsi_pdu_bhs  // NOP-Out  0x00
@@ -586,7 +590,7 @@ public:
 	virtual ~iscsi_pdu_nop_in();
 
 	bool set(const iscsi_pdu_nop_out & reply_to);
-	std::vector<blob_t> get() override;
+	std::vector<blob_t> get() const override;
 };
 
 class iscsi_pdu_scsi_r2t : public iscsi_pdu_bhs  // 0x31
@@ -625,7 +629,7 @@ public:
 	virtual ~iscsi_pdu_scsi_r2t();
 
 	bool set(session *const s, const iscsi_pdu_scsi_cmd & reply_to, const uint32_t TTT, const uint32_t buffer_offset, const uint32_t data_length);
-	std::vector<blob_t> get() override;
+	std::vector<blob_t> get() const override;
 
 	uint32_t get_TTT() const { return pdu_scsi_r2t->TTT; }
 };
@@ -664,7 +668,7 @@ public:
 	virtual ~iscsi_pdu_text_request();
 
 	bool set(session *const s, const uint8_t *const in, const size_t n) override;
-	std::vector<blob_t> get() override;
+	std::vector<blob_t> get() const override;
 
 	const uint8_t * get_LUN()      const { return text_req->LUN;              }
 	      uint32_t get_CmdSN()     const { return ntohl(text_req->CmdSN);     }
@@ -711,7 +715,7 @@ public:
 	virtual ~iscsi_pdu_text_reply();
 
 	bool set(const iscsi_pdu_text_request & reply_to, const iscsi_response_parameters *const parameters);
-	std::vector<blob_t> get() override;
+	std::vector<blob_t> get() const override;
 };
 
 class iscsi_pdu_logout_request : public iscsi_pdu_bhs  // logout request 0x06
@@ -745,7 +749,7 @@ public:
 	virtual ~iscsi_pdu_logout_request();
 
 	bool set(session *const s, const uint8_t *const in, const size_t n) override;
-	std::vector<blob_t> get() override;
+	std::vector<blob_t> get() const override;
 
 	uint32_t get_CmdSN()      const { return ntohl(logout_req->CmdSN); }
 	uint32_t get_Itasktag()   const { return logout_req->Itasktag;     }
@@ -791,7 +795,7 @@ public:
 	virtual ~iscsi_pdu_logout_reply();
 
 	bool set(const iscsi_pdu_logout_request & reply_to);
-	std::vector<blob_t> get() override;
+	std::vector<blob_t> get() const override;
 };
 
 ///
@@ -829,7 +833,7 @@ public:
 	virtual ~iscsi_pdu_taskman_request();
 
 	bool set(session *const s, const uint8_t *const in, const size_t n) override;
-	std::vector<blob_t> get() override;
+	std::vector<blob_t> get() const override;
 
 	uint32_t get_Itasktag()  const { return taskman_req->Itasktag;         }
 	uint32_t get_ExpStatSN() const { return ntohl(taskman_req->ExpStatSN); }
@@ -870,5 +874,5 @@ public:
 	virtual ~iscsi_pdu_taskman_reply();
 
 	bool set(const iscsi_pdu_taskman_request & reply_to);
-	std::vector<blob_t> get() override;
+	std::vector<blob_t> get() const override;
 };

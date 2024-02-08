@@ -12,6 +12,8 @@ add_executable(
 	iesp
 	backend.cpp
 	backend-file.cpp
+	com.cpp
+	com-sockets.cpp
 	iscsi.cpp
 	iscsi-pdu.cpp
 	main.cpp
