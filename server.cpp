@@ -1,4 +1,4 @@
-#ifdef ESP32
+#if defined(ESP32) || defined(RP2040W)
 #include <Arduino.h>
 #endif
 #include <atomic>

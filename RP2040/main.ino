@@ -8,19 +8,21 @@
 #include <WiFi.h>
 
 #include "backend-sdcard.h"
+#include "com-arduino.h"
 #include "random.h"
 #include "server.h"
 #include "version.h"
 #include "wifi.h"
 
 
-std::atomic_bool stop { false };
+std::atomic_bool stop { false   };
+com             *c    { nullptr };
+backend_sdcard   bs;
 
 void setup()
 {
 	Serial.begin(115200);
 	Serial.setDebugOutput(true);
-	WiFi.hostname("iESP");
 
 	init_my_getrandom();
 
@@ -29,30 +31,14 @@ void setup()
 	Serial.print(F("GIT hash: "));
 	Serial.println(version_str);
 
-	WiFi.mode(WIFI_STA);
-	WiFi.begin(ssid, wifi_pw);
- 
-	while (WiFi.status() != WL_CONNECTED){
-		delay(500);
-		Serial.print(".");
-	}
-	Serial.println(F(""));
-
-	Serial.print(F("Will listen on (in a bit): "));
-	Serial.println(WiFi.localIP());
+	c = new com_arduino(3260);
+	if (c->begin() == false)
+		Serial.println(F("Failed to initialize com-layer"));
 }
 
 void loop()
 {
-	backend_sdcard bs;
-
-	auto ip = WiFi.localIP();
-	char buffer[16];
-	snprintf(buffer, sizeof buffer, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
-
-	server s(&bs, buffer, 3260);
+	server s(&bs, c);
 	Serial.println(F("Go!"));
-	s.begin();
-
 	s.handler();
 }
