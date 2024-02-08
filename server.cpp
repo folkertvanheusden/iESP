@@ -172,6 +172,20 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 			DOLOG("server::receive_pdu: initialize PDU: validation failed\n");
 		}
 
+#if defined(ESP32) || !defined(NDEBUG)
+		if (bhs.get_opcode() == iscsi_pdu_bhs::iscsi_bhs_opcode::o_login_req) {
+			auto initiator = reinterpret_cast<iscsi_pdu_login_request *>(pdu_obj)->get_initiator();
+			if (initiator.has_value()) {
+#ifdef ESP32
+				Serial.print(F("Initiator: "));
+				Serial.println(initiator.value().c_str());
+#else
+				DOLOG("server::receive_pdu: initiator: %s\n", initiator.value().c_str());
+#endif
+			}
+		}
+#endif
+
 		size_t ahs_len = pdu_obj->get_ahs_length();
 		if (ahs_len) {
 			DOLOG("server::receive_pdu: read %zu ahs bytes\n", ahs_len);

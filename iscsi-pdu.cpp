@@ -189,10 +189,32 @@ iscsi_pdu_login_request::~iscsi_pdu_login_request()
 
 bool iscsi_pdu_login_request::set(session *const s, const uint8_t *const in, const size_t n)
 {
-	if (iscsi_pdu_bhs::set(s, in, n) == false)
+	if (iscsi_pdu_bhs::set(s, in, n) == false) {
+		DOLOG("iscsi_pdu_login_request::set: iscsi_pdu_bhs::set returned false\n");
 		return false;
+	}
 
-	// TODO further validation
+	auto kvs_in = data_to_text_array(data.first, data.second);
+	uint32_t max_burst = ~0;
+	for(auto & kv: kvs_in) {
+		DOLOG("iscsi_pdu_login_request::get_response: kv %s\n", kv.c_str());
+
+		auto parts = split(kv, "=");
+		if (parts.size() < 2)
+			continue;
+
+		if (parts[0] == "MaxBurstLength")
+			max_burst = std::min(max_burst, uint32_t(std::atoi(parts[1].c_str())));
+		if (parts[0] == "FirstBurstLength")
+			max_burst = std::min(max_burst, uint32_t(std::atoi(parts[1].c_str())));
+		if (parts[0] == "InitiatorName")
+			initiator = parts[1];
+	}
+
+	if (max_burst < uint32_t(~0)) {
+		DOLOG("iscsi_pdu_login_request::get_response: set max-burst to %u\n", max_burst);
+		s->set_ack_interval(max_burst);
+	}
 
 	return true;
 }
@@ -208,27 +230,6 @@ std::vector<blob_t> iscsi_pdu_login_request::get()
 std::optional<iscsi_response_set> iscsi_pdu_login_request::get_response(session *const s, const iscsi_response_parameters *const parameters_in)
 {
 	auto parameters = static_cast<const iscsi_response_parameters_login_req *>(parameters_in);
-
-	auto kvs_in = data_to_text_array(data.first, data.second);
-	uint32_t max_burst = ~0;
-	for(auto & kv: kvs_in) {
-#ifndef NDEBUG
-		DOLOG("iscsi_pdu_login_request::get_response: kv %s\n", kv.c_str());
-#endif
-		auto parts = split(kv, "=");
-		if (parts.size() < 2)
-			continue;
-
-		if (parts[0] == "MaxBurstLength")
-			max_burst = std::min(max_burst, uint32_t(std::atoi(parts[1].c_str())));
-		if (parts[0] == "FirstBurstLength")
-			max_burst = std::min(max_burst, uint32_t(std::atoi(parts[1].c_str())));
-	}
-
-	if (max_burst < uint32_t(~0)) {
-		DOLOG("iscsi_pdu_login_request::get_response: set max-burst to %u\n", max_burst);
-		s->set_ack_interval(max_burst);
-	}
 
 	iscsi_response_set response;
 	auto reply_pdu = new iscsi_pdu_login_reply();

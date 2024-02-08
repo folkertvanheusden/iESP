@@ -239,6 +239,8 @@ public:
 
 	__login_req__ *login_req __attribute__((packed)) { reinterpret_cast<__login_req__ *>(pdu_bytes) };
 
+	std::optional<std::string> initiator;
+
 public:
 	iscsi_pdu_login_request();
 	virtual ~iscsi_pdu_login_request();
@@ -257,6 +259,7 @@ public:
 	      uint8_t  get_versionmin() const { return login_req->versionmin;   }
 	      uint32_t get_Itasktag()   const { return login_req->Itasktag;     }
 	      uint32_t get_ExpStatSN()  const { return ntohl(login_req->ExpStatSN); }
+	std::optional<std::string> get_initiator() const { return initiator;    }
 
 	virtual std::optional<iscsi_response_set> get_response(session *const s, const iscsi_response_parameters *const parameters) override;
 };
