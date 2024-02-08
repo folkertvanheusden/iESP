@@ -70,6 +70,7 @@ com_client *com_arduino::accept()
 
 com_client_arduino::com_client_arduino(WiFiClient & wc): wc(wc), com_client(nullptr)
 {
+	wc.setNoDelay(true);
 }
 
 com_client_arduino::~com_client_arduino()
