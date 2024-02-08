@@ -183,7 +183,7 @@ public:
 	virtual bool set(session *const s, const uint8_t *const in, const size_t n);
 	virtual std::vector<blob_t> get() const;
 
-	size_t           get_ahs_length()  const { return bhs->ahslen;         }
+	size_t           get_ahs_length()  const { return bhs->ahslen * 4;                                              }
 	bool             set_ahs_segment(std::pair<const uint8_t *, std::size_t> ahs_in);
 
 	iscsi_bhs_opcode get_opcode()      const { return iscsi_bhs_opcode(get_bits(bhs->b1, 0, 6));                    }
