@@ -3,7 +3,9 @@
 #include <string>
 #include <unistd.h>
 #include <vector>
-#if !defined(RP2040W)
+#if defined(RP2040W)
+#include <Arduino.h>
+#else
 #include <netdb.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -139,5 +141,16 @@ std::string myformat(const char *const fmt, ...)
         std::string result = buffer;
 
         return result;
+#endif
+}
+
+uint32_t get_free_heap_space()
+{
+#if defined(RP2040W)
+	return rp2040.getFreeHeap();
+#elif defined(ESP32)
+	return heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+#else
+	return 0;
 #endif
 }

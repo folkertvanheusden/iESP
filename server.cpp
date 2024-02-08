@@ -463,7 +463,7 @@ void server::handler()
 				uint64_t bytes_written = 0;
 				uint64_t n_syncs       = 0;
 				b->get_and_reset_stats(&bytes_read, &bytes_written, &n_syncs);
-				Serial.printf("%ld] PDU/s: %.2f (%zu), send: %" PRIu64 " (%.2f/s), recv: %" PRIu64 " (%.2f/s), written: %.2f/s, read: %.2f/s, syncs: %.2f/s, load: %.2f%%\r\n", now, pdu_count / dtook, pdu_count, bytes_send, bytes_send / dtook, bytes_recv, bytes_recv / dtook, bytes_written / dtook, bytes_read / dtook, n_syncs / dtook, busy * 0.1 / took);
+				Serial.printf("%ld] PDU/s: %.2f (%zu), send: %" PRIu64 " (%.2f/s), recv: %" PRIu64 " (%.2f/s), written: %.2f/s, read: %.2f/s, syncs: %.2f/s, load: %.2f%%, mem: %u\r\n", now, pdu_count / dtook, pdu_count, bytes_send, bytes_send / dtook, bytes_recv, bytes_recv / dtook, bytes_written / dtook, bytes_read / dtook, n_syncs / dtook, busy * 0.1 / took, get_free_heap_space());
 				pdu_count  = 0;
 				bytes_send = 0;
 				bytes_recv = 0;
