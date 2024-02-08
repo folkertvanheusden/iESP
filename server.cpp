@@ -10,16 +10,6 @@
 #include <poll.h>
 #endif
 #include <unistd.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#ifdef ESP32
-#ifndef SOL_TCP
-#define SOL_TCP 6
-#endif
-#endif
 
 #include "iscsi-pdu.h"
 #include "log.h"
@@ -29,88 +19,23 @@
 
 extern std::atomic_bool stop;
 
-server::server(backend *const b, const std::string & listen_ip, const int listen_port):
+server::server(backend *const b, com *const c):
 	b(b),
-	listen_ip(listen_ip), listen_port(listen_port)
+	c(c)
 {
 }
 
 server::~server()
 {
-	close(listen_fd);
 }
 
-bool server::begin()
-{
-	// setup listening socket for viewers
-	listen_fd = socket(AF_INET, SOCK_STREAM, 0);
-	if (listen_fd == -1) {
-		DOLOG("server::begin: failed to create socket: %s\n", strerror(errno));
-		return false;
-	}
-
-        int reuse_addr = 1;
-        if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<char *>(&reuse_addr), sizeof reuse_addr) == -1) {
-		DOLOG("server::begin: failed to set socket to reuse address: %s\n", strerror(errno));
-		return false;
-	}
-
-#ifdef linux
-	int q_size = SOMAXCONN;
-	if (setsockopt(listen_fd, SOL_TCP, TCP_FASTOPEN, &q_size, sizeof q_size)) {
-		DOLOG("server::begin: failed to set \"TCP fast open\": %s\n", strerror(errno));
-		return false;
-	}
-#endif
-
-        sockaddr_in server_addr { };
-        server_addr.sin_family = AF_INET;
-        server_addr.sin_port = htons(listen_port);
-	if (inet_aton(listen_ip.c_str(), &reinterpret_cast<sockaddr_in *>(&server_addr)->sin_addr) == 0) {
-		DOLOG("server::begin: failed to translate listen address (%s): %s\n", listen_ip.c_str(), strerror(errno));
-		return false;
-	}
-
-        if (bind(listen_fd, reinterpret_cast<sockaddr *>(&server_addr), sizeof server_addr) == -1) {
-		DOLOG("server::begin: failed to bind socket to %s:%d: %s\n", listen_ip.c_str(), listen_port, strerror(errno));
-		return false;
-	}
-
-        if (listen(listen_fd, 4) == -1) {
-		DOLOG("server::begin: failed to setup listen queue: %s\n", strerror(errno));
-                return false;
-	}
-
-	return true;
-}
-
-std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(const int fd, session **const s)
+std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, session **const s)
 {
 	if (*s == nullptr)
 		*s = new session();
 
-#ifndef ESP32
-	pollfd fds[] { { fd, POLLIN, 0 } };
-
-	for(;;) {
-		int rc = poll(fds, 1, 100);
-		if (rc == -1) {
-			DOLOG("server::receive_pdu: poll failed with error %s\n", strerror(errno));
-			return { nullptr, false };
-		}
-
-		if (stop == true) {
-			DOLOG("server::receive_pdu: abort due external stop\n");
-			return { nullptr, false };
-		}
-
-		if (rc >= 1)
-			break;
-	}
-#endif
-
 	uint8_t pdu[48] { 0 };
-	if (READ(fd, pdu, sizeof pdu) == -1) {
+	if (cc->recv(pdu, sizeof pdu) == false) {
 		DOLOG("server::receive_pdu: PDU receive error\n");
 		return { nullptr, false };
 	}
@@ -194,7 +119,7 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(const int fd, session **con
 			DOLOG("server::receive_pdu: read %zu ahs bytes\n", ahs_len);
 
 			uint8_t *ahs_temp = new uint8_t[ahs_len]();
-			if (READ(fd, ahs_temp, ahs_len) == -1) {
+			if (cc->recv(ahs_temp, ahs_len) == false) {
 				ok = false;
 				DOLOG("server::receive_pdu: AHS receive error\n");
 			}
@@ -213,7 +138,7 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(const int fd, session **con
 			DOLOG("server::receive_pdu: read %zu data bytes (%zu with padding)\n", data_length, padded_data_length);
 
 			uint8_t *data_temp = new uint8_t[padded_data_length]();
-			if (READ(fd, data_temp, padded_data_length) == -1) {
+			if (cc->recv(data_temp, padded_data_length) == false) {
 				ok = false;
 				DOLOG("server::receive_pdu: data receive error\n");
 			}
@@ -235,7 +160,7 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(const int fd, session **con
 	return { pdu_obj, pdu_error };
 }
 
-bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const pdu, iscsi_response_parameters *const parameters)
+bool server::push_response(com_client *const cc, session *const s, iscsi_pdu_bhs *const pdu, iscsi_response_parameters *const parameters)
 {
 	bool ok = true;
 
@@ -324,7 +249,7 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 			assert((blobs.n & 3) == 0);
 
 			if (ok) {
-				ok = WRITE(fd, blobs.data, blobs.n) != -1;
+				ok = cc->send(blobs.data, blobs.n);
 				if (!ok)
 					DOLOG("server::push_response: sending PDU to peer failed (%s)\n", strerror(errno));
 				bytes_send += blobs.n;
@@ -383,7 +308,7 @@ bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const 
 
 			blob_t out = iscsi_pdu_scsi_data_in::gen_data_in_pdu(s, reply_to, buffer, use_pdu_data_size, offset);
 
-			if (WRITE(fd, out.data, out.n) == -1) {
+			if (cc->send(out.data, out.n) == false) {
 				delete [] out.data;
 				DOLOG("server::push_response: problem sending block %zu to initiator\n", size_t(cur_block_nr));
 				ok = false;
@@ -414,7 +339,7 @@ iscsi_response_parameters *server::select_parameters(iscsi_pdu_bhs *const pdu, s
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_nop_out:
 			return new iscsi_response_parameters_nop_out(ses);
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_text_req:
-			return new iscsi_response_parameters_text_req(ses, listen_ip, listen_port);
+			return new iscsi_response_parameters_text_req(ses, c->get_local_address());
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_logout_req:
 			return new iscsi_response_parameters_logout_req(ses);
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_r2t:
@@ -435,42 +360,14 @@ void server::handler()
 {
 	scsi scsi_dev(b);
 
-#ifndef ESP32
-	pollfd fds[] { { listen_fd, POLLIN, 0 } };
-#endif
-
 	while(!stop) {
-#ifndef ESP32
-		while(!stop) {
-			int rc = poll(fds, 1, 100);
-			if (rc == -1) {
-				DOLOG("server::handler: poll failed with error %s\n", strerror(errno));
-				break;
-			}
-
-			if (rc >= 1)
-				break;
-		}
-#endif
-
-		if (stop)
-			break;
-
-		int fd = accept(listen_fd, nullptr, nullptr);
-		if (fd == -1) {
+		com_client *cc = c->accept();
+		if (cc == nullptr) {
 			DOLOG("server::handler: accept() failed: %s\n", strerror(errno));
 			continue;
 		}
 
-		std::string endpoint = get_endpoint_name(fd);
-
-		int flags = 1;
-#if defined(__FreeBSD__)
-		if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (void *)&flags, sizeof(flags)) == -1)
-#else
-		if (setsockopt(fd, SOL_TCP, TCP_NODELAY, (void *)&flags, sizeof(flags)) == -1)
-#endif
-			DOLOG("server::handler: cannot disable Nagle algorithm\n");
+		std::string endpoint = cc->get_endpoint_name();
 
 #ifdef ESP32
 		Serial.printf("new session with %s\r\n", endpoint.c_str());
@@ -487,7 +384,7 @@ void server::handler()
 		bool     ok = true;
 
 		do {
-			auto incoming = receive_pdu(fd, &s);
+			auto incoming = receive_pdu(cc, &s);
 			iscsi_pdu_bhs *pdu = incoming.first;
 			if (!pdu) {
 				DOLOG("server::handler: no PDU received, aborting socket connection\n");
@@ -507,9 +404,9 @@ void server::handler()
 					continue;
 				}
 
-				int rc = WRITE(fd, reject.value().data, reject.value().n);
+				bool rc = cc->send(reject.value().data, reject.value().n);
 				delete [] reject.value().data;
-				if (rc == -1) {
+				if (rc == false) {
 					DOLOG("server::handler: cannot transmit reject PDU\n");
 					break;
 				}
@@ -519,7 +416,7 @@ void server::handler()
 			else {
 				auto parameters = select_parameters(pdu, s, &scsi_dev);
 				if (parameters) {
-					push_response(fd, s, pdu, parameters);
+					push_response(cc, s, pdu, parameters);
 					delete parameters;
 				}
 				else {
@@ -561,7 +458,7 @@ void server::handler()
 
 		b->sync();
 
-		close(fd);
+		delete cc;
 		delete s;
 	}
 }

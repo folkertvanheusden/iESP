@@ -875,7 +875,7 @@ bool iscsi_pdu_text_reply::set(const iscsi_pdu_text_request & reply_to, const is
 		auto *temp_parameters = reinterpret_cast<const iscsi_response_parameters_text_req *>(parameters);
 		const std::vector<std::string> kvs {
 			"TargetName=test",
-			"TargetAddress=" + temp_parameters->listen_ip + myformat(":%d", temp_parameters->listen_port) + ",1",
+			"TargetAddress=" + temp_parameters->listen_address + ",1",
 		};
 		auto temp = text_array_to_data(kvs);
 		text_reply_reply_data.first  = temp.first;

@@ -8,6 +8,7 @@
 #include <WiFiManager.h>
 
 #include "backend-sdcard.h"
+#include "com-sockets.h"
 #include "server.h"
 #include "version.h"
 
@@ -50,9 +51,11 @@ void loop()
 	char buffer[16];
 	snprintf(buffer, sizeof buffer, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
 
-	server s(&bs, buffer, 3260);
-	Serial.println(F("Go!"));
-	s.begin();
+	com_sockets c(buffer, 3260, &stop);
+	if (c.begin() == false)
+		Serial.println(F("Failed to initialize communication layer!"));
 
+	server s(&bs, &c);
+	Serial.println(F("Go!"));
 	s.handler();
 }

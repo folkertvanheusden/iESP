@@ -73,12 +73,11 @@ struct iscsi_response_parameters_login_req : public iscsi_response_parameters_bh
 
 struct iscsi_response_parameters_text_req : public iscsi_response_parameters_bhs
 {
-	const std::string listen_ip;
-	const int         listen_port;
+	const std::string listen_address;
 
-	iscsi_response_parameters_text_req(session *const ses, const std::string & listen_ip, const int listen_port) :
+	iscsi_response_parameters_text_req(session *const ses, const std::string & listen_address):
 		iscsi_response_parameters_bhs(ses),
-		listen_ip(listen_ip), listen_port(listen_port) {
+		listen_address(listen_address) {
 	}
 };
 
