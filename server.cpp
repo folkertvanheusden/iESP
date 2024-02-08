@@ -84,7 +84,7 @@ bool server::begin()
 	return true;
 }
 
-iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
+std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(const int fd, session **const s)
 {
 	if (*s == nullptr)
 		*s = new session();
@@ -96,12 +96,12 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 		int rc = poll(fds, 1, 100);
 		if (rc == -1) {
 			DOLOG("server::receive_pdu: poll failed with error %s\n", strerror(errno));
-			return nullptr;
+			return { nullptr, false };
 		}
 
 		if (stop == true) {
 			DOLOG("server::receive_pdu: abort due external stop\n");
-			return nullptr;
+			return { nullptr, false };
 		}
 
 		if (rc >= 1)
@@ -112,7 +112,7 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 	uint8_t pdu[48] { 0 };
 	if (READ(fd, pdu, sizeof pdu) == -1) {
 		DOLOG("server::receive_pdu: PDU receive error\n");
-		return nullptr;
+		return { nullptr, false };
 	}
 
 	bytes_recv += sizeof pdu;
@@ -120,7 +120,7 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 	iscsi_pdu_bhs bhs;
 	if (bhs.set(*s, pdu, sizeof pdu) == false) {
 		DOLOG("server::receive_pdu: BHS validation error\n");
-		return nullptr;
+		return { nullptr, false };
 	}
 
 #ifdef ESP32
@@ -132,7 +132,8 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 	DOLOG("opcode: %02xh / %s\n", bhs.get_opcode(), pdu_opcode_to_string(bhs.get_opcode()).c_str());
 #endif
 
-	iscsi_pdu_bhs *pdu_obj = nullptr;
+	iscsi_pdu_bhs *pdu_obj   = nullptr;
+	bool           pdu_error = false;
 
 	switch(bhs.get_opcode()) {
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_login_req:
@@ -161,6 +162,8 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 			break;
 		default:
 			DOLOG("server::receive_pdu: opcode %02xh not implemented\n", bhs.get_opcode());
+			pdu_obj = new iscsi_pdu_bhs();
+			pdu_error = true;
 			break;
 	}
 
@@ -229,7 +232,7 @@ iscsi_pdu_bhs *server::receive_pdu(const int fd, session **const s)
 		}
 	}
 
-	return pdu_obj;
+	return { pdu_obj, pdu_error };
 }
 
 bool server::push_response(const int fd, session *const s, iscsi_pdu_bhs *const pdu, iscsi_response_parameters *const parameters)
@@ -484,7 +487,8 @@ void server::handler()
 		bool     ok = true;
 
 		do {
-			iscsi_pdu_bhs *pdu = receive_pdu(fd, &s);
+			auto incoming = receive_pdu(fd, &s);
+			iscsi_pdu_bhs *pdu = incoming.first;
 			if (!pdu) {
 				DOLOG("server::handler: no PDU received, aborting socket connection\n");
 				break;
@@ -493,16 +497,37 @@ void server::handler()
 #ifdef ESP32
 			auto tx_start = micros();
 #endif
-			auto parameters = select_parameters(pdu, s, &scsi_dev);
-			if (parameters) {
-				push_response(fd, s, pdu, parameters);
-				delete parameters;
+
+			if (incoming.second) {  // something wrong with the received PDU?
+				DOLOG("server::handler: invalid PDU received\n");
+
+				std::optional<blob_t> reject = generate_reject_pdu(*pdu);
+				if (reject.has_value() == false) {
+					DOLOG("server::handler: cannot generate reject PDU\n");
+					continue;
+				}
+
+				int rc = WRITE(fd, reject.value().data, reject.value().n);
+				delete [] reject.value().data;
+				if (rc == -1) {
+					DOLOG("server::handler: cannot transmit reject PDU\n");
+					break;
+				}
+
+				DOLOG("server::handler: transmitted reject PDU\n");
 			}
 			else {
-				ok = false;
-			}
+				auto parameters = select_parameters(pdu, s, &scsi_dev);
+				if (parameters) {
+					push_response(fd, s, pdu, parameters);
+					delete parameters;
+				}
+				else {
+					ok = false;
+				}
 
-			delete pdu;
+				delete pdu;
+			}
 #ifdef ESP32
 			auto tx_end = micros();
 			busy += tx_end - tx_start;
