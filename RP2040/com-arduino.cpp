@@ -21,12 +21,21 @@ bool com_arduino::begin()
 
 	Serial.println(F("Start WiFi"));
 	WiFi.mode(WIFI_STA);
+	Serial.println(F("Disable WiFi low power"));
+	WiFi.noLowPowerMode();
+	Serial.print(F("Connecting to: "));
+	Serial.println(ssid);
 	WiFi.begin(ssid, wifi_pw);
  
-	Serial.println(F("Wait for connetion"));
-	while (WiFi.status() != WL_CONNECTED){
+	Serial.println(F("Wait for connection:"));
+	for(;;) {
+		auto rc = WiFi.status();
+		if (rc == WL_CONNECTED)
+			break;
+
 		delay(500);
-		Serial.print(".");
+		Serial.print(' ');
+		Serial.print(rc);
 	}
 	Serial.println(F(""));
 
