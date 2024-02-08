@@ -75,6 +75,8 @@ com_client *com_arduino::accept()
 
 	auto wc = server->accept();
 
+	Serial.println(F("New session!"));
+
 	return new com_client_arduino(wc);
 }
 
@@ -90,19 +92,42 @@ com_client_arduino::~com_client_arduino()
 
 bool com_client_arduino::send(const uint8_t *const from, const size_t n)
 {
-	if (wc.connected() == false)
-		return false;
+	const uint8_t *p    = from;
+	size_t         todo = n;
 
-	wc.write(from, n);
+	while(todo > 0) {
+		if (wc.connected() == false)
+			return false;
+
+		size_t cur_n = wc.write(p, n);
+		p    += cur_n;
+		todo -= cur_n;
+
+		if (todo)
+			yield();
+	}
+
 	return true;
 }
 
 bool com_client_arduino::recv(uint8_t *const to, const size_t n)
 {
-	if (wc.connected() == false)
-		return false;
+	uint8_t *p    = to;
+	size_t   todo = n;
 
-	wc.readBytes(to, n);
+	while(todo > 0) {
+		size_t cur_n = wc.read(p, todo);
+		p    += cur_n;
+		todo -= cur_n;
+
+		if (todo) {
+			yield();
+
+			if (wc.connected() == false)
+				return false;
+		}
+	}
+
 	return true;
 }
 

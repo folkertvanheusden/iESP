@@ -290,17 +290,27 @@ bool server::push_response(com_client *const cc, session *const s, iscsi_pdu_bhs
 			use_pdu_data_size = reply_to.get_ExpDatLen();
 		}
 
-		blob_t buffer { nullptr, 0 };
+		blob_t buffer       { nullptr, 0 };
+		auto   ack_interval = s->get_ack_interval();
 #ifdef ESP32
 		size_t heap_free = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
-		if (heap_free >= 5120)
-			buffer.n = std::min((heap_free - 2048) / 2, s->get_ack_interval());
-		if (buffer.n < 512)
-			buffer.n = 512;
+		buffer.n = 512;
+		if (heap_free >= 5120) {
+			if (ack_interval.has_value())
+				buffer.n = std::min((heap_free - 2048) / 2, ack_interval.value());
+			else
+				buffer.n = (heap_free - 2048) / 2;
+		}
 #elif defined(RP2040W)
-		buffer.n    = std::min(uint32_t(4096), s->get_ack_interval());
+		if (ack_interval.has_value())
+			buffer.n = std::min(uint32_t(4096), ack_interval.value());
+		else
+			buffer.n = 4096;
 #else
-		buffer.n    = std::max(uint32_t(512), s->get_ack_interval());
+		if (ack_interval.has_value())
+			buffer.n = std::max(uint32_t(512), ack_interval.value());
+		else
+			buffer.n = 512;
 #endif
 		buffer.data = new uint8_t[buffer.n]();
 		uint32_t block_group_size = buffer.n / 512;
@@ -404,7 +414,7 @@ void server::handler()
 				break;
 			}
 
-#ifdef ESP32
+#if defined(ESP32) || defined(RP2040W)
 			auto tx_start = micros();
 #endif
 
@@ -438,12 +448,11 @@ void server::handler()
 
 				delete pdu;
 			}
-#ifdef ESP32
-			auto tx_end = micros();
-			busy += tx_end - tx_start;
-#endif
 
 #if defined(ESP32) || defined(RP2040W)
+			auto tx_end = micros();
+			busy += tx_end - tx_start;
+
 			pdu_count++;
 			auto now = millis();
 			auto took = now - prev_output;
@@ -454,7 +463,7 @@ void server::handler()
 				uint64_t bytes_written = 0;
 				uint64_t n_syncs       = 0;
 				b->get_and_reset_stats(&bytes_read, &bytes_written, &n_syncs);
-				Serial.printf("%ld] PDU/s: %.2f (%zu), send: %" PRIu64 " (%.2f/s), recv: %" PRIu64 " (%.2f/s), written: %.2f/s, read: %.2f/s, syncs: %.2f/s, load: %.2f%%\r\n", now, pdu_count / dtook, pdu_count, bytes_send, bytes_send / dtook, bytes_recv, bytes_recv / dtook, bytes_written / dtook, bytes_read / dtook, n_syncs / dtook, busy * 0.1 / interval);
+				Serial.printf("%ld] PDU/s: %.2f (%zu), send: %" PRIu64 " (%.2f/s), recv: %" PRIu64 " (%.2f/s), written: %.2f/s, read: %.2f/s, syncs: %.2f/s, load: %.2f%%\r\n", now, pdu_count / dtook, pdu_count, bytes_send, bytes_send / dtook, bytes_recv, bytes_recv / dtook, bytes_written / dtook, bytes_read / dtook, n_syncs / dtook, busy * 0.1 / took);
 				pdu_count  = 0;
 				bytes_send = 0;
 				bytes_recv = 0;
