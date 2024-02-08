@@ -1,3 +1,5 @@
 - show initiator in output
 - multiple LUNs
 - SCSI TRIM support
+- multiple concurrent sessions
+  - SCSI RESERVE
