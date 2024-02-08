@@ -35,27 +35,38 @@ void setup()
 	Serial.print(F("Free memory at start: "));
 	Serial.println(rp2040.getFreeHeap());
 
-	c = new com_arduino(3260);
-	if (c->begin() == false)
-		Serial.println(F("Failed to initialize com-layer"));
+	try {
+		c = new com_arduino(3260);
+		if (c->begin() == false)
+			Serial.println(F("Failed to initialize com-layer"));
 
-	init_my_getrandom();
+		init_my_getrandom();
 
-	Serial.println(F("Init SD card"));
-	bs = new backend_sdcard();
+		Serial.println(F("Init SD card"));
+		bs = new backend_sdcard();
 
-	Serial.println(F("Instantiate iSCSI server"));
-	s = new server(bs, c);
+		Serial.println(F("Instantiate iSCSI server"));
+		s = new server(bs, c);
 
-	Serial.print(F("Free memory after full init: "));
-	Serial.println(rp2040.getFreeHeap());
+		Serial.print(F("Free memory after full init: "));
+		Serial.println(rp2040.getFreeHeap());
 
-	Serial.println(F("Setup step finished"));
+		Serial.println(F("Setup step finished"));
+	}
+	catch(...) {
+		Serial.println(F("An exception occured during init"));
+	}
 }
 
 void loop()
 {
 	Serial.print(millis());
 	Serial.println(F(" Go!"));
-	s->handler();
+
+	try {
+		s->handler();
+	}
+	catch(...) {
+		Serial.println(F("An exception occured during run-time"));
+	}
 }
