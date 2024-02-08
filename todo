@@ -3,3 +3,4 @@
 - SCSI TRIM support
 - multiple concurrent sessions
   - SCSI RESERVE
+- VMware initiator compatibility
