@@ -3,5 +3,4 @@
 - multiple concurrent sessions
   - SCSI RESERVE
 - VMware initiator compatibility
-- [38695.579947] sd 6:0:0:0: lun281474976710664 has a LUN larger than allowed by the host adapter
 - nmap 'compatibility'
