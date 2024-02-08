@@ -35,6 +35,9 @@ void setup()
 	Serial.print(F("Free memory at start: "));
 	Serial.println(rp2040.getFreeHeap());
 
+	if (rp2040.isPicoW() == false)
+		Serial.println(F("This is NOT a Pico-W, this program will fail!"));
+
 	try {
 		c = new com_arduino(3260);
 		if (c->begin() == false)
