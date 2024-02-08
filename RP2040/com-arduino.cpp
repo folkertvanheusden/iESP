@@ -16,11 +16,14 @@ com_arduino::com_arduino(const int port): com(nullptr), port(port)
 
 bool com_arduino::begin()
 {
+	Serial.println(F("Set hostname"));
 	WiFi.hostname("iPICO");
 
+	Serial.println(F("Start WiFi"));
 	WiFi.mode(WIFI_STA);
 	WiFi.begin(ssid, wifi_pw);
  
+	Serial.println(F("Wait for connetion"));
 	while (WiFi.status() != WL_CONNECTED){
 		delay(500);
 		Serial.print(".");
@@ -35,6 +38,7 @@ bool com_arduino::begin()
 	Serial.print(F("Will listen on (in a bit): "));
 	Serial.println(WiFi.localIP());
 
+	Serial.printf("Starting server on port %d\r\n", port);
 	server = new WiFiServer(port);
 
 	return true;

@@ -5,8 +5,11 @@
 #include "backend-sdcard.h"
 #include "log.h"
 
-
+#ifdef RP2040W
+#define CS_SD 13
+#else
 #define CS_SD 5
+#endif
 #define FILENAME "test.dat"
 
 backend_sdcard::backend_sdcard()

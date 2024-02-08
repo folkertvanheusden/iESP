@@ -17,11 +17,14 @@
 
 std::atomic_bool stop { false   };
 com             *c    { nullptr };
-backend_sdcard   bs;
+backend_sdcard  *bs   { nullptr };
+server          *s    { nullptr };
 
 void setup()
 {
 	Serial.begin(115200);
+	while(!Serial)
+		delay(100);
 	Serial.setDebugOutput(true);
 
 	init_my_getrandom();
@@ -34,11 +37,19 @@ void setup()
 	c = new com_arduino(3260);
 	if (c->begin() == false)
 		Serial.println(F("Failed to initialize com-layer"));
+
+	Serial.println(F("Init SD card"));
+	bs = new backend_sdcard();
+
+	Serial.println(F("Instantiate iSCSI server"));
+	s = new server(bs, c);
+
+	Serial.println(F("Setup step finished"));
 }
 
 void loop()
 {
-	server s(&bs, c);
-	Serial.println(F("Go!"));
-	s.handler();
+	Serial.print(millis());
+	Serial.println(F(" Go!"));
+	s->handler();
 }
