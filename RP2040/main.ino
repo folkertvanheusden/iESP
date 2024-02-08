@@ -27,22 +27,28 @@ void setup()
 		delay(100);
 	Serial.setDebugOutput(true);
 
-	init_my_getrandom();
-
 	Serial.println(F("iESP (for RP2040W), (C) 2023-2024 by Folkert van Heusden <mail@vanheusden.com>"));
 	Serial.println(F("Compiled on " __DATE__ " " __TIME__));
 	Serial.print(F("GIT hash: "));
 	Serial.println(version_str);
 
+	Serial.print(F("Free memory at start: "));
+	Serial.println(rp2040.getFreeHeap());
+
 	c = new com_arduino(3260);
 	if (c->begin() == false)
 		Serial.println(F("Failed to initialize com-layer"));
+
+	init_my_getrandom();
 
 	Serial.println(F("Init SD card"));
 	bs = new backend_sdcard();
 
 	Serial.println(F("Instantiate iSCSI server"));
 	s = new server(bs, c);
+
+	Serial.print(F("Free memory after full init: "));
+	Serial.println(rp2040.getFreeHeap());
 
 	Serial.println(F("Setup step finished"));
 }
