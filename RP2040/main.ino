@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <SPI.h>
 #include <WiFi.h>
+#include <hardware/watchdog.h>
 
 #include "backend-sdcard.h"
 #include "com-arduino.h"
@@ -38,6 +39,9 @@ void setup()
 	if (rp2040.isPicoW() == false)
 		Serial.println(F("This is NOT a Pico-W, this program will fail!"));
 
+	if (watchdog_caused_reboot())
+		Serial.println(F("Rebooted by watchdog"));
+
 	try {
 		c = new com_arduino(3260);
 		if (c->begin() == false)
@@ -53,6 +57,9 @@ void setup()
 
 		Serial.print(F("Free memory after full init: "));
 		Serial.println(rp2040.getFreeHeap());
+
+		Serial.print(F("Enable watchdog"));
+		watchdog_enable(2500, 1);  // 2.5s
 
 		Serial.println(F("Setup step finished"));
 	}

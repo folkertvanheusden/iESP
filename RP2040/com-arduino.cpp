@@ -3,6 +3,7 @@
 #include <cstring>
 #include <unistd.h>
 #include <WiFi.h>
+#include <hardware/watchdog.h>
 
 #include "com-arduino.h"
 #include "log.h"
@@ -70,8 +71,10 @@ std::string com_arduino::get_local_address()
 
 com_client *com_arduino::accept()
 {
-	while(!server->hasClient())
+	while(!server->hasClient()) {
+		 watchdog_update();
 		delay(10);
+	}
 
 	auto wc = server->accept();
 
@@ -99,6 +102,8 @@ bool com_client_arduino::send(const uint8_t *const from, const size_t n)
 		if (wc.connected() == false)
 			return false;
 
+		watchdog_update();
+
 		size_t cur_n = wc.write(p, n);
 		p    += cur_n;
 		todo -= cur_n;
@@ -119,6 +124,8 @@ bool com_client_arduino::recv(uint8_t *const to, const size_t n)
 		size_t cur_n = wc.read(p, todo);
 		p    += cur_n;
 		todo -= cur_n;
+
+		watchdog_update();
 
 		if (todo) {
 			yield();
