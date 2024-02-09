@@ -6,6 +6,9 @@ import random
 import sys
 import time
 
+##### DO NOT RUN THIS ON A DEVICE WITH DATA! IT GETS ERASED! ######
+
+
 dev = sys.argv[1]  # device file
 blocksize = int(sys.argv[2])  # size of each block (512, 4096, etc)
 max_b = int(sys.argv[3])  # max. number of blocks in one go
