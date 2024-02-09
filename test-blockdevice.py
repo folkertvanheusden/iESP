@@ -28,6 +28,7 @@ n = 0
 verified = 0
 start = time.time()
 prev = start
+w = 0
 
 while True:
     offset = random.randint(0, dev_size) & ~(blocksize - 1)
@@ -42,13 +43,15 @@ while True:
         verified += 1
 
     else:
-        seen[nr] = random.randint(0, 65535)
-        b = gen_block(blocksize, offset, seen[nr])
-        os.pwrite(fd, b, offset)
+        w += 1
+
+    seen[nr] = random.randint(0, 65535)
+    b = gen_block(blocksize, offset, seen[nr])
+    os.pwrite(fd, b, offset)
 
     n += 1
 
     now = time.time()
     if now - prev >= 1:
-        print(f'total: {n}, n/s: {int(n / (now - start))}, percent done: {n * 100 / n_blocks:.2f}, n verified: {verified}')
+        print(f'total: {n}, n/s: {int(n / (now - start))}, percent done: {w * 100 / n_blocks:.2f}, n verified: {verified}')
         prev = now
