@@ -18,7 +18,7 @@
 
 
 std::atomic_bool stop { false };
-const char name[] = "iESP";
+char name[16] { 0 };
 backend_sdcard  *bs { nullptr };
 
 bool progress_indicator(const int nr, const int mx, const std::string & which) {
@@ -87,10 +87,20 @@ void setup()
 		yield();
 	Serial.setDebugOutput(true);
 
+	uint8_t chipid[6] { };
+	esp_read_mac(chipid, ESP_MAC_WIFI_STA);
+	snprintf(name, sizeof name, "iESP-%02x%02x%02x%02x", chipid[2], chipid[3], chipid[4], chipid[5]);
+
 	Serial.println(F("iESP, (C) 2023-2024 by Folkert van Heusden <mail@vanheusden.com>"));
 	Serial.println(F("Compiled on " __DATE__ " " __TIME__));
 	Serial.print(F("GIT hash: "));
 	Serial.println(version_str);
+	Serial.print(F("System name: "));
+	Serial.println(name);
+
+	auto reset_reason = esp_reset_reason();
+	if (reset_reason != ESP_RST_POWERON)
+		Serial.printf("Reset reason: %d\r\n", reset_reason);
 
 	bs = new backend_sdcard();
 
