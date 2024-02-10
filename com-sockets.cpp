@@ -132,7 +132,15 @@ com_client_sockets::~com_client_sockets()
 
 bool com_client_sockets::send(const uint8_t *const from, const size_t n)
 {
-	return WRITE(fd, from, n) == n;
+	auto rc = WRITE(fd, from, n);
+	if (rc == -1) {
+#ifdef ESP32
+		printf("com_client_sockets::send: write failed with error %s\r\n", strerror(errno));
+#else
+		DOLOG("com_client_sockets::send: write failed with error %s\n", strerror(errno));
+#endif
+	}
+	return rc == n;
 }
 
 bool com_client_sockets::recv(uint8_t *const to, const size_t n)
@@ -158,7 +166,17 @@ bool com_client_sockets::recv(uint8_t *const to, const size_t n)
 #endif
 
 	// ideally the poll-loop should include the read (TODO)
-	return READ(fd, to, n) == n;
+	auto rc = READ(fd, to, n);
+
+	if (rc == -1) {
+#ifdef ESP32
+		printf("com_client_sockets::recv: read failed with error %s\r\n", strerror(errno));
+#else
+		DOLOG("com_client_sockets::recv: read failed with error %s\n", strerror(errno));
+#endif
+	}
+
+	return rc == n;
 }
 
 std::string com_client_sockets::get_endpoint_name() const
