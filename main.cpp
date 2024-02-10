@@ -1,6 +1,7 @@
 #include <atomic>
 #include <csignal>
 #include <cstdio>
+#include <getopt.h>
 
 #include "backend-file.h"
 #include "com-sockets.h"
@@ -16,14 +17,39 @@ void sigh(int sig)
 	DOLOG("Stop signal received\n");
 }
 
+void help()
+{
+	printf("-d x    device/file to serve\n");
+	printf("-i x    IP-address of adapter to listen on\n");
+	printf("-p x    TCP-port to listen on\n");
+	printf("-h      this help\n");
+}
+
 int main(int argc, char *argv[])
 {
 	signal(SIGPIPE, SIG_IGN);
 	signal(SIGINT, sigh);
 
-	backend_file bf("test.dat");
+	std::string ip_address = "192.168.64.206";
+	int         port       = 3260;
+	std::string dev        = "test.dat";
+	int o = -1;
+	while((o = getopt(argc, argv, "d:i:p:h")) != -1) {
+		if (o == 'd')
+			dev = optarg;
+		else if (o == 'i')
+			ip_address = optarg;
+		else if (o == 'p')
+			port = atoi(optarg);
+		else {
+			help();
+			return o != 'h';
+		}
+	}
 
-	com_sockets c("192.168.64.206", 3260, &stop);
+	backend_file bf(dev);
+
+	com_sockets c(ip_address, port, &stop);
 	if (c.begin() == false) {
 		fprintf(stderr, "Failed to communication layer\n");
 		return 1;
