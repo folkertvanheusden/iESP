@@ -8,6 +8,10 @@ import time
 
 ##### DO NOT RUN THIS ON A DEVICE WITH DATA! IT GETS ERASED! ######
 
+if len(sys.argv) != 4:
+    print(f'Usage: {sys.argv[0]} dev blocksize maxblockcount')
+    print(' ##### DO NOT RUN THIS ON A DEVICE WITH DATA! IT GETS ERASED! ###### ')
+    sys.exit(1)
 
 dev = sys.argv[1]  # device file
 blocksize = int(sys.argv[2])  # size of each block (512, 4096, etc)
