@@ -33,7 +33,7 @@ backend_sdcard::backend_sdcard()
 		return;
 	}
 
-	sd.ls();
+	sd.ls(LS_DATE | LS_SIZE);
 
 retry:
 	if (sd.exists(FILENAME) == false)
@@ -98,7 +98,7 @@ void backend_sdcard::init_file()
 
 	file.close();
 
-	file.ls();
+	file.ls(LS_DATE | LS_SIZE);
 }
 
 uint64_t backend_sdcard::get_size_in_blocks() const
