@@ -342,6 +342,45 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		// 4...7 reserved
 		response.io.what.data.first[8]  = 1;  // LUN1 id
 	}
+	else if (opcode == o_rep_sup_oper) {  // 0xa3
+		uint8_t service_action     = CDB[1] & 31;
+		uint8_t reporting_options  = CDB[2] & 7;
+		uint8_t req_operation_code = CDB[3];
+		DOLOG("scsi::send: REPORT SUPPORTED OPERATION CODES, service action %02xh, requested operation code %02xh, reporting options: %xh\n", service_action, req_operation_code, reporting_options);
+		bool ok = false;
+
+		if (service_action == 0x0c && reporting_options == 1) {
+			if (req_operation_code == o_test_unit_ready ||
+			    req_operation_code == o_request_sense ||
+			    req_operation_code == o_read_6 ||
+			    req_operation_code == o_write_6 ||
+			    req_operation_code == o_seek ||
+			    req_operation_code == o_inquiry ||
+			    req_operation_code == o_mode_sense_6 ||
+			    req_operation_code == o_read_capacity_10 ||
+			    req_operation_code == o_read_10 ||
+			    req_operation_code == o_write_10 ||
+			    req_operation_code == o_write_verify_10 ||
+			    req_operation_code == o_sync_cache_10 ||
+			    req_operation_code == o_read_16 ||
+			    req_operation_code == o_write_16 ||
+			    req_operation_code == o_get_lba_status ||
+			    req_operation_code == o_report_luns ||
+			    req_operation_code == o_rep_sup_oper) {
+				response.io.is_inline           = true;
+				response.io.what.data.second    = 4;
+				response.io.what.data.first     = new uint8_t[response.io.what.data.second]();
+				response.io.what.data.first[1]  = 3;
+
+				ok = true;
+			}
+		}
+
+		if (!ok) {
+			DOLOG("scsi::send: 0xa3 not fully implemented\n");
+			response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00 };
+		}
+	}
 	else {
 		DOLOG("scsi::send: opcode %02xh not implemented\n", opcode);
 		response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00 };
