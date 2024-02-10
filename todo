@@ -4,3 +4,6 @@
   - SCSI RESERVE
 - VMware initiator compatibility
 - nmap 'compatibility'
+- configurable:
+  - async writes
+  - name of disk-image on SD card
