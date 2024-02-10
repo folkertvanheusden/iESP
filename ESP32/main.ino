@@ -19,6 +19,7 @@
 
 std::atomic_bool stop { false };
 const char name[] = "iESP";
+backend_sdcard  *bs { nullptr };
 
 bool progress_indicator(const int nr, const int mx, const std::string & which) {
 	printf("%3.2f%%: %s\r\n", nr * 100. / mx, which.c_str());
@@ -82,12 +83,16 @@ retry:
 void setup()
 {
 	Serial.begin(115200);
+	while(!Serial)
+		yield();
 	Serial.setDebugOutput(true);
 
 	Serial.println(F("iESP, (C) 2023-2024 by Folkert van Heusden <mail@vanheusden.com>"));
 	Serial.println(F("Compiled on " __DATE__ " " __TIME__));
 	Serial.print(F("GIT hash: "));
 	Serial.println(version_str);
+
+	bs = new backend_sdcard();
 
 	setup_wifi();
 
@@ -104,8 +109,6 @@ void setup()
 
 void loop()
 {
-	backend_sdcard bs;
-
 	auto ip = WiFi.localIP();
 	char buffer[16];
 	snprintf(buffer, sizeof buffer, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
@@ -114,7 +117,7 @@ void loop()
 	if (c.begin() == false)
 		Serial.println(F("Failed to initialize communication layer!"));
 
-	server s(&bs, &c);
+	server s(bs, &c);
 	Serial.println(F("Go!"));
 	s.handler();
 }
