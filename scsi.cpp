@@ -131,7 +131,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 				response.io.what.data.first[4 + 3] = 1;
 				response.io.what.data.first[4 + 4] = 1;
 			}
-			else if (CDB[2] == 0xb0) {  //
+			else if (CDB[2] == 0xb0) {  // block limits
 				response.io.is_inline          = true;
 				response.io.what.data.second = 64;
 				response.io.what.data.first = new uint8_t[response.io.what.data.second]();
@@ -145,7 +145,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 				response.io.what.data.first[7] = 0;
 				// ... set all to 'not set'
 			}
-			else if (CDB[2] == 0xb1) {
+			else if (CDB[2] == 0xb1) {  // block device characteristics
 				response.io.is_inline          = true;
 				response.io.what.data.second = 64;
 				response.io.what.data.first = new uint8_t[response.io.what.data.second]();
