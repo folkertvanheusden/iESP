@@ -78,7 +78,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		DOLOG(" INQUIRY: AllocationLength: %d\n", allocation_length);
 		DOLOG(" INQUIRY: ControlByte: %02xh\n", CDB[5]);
 		bool ok = true;
-		if ((CDB[1] & 1) == 0) {
+		if ((CDB[1] & 1) == 0) {  // requests standard inquiry data
 			if (CDB[2])
 				ok = false;
 			else {
@@ -108,7 +108,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 			}
 		}
 		else {
-                        if (CDB[2] == 0x00) {
+                        if (CDB[2] == 0x00) {  // supported vital product page
 				response.io.is_inline          = true;
                                 response.io.what.data.second   = 8;
                                 response.io.what.data.first    = new uint8_t[response.io.what.data.second]();
@@ -121,7 +121,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
                                 response.io.what.data.first[6] = 0xb0;
                                 response.io.what.data.first[7] = 0xb1;
                         }
-			else if (CDB[2] == 0x83) {
+			else if (CDB[2] == 0x83) {  // device identification page
 				response.io.is_inline          = true;
 				response.io.what.data.second = 4 + 5;
 				response.io.what.data.first = new uint8_t[response.io.what.data.second]();
@@ -131,7 +131,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 				response.io.what.data.first[4 + 3] = 1;
 				response.io.what.data.first[4 + 4] = 1;
 			}
-			else if (CDB[2] == 0xb0) {
+			else if (CDB[2] == 0xb0) {  //
 				response.io.is_inline          = true;
 				response.io.what.data.second = 64;
 				response.io.what.data.first = new uint8_t[response.io.what.data.second]();
