@@ -4,8 +4,12 @@
 #include <atomic>
 #include <csignal>
 #include <cstdio>
+#include <esp_wifi.h>
 #include <ESPmDNS.h>
-#include <WiFiManager.h>
+// M.A.X.X:
+#include <LittleFS.h>
+#include <configure.h>
+#include <wifi.h>
 
 #include "backend-sdcard.h"
 #include "com-sockets.h"
@@ -14,27 +18,82 @@
 
 
 std::atomic_bool stop { false };
+const char name[] = "iESP";
 
-WiFiManager *wifiManager { nullptr };
+bool progress_indicator(const int nr, const int mx, const std::string & which) {
+	printf("%3.2f%%: %s\r\n", nr * 100. / mx, which.c_str());
 
+	return true;
+}
+
+void setup_wifi() {
+	set_hostname(name);
+
+	enable_wifi_debug();
+
+	scan_access_points_start();
+
+	if (!LittleFS.begin())
+		printf("LittleFS.begin() failed\r\n");
+
+	configure_wifi cw;
+
+	if (cw.is_configured() == false) {
+retry:
+		Serial.println(F("Cannot connect to WiFi: accesspoint for configuration started"));
+		start_wifi(name);  // enable wifi with AP (empty string for no AP)
+
+		cw.configure_aps();
+	}
+	else {
+		Serial.println(F("Connecting to WiFi..."));
+		start_wifi("");
+	}
+
+	Serial.println(F("Scanning for accesspoints"));
+	scan_access_points_start();
+
+	while(scan_access_points_wait() == false)
+		delay(100);
+
+	auto available_access_points = scan_access_points_get();
+
+	auto state = try_connect_init(cw.get_targets(), available_access_points, 300, progress_indicator);
+	connect_status_t cs = CS_IDLE;
+
+	Serial.println(F("Connecting..."));
+	for(;;) {
+		cs = try_connect_tick(state);
+
+		if (cs != CS_IDLE)
+			break;
+
+		delay(100);
+	}
+
+	// could not connect, restart esp
+	// you could also re-run the portal
+	if (cs == CS_FAILURE) {
+		Serial.println(F("Failed to connect"));
+
+		goto retry;
+	}
+}
 void setup()
 {
 	Serial.begin(115200);
 	Serial.setDebugOutput(true);
-	WiFi.hostname("iESP");
 
 	Serial.println(F("iESP, (C) 2023-2024 by Folkert van Heusden <mail@vanheusden.com>"));
 	Serial.println(F("Compiled on " __DATE__ " " __TIME__));
 	Serial.print(F("GIT hash: "));
 	Serial.println(version_str);
 
-	wifiManager = new WiFiManager();
-	wifiManager->setConfigPortalTimeout(120);
-	wifiManager->autoConnect();
+	setup_wifi();
 
 	esp_wifi_set_ps(WIFI_PS_NONE);
 
-	if (MDNS.begin("iESP"))
+	if (MDNS.begin(name))
 		MDNS.addService("iscsi", "tcp", 3260);
 	else
 		Serial.println(F("Failed starting mdns responder"));
