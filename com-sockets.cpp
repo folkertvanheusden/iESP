@@ -11,11 +11,6 @@
 #include <netinet/tcp.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-#ifdef ESP32
-#ifndef SOL_TCP
-#define SOL_TCP 6
-#endif
-#endif
 
 #include "com-sockets.h"
 #include "log.h"
@@ -117,7 +112,7 @@ com_client *com_sockets::accept()
 com_client_sockets::com_client_sockets(const int fd, std::atomic_bool *const stop): com_client(stop), fd(fd)
 {
 	int flags = 1;
-#if defined(__FreeBSD__)
+#if defined(__FreeBSD__) || defined(ESP32)
 	if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (void *)&flags, sizeof(flags)) == -1)
 #else
 	if (setsockopt(fd, SOL_TCP, TCP_NODELAY, (void *)&flags, sizeof(flags)) == -1)

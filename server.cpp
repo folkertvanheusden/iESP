@@ -1,5 +1,6 @@
 #if defined(ESP32) || defined(RP2040W)
 #include <Arduino.h>
+#include <WiFi.h>
 #endif
 #include <atomic>
 #include <cassert>
@@ -17,11 +18,6 @@
 #include <sys/socket.h>
 #endif
 #include <sys/types.h>
-#if defined(ESP32)
-#ifndef SOL_TCP
-#define SOL_TCP 6
-#endif
-#endif
 
 #include "iscsi-pdu.h"
 #include "log.h"
@@ -473,7 +469,7 @@ void server::handler()
 		}
 		while(ok);
 #if defined(ESP32) || defined(RP2040W)
-		Serial.println(F("session finished"));
+		Serial.printf("session finished: %d\r\n", WiFi.status());
 #else
 		DOLOG("session finished\n");
 #endif
