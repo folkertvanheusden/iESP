@@ -10,6 +10,8 @@
 #define SDCARD_SPI SPI1
 #else
 #define CS_SD 5
+#define LED_GREEN 16
+#define LED_RED   17
 #endif
 #define FILENAME "test.dat"
 
@@ -28,7 +30,7 @@ backend_sdcard::backend_sdcard()
 	}
 
 	if (ok == false) {
-		Serial.printf("SD-card mount failed (assuming CS is on pin %d)", CS_SD);
+		Serial.printf("SD-card mount failed (assuming CS is on pin %d)\r\n", CS_SD);
 		sd.initErrorHalt(&Serial);
 		return;
 	}
@@ -57,6 +59,14 @@ retry:
 	}
 
 	Serial.printf("Virtual disk size: %zuMB\r\n", size_t(card_size / 1024 / 1024));
+
+	Serial.println(F("Init LEDs"));
+#ifdef LED_GREEN
+	pinMode(LED_GREEN, OUTPUT);
+#endif
+#ifdef LED_RED
+	pinMode(LED_RED,   OUTPUT);
+#endif
 }
 
 backend_sdcard::~backend_sdcard()
@@ -68,10 +78,17 @@ backend_sdcard::~backend_sdcard()
 
 bool backend_sdcard::sync()
 {
+#ifdef LED_RED
+	digitalWrite(LED_RED, HIGH);
+#endif
 	n_syncs++;
 
 	if (file.sync() == false)
 		Serial.println(F("SD card backend: sync failed"));
+
+#ifdef LED_RED
+	digitalWrite(LED_RED, LOW);
+#endif
 
 	return true;
 }
@@ -114,12 +131,18 @@ uint64_t backend_sdcard::get_block_size() const
 bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data)
 {
 	// Serial.printf("Write to block %zu, %u blocks\r\n", size_t(block_nr), n_blocks);
+#ifdef LED_RED
+	digitalWrite(LED_RED, HIGH);
+#endif
 
 	uint64_t iscsi_block_size = get_block_size();
 	uint64_t byte_address     = block_nr * iscsi_block_size;  // iSCSI to bytes
 
 	if (file.seekSet(byte_address) == false) {
 		Serial.println(F("Cannot seek to position"));
+#ifdef LED_RED
+		digitalWrite(LED_RED, LOW);
+#endif
 		return false;
 	}
 
@@ -129,11 +152,17 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 	bool rc = file.write(data, n_bytes_to_write) == n_bytes_to_write;
 	if (!rc)
 		Serial.printf("Cannot write (%d)\r\n", file.getError());
+#ifdef LED_RED
+		digitalWrite(LED_RED, LOW);
+#endif
 	return rc;
 }
 
 bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_t *const data)
 {
+#ifdef LED_GREEN
+	digitalWrite(LED_GREEN, HIGH);
+#endif
 	// Serial.printf("Read from block %zu, %u blocks\r\n", size_t(block_nr), n_blocks);
 
 	uint64_t iscsi_block_size = get_block_size();
@@ -141,6 +170,9 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 
 	if (file.seekSet(byte_address) == false) {
 		Serial.println(F("Cannot seek to position"));
+#ifdef LED_GREEN
+		digitalWrite(LED_GREEN, LOW);
+#endif
 		return false;
 	}
 
@@ -150,5 +182,8 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 	bool rc = file.read(data, n_bytes_to_read) == n_bytes_to_read;
 	if (!rc)
 		Serial.printf("Cannot read (%d)\r\n", file.getError());
+#ifdef LED_GREEN
+	digitalWrite(LED_GREEN, LOW);
+#endif
 	return rc;
 }
