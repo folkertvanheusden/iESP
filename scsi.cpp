@@ -158,6 +158,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 				// ... set all to 'not set'
 			}
 			else {
+				DOLOG("scsi::send: INQUIRY page code %02xh not implemented\n", CDB[2]);
 				ok = false;
 			}
 		}
@@ -229,6 +230,9 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 			response.io.what.data.first[3] = response.io.what.data.second - 3;
 			memcpy(&response.io.what.data.first[8], &CDB[2], 8);  // LBA STATUS LOGICAL BLOCK ADDRESS
 			memcpy(&response.io.what.data.first[16], &CDB[10], 4);  // ALLOCATIN LENGTH
+		}
+		else {
+			DOLOG("scsi::send: GET LBA STATUS service action %02xh not implemented\n", service_action);
 		}
 	}
 	else if (opcode == o_write_6 || opcode == o_write_10 || opcode == o_write_verify_10 || opcode == o_write_16) {
