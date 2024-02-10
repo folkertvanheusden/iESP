@@ -272,7 +272,9 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 			if (received_blocks > 0 && b->write(lba, received_blocks, data.first) == false) {
 				DOLOG("scsi::send: WRITE_xx, failed writing\n");
 
-				// TODO set sense_data
+				// sense key 0x01, asc 0x03, ascq 0x00; 'peripheral device write'
+				response.sense_data = { 0x70, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00 };
+				//                                  ^^^^                                                        ^^^^  ^^^^
 			}
 			else {
 				if (received_size == expected_size) {
