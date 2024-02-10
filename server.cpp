@@ -297,7 +297,7 @@ bool server::push_response(com_client *const cc, session *const s, iscsi_pdu_bhs
 		buffer.n = 512;
 		if (heap_free >= 5120) {
 			if (ack_interval.has_value())
-				buffer.n = std::min((heap_free - 2048) / 2, ack_interval.value());
+				buffer.n = std::min((heap_free - 2048) / 2, size_t(ack_interval.value()));
 			else
 				buffer.n = (heap_free - 2048) / 2;
 		}
