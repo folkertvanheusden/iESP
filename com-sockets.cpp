@@ -1,8 +1,10 @@
 #include <atomic>
 #include <errno.h>
 #include <cstring>
+#ifdef ESP32
+#include <Arduino.h>
+#else
 #include <netdb.h>
-#ifndef ESP32
 #include <poll.h>
 #endif
 #include <unistd.h>
@@ -165,7 +167,7 @@ bool com_client_sockets::recv(uint8_t *const to, const size_t n)
 
 	if (rc == -1) {
 #ifdef ESP32
-		printf("com_client_sockets::recv: read failed with error %s\r\n", strerror(errno));
+		Serial.printf("com_client_sockets::recv: read failed with error %s\r\n", strerror(errno));
 #else
 		DOLOG("com_client_sockets::recv: read failed with error %s\n", strerror(errno));
 #endif
