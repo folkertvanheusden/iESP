@@ -33,7 +33,8 @@ def do_(duration, bs, results, results_index):
 
     os.close(fd)
 
-fh = open('plot.dat', 'w')
+fhi = open('plot-iops.dat', 'w')
+fhb = open('plot-bw.dat', 'w')
 
 for bs_it in range(0, bs_depth):
     bs = 512 << bs_it
@@ -55,9 +56,15 @@ for bs_it in range(0, bs_depth):
 
         str_ = f'{bs}\t{temp_jd_nr}\t{total_iops}'
         print(str_)
-        fh.write(f'{str_}\n')
+        fhi.write(f'{str_}\n')
 
-    fh.write('\n')
+        str_ = f'{bs}\t{temp_jd_nr}\t{total_iops * bs}'
+        print(str_)
+        fhb.write(f'{str_}\n')
+
+    fhi.write('\n')
+    fhb.write('\n')
     print()
 
-fh.close()
+fhi.close()
+fhb.close()

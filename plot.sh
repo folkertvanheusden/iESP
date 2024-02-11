@@ -1,7 +1,7 @@
 #! /usr/bin/gnuplot
 
 set terminal png size 1920,1080
-set output 'plot.png'
+set output 'plot-iops.png'
 set hidden3d
 set xyplane at 0
 set xlabel 'block size'
@@ -10,4 +10,8 @@ set ylabel 'number of threads'
 set zlabel 'IOPS'
 set boxdepth 0.9
 set boxwidth 0.9
-splot 'plot.dat' with boxes palette
+splot 'plot-iops.dat' with boxes palette
+
+set output 'plot-bw.png'
+set zlabel 'bandwidth'
+splot 'plot-bw.dat' with boxes palette
