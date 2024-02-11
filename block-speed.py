@@ -29,7 +29,7 @@ def do_(duration, bs, results, results_index):
             took = now - start
             break
 
-    results[results_index] = iop * duration / (took * 1000.)
+    results[results_index] = iop / took
 
     os.close(fd)
 
