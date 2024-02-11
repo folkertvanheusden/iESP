@@ -10,8 +10,10 @@ set ylabel 'number of threads'
 set zlabel 'IOPS'
 set boxdepth 0.9
 set boxwidth 0.9
+set title 'iESP IOPS plot'
 splot 'plot-iops.dat' with boxes palette
 
 set output 'plot-bw.png'
-set zlabel 'bandwidth'
+set zlabel 'bandwidth (bytes/s)'
+set title 'iESP bandwidth plot'
 splot 'plot-bw.dat' with boxes palette
