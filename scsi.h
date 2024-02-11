@@ -59,5 +59,15 @@ public:
 		o_rep_sup_oper     = 0xa3,
 	};
 
+        uint64_t get_size_in_blocks() const;
+        uint64_t get_block_size()     const;
+
+	bool sync();
+
+	void get_and_reset_stats(uint64_t *const bytes_read, uint64_t *const bytes_written, uint64_t *const n_syncs);
+
+	bool write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data);
+	bool read (const uint64_t block_nr, const uint32_t n_blocks,       uint8_t *const data);
+
 	std::optional<scsi_response> send(const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
 };

@@ -392,3 +392,33 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 
 	return response;
 }
+
+uint64_t scsi::get_size_in_blocks() const
+{
+	return b->get_size_in_blocks();
+}
+
+uint64_t scsi::get_block_size() const
+{
+	return b->get_block_size();
+}
+
+bool scsi::sync()
+{
+	return b->sync();
+}
+
+void scsi::get_and_reset_stats(uint64_t *const bytes_read, uint64_t *const bytes_written, uint64_t *const n_syncs)
+{
+	return b->get_and_reset_stats(bytes_read, bytes_written, n_syncs);
+}
+
+bool scsi::write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data)
+{
+	return b->write(block_nr, n_blocks, data);
+}
+
+bool scsi::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_t *const data)
+{
+	return b->read(block_nr, n_blocks, data);
+}

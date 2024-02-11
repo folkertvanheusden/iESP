@@ -48,6 +48,7 @@ int main(int argc, char *argv[])
 	}
 
 	backend_file bf(dev);
+	scsi         sd(&bf);
 
 	com_sockets c(ip_address, port, &stop);
 	if (c.begin() == false) {
@@ -55,7 +56,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	server s(&bf, &c);
+	server s(&sd, &c);
 	s.handler();
 
 	return 0;

@@ -20,6 +20,7 @@
 std::atomic_bool stop { false };
 char name[16] { 0 };
 backend_sdcard  *bs { nullptr };
+scsi *scsi_dev { nullptr };
 
 bool progress_indicator(const int nr, const int mx, const std::string & which) {
 	printf("%3.2f%%: %s\r\n", nr * 100. / mx, which.c_str());
@@ -103,6 +104,7 @@ void setup()
 		Serial.printf("Reset reason: %d\r\n", reset_reason);
 
 	bs = new backend_sdcard();
+	scsi_dev = new scsi(bs);
 
 	setup_wifi();
 
@@ -127,7 +129,7 @@ void loop()
 	if (c.begin() == false)
 		Serial.println(F("Failed to initialize communication layer!"));
 
-	server s(bs, &c);
+	server s(scsi_dev, &c);
 	Serial.println(F("Go!"));
 	s.handler();
 }

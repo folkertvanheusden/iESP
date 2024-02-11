@@ -27,8 +27,8 @@
 
 extern std::atomic_bool stop;
 
-server::server(backend *const b, com *const c):
-	b(b),
+server::server(scsi *const s, com *const c):
+	s(s),
 	c(c)
 {
 }
@@ -168,7 +168,7 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 	return { pdu_obj, pdu_error };
 }
 
-bool server::push_response(com_client *const cc, session *const s, iscsi_pdu_bhs *const pdu, iscsi_response_parameters *const parameters)
+bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_bhs *const pdu, iscsi_response_parameters *const parameters)
 {
 	bool ok = true;
 
@@ -180,7 +180,7 @@ bool server::push_response(com_client *const cc, session *const s, iscsi_pdu_bhs
 		auto     data         = pdu_data_out->get_data();
 		uint32_t TTT          = pdu_data_out->get_TTT();
 		bool     F            = pdu_data_out->get_F();
-		auto     session      = s->get_r2t_sesion(TTT);
+		auto     session      = ses->get_r2t_sesion(TTT);
 
 		if (session == nullptr) {
 			DOLOG("server::push_response: DATA-OUT PDU references unknown TTT (%08x)\n", TTT);
@@ -189,13 +189,13 @@ bool server::push_response(com_client *const cc, session *const s, iscsi_pdu_bhs
 			return false;
 		}
 		else if (data.has_value() && data.value().second > 0) {
-			auto block_size = b->get_block_size();
+			auto block_size = s->get_block_size();
 			DOLOG("server::push_response: writing %zu bytes to offset LBA %zu + offset %u => %zu (in bytes)\n", data.value().second, session->buffer_lba, offset, session->buffer_lba * block_size + offset);
 
 			assert((offset % block_size) == 0);
 			assert((data.value().second % block_size) == 0);
 
-			bool rc = b->write(session->buffer_lba + offset / block_size, data.value().second / block_size, data.value().first);
+			bool rc = s->write(session->buffer_lba + offset / block_size, data.value().second / block_size, data.value().first);
 			delete [] data.value().first;
 
 			if (rc == false) {
@@ -216,22 +216,22 @@ bool server::push_response(com_client *const cc, session *const s, iscsi_pdu_bhs
 			DOLOG("server::push-response: end of batch\n");
 
 			iscsi_pdu_scsi_cmd response;
-			response.set(s, session->PDU_initiator.data, session->PDU_initiator.n);  // TODO check for false
-			response_set = response.get_response(s, parameters, session->bytes_left);
+			response.set(ses, session->PDU_initiator.data, session->PDU_initiator.n);  // TODO check for false
+			response_set = response.get_response(ses, parameters, session->bytes_left);
 
 			if (session->bytes_left == 0) {
 				DOLOG("server::push-response: end of task\n");
 
-				s->remove_r2t_session(TTT);
+				ses->remove_r2t_session(TTT);
 			}
 			else {
 				DOLOG("server::push-response: ask for more (%u bytes left)\n", session->bytes_left);
 				// send 0x31 for range
 				iscsi_pdu_scsi_cmd temp;
-				temp.set(s, session->PDU_initiator.data, session->PDU_initiator.n);
+				temp.set(ses, session->PDU_initiator.data, session->PDU_initiator.n);
 
 				auto *response = new iscsi_pdu_scsi_r2t /* 0x31 */;
-				response->set(s, temp, TTT, session->bytes_done, session->bytes_left);  // TODO check for false
+				response->set(ses, temp, TTT, session->bytes_done, session->bytes_left);  // TODO check for false
 				// ^ ADD TO RESPONSE SET TODO
 
 				response_set.value().responses.push_back(response);
@@ -239,7 +239,7 @@ bool server::push_response(com_client *const cc, session *const s, iscsi_pdu_bhs
 		}
 	}
 	else {
-		response_set = pdu->get_response(s, parameters);
+		response_set = pdu->get_response(ses, parameters);
 	}
 
 	if (response_set.has_value() == false) {
@@ -277,7 +277,7 @@ bool server::push_response(com_client *const cc, session *const s, iscsi_pdu_bhs
 
 		iscsi_pdu_scsi_cmd reply_to;
 		auto temp = pdu->get_raw();
-		reply_to.set(s, temp.data, temp.n);
+		reply_to.set(ses, temp.data, temp.n);
 		delete [] temp.data;
 
 	        auto use_pdu_data_size = stream_parameters.n_sectors * 512;
@@ -287,7 +287,7 @@ bool server::push_response(com_client *const cc, session *const s, iscsi_pdu_bhs
 		}
 
 		blob_t buffer       { nullptr, 0 };
-		auto   ack_interval = s->get_ack_interval();
+		auto   ack_interval = ses->get_ack_interval();
 #ifdef ESP32
 		size_t heap_free = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
 		buffer.n = 512;
@@ -319,13 +319,13 @@ bool server::push_response(com_client *const cc, session *const s, iscsi_pdu_bhs
 
 			uint64_t cur_block_nr = block_nr + stream_parameters.lba;
 			DOLOG("server::push_response: reading %u block(s) %zu from backend\n", n_left, size_t(cur_block_nr));
-			if (b->read(cur_block_nr, n_left, buffer.data) == false) {
+			if (s->read(cur_block_nr, n_left, buffer.data) == false) {
 				DOLOG("server::push_response: reading %u block(s) %zu from backend failed\n", n_left, size_t(cur_block_nr));
 				ok = false;
 				break;
 			}
 
-			blob_t out = iscsi_pdu_scsi_data_in::gen_data_in_pdu(s, reply_to, buffer, use_pdu_data_size, offset);
+			blob_t out = iscsi_pdu_scsi_data_in::gen_data_in_pdu(ses, reply_to, buffer, use_pdu_data_size, offset);
 
 			if (cc->send(out.data, out.n) == false) {
 				delete [] out.data;
@@ -377,8 +377,6 @@ iscsi_response_parameters *server::select_parameters(iscsi_pdu_bhs *const pdu, s
 
 void server::handler()
 {
-	scsi scsi_dev(b);
-
 	while(!stop) {
 		com_client *cc = c->accept();
 		if (cc == nullptr) {
@@ -399,11 +397,11 @@ void server::handler()
 		DOLOG("server::handler: new session with %s\n", endpoint.c_str());
 #endif
 
-		session *s  = nullptr;
-		bool     ok = true;
+		session *ses = nullptr;
+		bool     ok  = true;
 
 		do {
-			auto incoming = receive_pdu(cc, &s);
+			auto incoming = receive_pdu(cc, &ses);
 			iscsi_pdu_bhs *pdu = incoming.first;
 			if (!pdu) {
 				DOLOG("server::handler: no PDU received, aborting socket connection\n");
@@ -433,9 +431,9 @@ void server::handler()
 				DOLOG("server::handler: transmitted reject PDU\n");
 			}
 			else {
-				auto parameters = select_parameters(pdu, s, &scsi_dev);
+				auto parameters = select_parameters(pdu, ses, s);
 				if (parameters) {
-					push_response(cc, s, pdu, parameters);
+					push_response(cc, ses, pdu, parameters);
 					delete parameters;
 				}
 				else {
@@ -458,7 +456,7 @@ void server::handler()
 				uint64_t bytes_read    = 0;
 				uint64_t bytes_written = 0;
 				uint64_t n_syncs       = 0;
-				b->get_and_reset_stats(&bytes_read, &bytes_written, &n_syncs);
+				s->get_and_reset_stats(&bytes_read, &bytes_written, &n_syncs);
 				Serial.printf("%ld] PDU/s: %.2f (%zu), send: %" PRIu64 " (%.2f/s), recv: %" PRIu64 " (%.2f/s), written: %.2f/s, read: %.2f/s, syncs: %.2f/s, load: %.2f%%, mem: %u\r\n", now, pdu_count / dtook, pdu_count, bytes_send, bytes_send / dtook, bytes_recv, bytes_recv / dtook, bytes_written / dtook, bytes_read / dtook, n_syncs / dtook, busy * 0.1 / took, get_free_heap_space());
 				pdu_count  = 0;
 				bytes_send = 0;
@@ -474,9 +472,9 @@ void server::handler()
 		DOLOG("session finished\n");
 #endif
 
-		b->sync();
+		s->sync();
 
 		delete cc;
-		delete s;
+		delete ses;
 	}
 }

@@ -1,7 +1,6 @@
 #include <cstdint>
 #include <utility>
 
-#include "backend.h"
 #include "com.h"
 #include "scsi.h"
 #include "session.h"
@@ -10,7 +9,7 @@
 class server
 {
 private:
-	backend    *const b          { nullptr };
+	scsi       *const s          { nullptr };
 	com        *const c          { nullptr };
 	uint64_t          bytes_recv { 0       };
 	uint64_t          bytes_send { 0       };
@@ -21,7 +20,7 @@ private:
 	iscsi_response_parameters       *select_parameters(iscsi_pdu_bhs *const pdu, session *const ses, scsi *const sd);
 
 public:
-	server(backend *const b, com *const c);
+	server(scsi *const s, com *const c);
 	virtual ~server();
 
 	bool begin();
