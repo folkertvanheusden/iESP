@@ -58,7 +58,7 @@ for bs_it in range(0, bs_depth):
         print(str_)
         fhi.write(f'{str_}\n')
 
-        str_ = f'{bs}\t{temp_jd_nr}\t{total_iops * bs}'
+        str_ = f'{bs}\t{temp_jd_nr}\t{total_iops * bs / 1024 / 1024}'
         print(str_)
         fhb.write(f'{str_}\n')
 

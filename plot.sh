@@ -7,13 +7,13 @@ set xyplane at 0
 set xlabel 'block size'
 set logscale x 2
 set ylabel 'number of threads'
-set zlabel 'IOPS'
+set zlabel 'IOPS' rotate parallel
 set boxdepth 0.9
 set boxwidth 0.9
 set title 'iESP IOPS plot'
 splot 'plot-iops.dat' with boxes palette
 
 set output 'plot-bw.png'
-set zlabel 'bandwidth (bytes/s)'
+set zlabel 'bandwidth (MB/s)' rotate parallel
 set title 'iESP bandwidth plot'
 splot 'plot-bw.dat' with boxes palette
