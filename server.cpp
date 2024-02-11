@@ -1,6 +1,7 @@
 #if defined(ESP32) || defined(RP2040W)
 #include <Arduino.h>
 #include <WiFi.h>
+#include <esp_pthread.h>
 #endif
 #include <atomic>
 #include <cassert>
@@ -10,6 +11,7 @@
 #if !defined(ESP32) && !defined(RP2040W)
 #include <poll.h>
 #endif
+#include <thread>
 #include <unistd.h>
 #if !defined(RP2040W)
 #include <arpa/inet.h>
@@ -290,12 +292,13 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 		auto   ack_interval = ses->get_ack_interval();
 #ifdef ESP32
 		size_t heap_free = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
-		buffer.n = 512;
 		if (heap_free >= 5120) {
+			size_t heap_allowed = (heap_free - 2048) / 4;
+
 			if (ack_interval.has_value())
-				buffer.n = std::min((heap_free - 2048) / 2, size_t(ack_interval.value()));
+				buffer.n = std::min(heap_allowed, size_t(ack_interval.value()));
 			else
-				buffer.n = (heap_free - 2048) / 2;
+				buffer.n = heap_allowed;
 		}
 #elif defined(RP2040W)
 		if (ack_interval.has_value())
@@ -305,9 +308,9 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 #else
 		if (ack_interval.has_value())
 			buffer.n = std::max(uint32_t(512), ack_interval.value());
-		else
-			buffer.n = 512;
 #endif
+		if (buffer.n < 512)
+			buffer.n = 512;
 		buffer.data = new uint8_t[buffer.n]();
 		uint32_t block_group_size = buffer.n / 512;
 
@@ -327,17 +330,25 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 
 			blob_t out = iscsi_pdu_scsi_data_in::gen_data_in_pdu(ses, reply_to, buffer, use_pdu_data_size, offset);
 
-			if (cc->send(out.data, out.n) == false) {
-				delete [] out.data;
-				DOLOG("server::push_response: problem sending block %zu to initiator\n", size_t(cur_block_nr));
-				ok = false;
-				break;
+			if (out.n == 0) {  // gen_data_in_pdu could not allocate memory
+#ifdef ESP32
+				Serial.printf("Low on memory: %zu bytes failed\r\n", buffer.n);
+#endif
+				buffer.n = 512;
 			}
-			bytes_send += out.n;
+			else {
+				if (cc->send(out.data, out.n) == false) {
+					delete [] out.data;
+					DOLOG("server::push_response: problem sending block %zu to initiator\n", size_t(cur_block_nr));
+					ok = false;
+					break;
+				}
+				bytes_send += out.n;
 
-			delete [] out.data;
+				delete [] out.data;
 
-			offset += buffer.n;
+				offset += buffer.n;
+			}
 		}
 
 		delete [] buffer.data;
@@ -377,6 +388,13 @@ iscsi_response_parameters *server::select_parameters(iscsi_pdu_bhs *const pdu, s
 
 void server::handler()
 {
+#if defined(ESP32)
+	esp_pthread_cfg_t cfg = esp_pthread_get_default_config();
+	Serial.printf("Original pthread stack size: %d\r\n", cfg.stack_size);
+	cfg.stack_size = 8192;
+	esp_pthread_set_cfg(&cfg);
+#endif
+
 	while(!stop) {
 		com_client *cc = c->accept();
 		if (cc == nullptr) {
@@ -384,97 +402,104 @@ void server::handler()
 			continue;
 		}
 
-		std::string endpoint = cc->get_endpoint_name();
+		std::thread *th = new std::thread([=]() {
+			std::string endpoint = cc->get_endpoint_name();
 
 #if defined(ESP32) || defined(RP2040W)
-		Serial.printf("new session with %s\r\n", endpoint.c_str());
-		uint32_t pdu_count   = 0;
-		auto     prev_output = millis();
-		auto     start       = prev_output;
-		unsigned long busy   = 0;
-		const long interval  = 5000;
+			Serial.printf("new session with %s\r\n", endpoint.c_str());
+			uint32_t pdu_count   = 0;
+			auto     prev_output = millis();
+			auto     start       = prev_output;
+			unsigned long busy   = 0;
+			const long interval  = 5000;
 #else
-		DOLOG("server::handler: new session with %s\n", endpoint.c_str());
+			DOLOG("server::handler: new session with %s\n", endpoint.c_str());
 #endif
 
-		session *ses = nullptr;
-		bool     ok  = true;
+			session *ses = nullptr;
+			bool     ok  = true;
 
-		do {
-			auto incoming = receive_pdu(cc, &ses);
-			iscsi_pdu_bhs *pdu = incoming.first;
-			if (!pdu) {
-				DOLOG("server::handler: no PDU received, aborting socket connection\n");
-				break;
-			}
-
-#if defined(ESP32) || defined(RP2040W)
-			auto tx_start = micros();
-#endif
-
-			if (incoming.second) {  // something wrong with the received PDU?
-				DOLOG("server::handler: invalid PDU received\n");
-
-				std::optional<blob_t> reject = generate_reject_pdu(*pdu);
-				if (reject.has_value() == false) {
-					DOLOG("server::handler: cannot generate reject PDU\n");
-					continue;
-				}
-
-				bool rc = cc->send(reject.value().data, reject.value().n);
-				delete [] reject.value().data;
-				if (rc == false) {
-					DOLOG("server::handler: cannot transmit reject PDU\n");
+			do {
+				auto incoming = receive_pdu(cc, &ses);
+				iscsi_pdu_bhs *pdu = incoming.first;
+				if (!pdu) {
+					DOLOG("server::handler: no PDU received, aborting socket connection\n");
 					break;
 				}
 
-				DOLOG("server::handler: transmitted reject PDU\n");
-			}
-			else {
-				auto parameters = select_parameters(pdu, ses, s);
-				if (parameters) {
-					push_response(cc, ses, pdu, parameters);
-					delete parameters;
+#if defined(ESP32) || defined(RP2040W)
+				auto tx_start = micros();
+#endif
+
+				if (incoming.second) {  // something wrong with the received PDU?
+					DOLOG("server::handler: invalid PDU received\n");
+
+					std::optional<blob_t> reject = generate_reject_pdu(*pdu);
+					if (reject.has_value() == false) {
+						DOLOG("server::handler: cannot generate reject PDU\n");
+						continue;
+					}
+
+					bool rc = cc->send(reject.value().data, reject.value().n);
+					delete [] reject.value().data;
+					if (rc == false) {
+						DOLOG("server::handler: cannot transmit reject PDU\n");
+						break;
+					}
+
+					DOLOG("server::handler: transmitted reject PDU\n");
 				}
 				else {
-					ok = false;
+					auto parameters = select_parameters(pdu, ses, s);
+					if (parameters) {
+						push_response(cc, ses, pdu, parameters);
+						delete parameters;
+					}
+					else {
+						ok = false;
+					}
+
+					delete pdu;
 				}
 
-				delete pdu;
-			}
-
 #if defined(ESP32) || defined(RP2040W)
-			auto tx_end = micros();
-			busy += tx_end - tx_start;
+				auto tx_end = micros();
+				busy += tx_end - tx_start;
 
-			pdu_count++;
-			auto now = millis();
-			auto took = now - prev_output;
-			if (took >= interval) {
-				prev_output = now;
-				double   dtook = took / 1000.;
-				uint64_t bytes_read    = 0;
-				uint64_t bytes_written = 0;
-				uint64_t n_syncs       = 0;
-				s->get_and_reset_stats(&bytes_read, &bytes_written, &n_syncs);
-				Serial.printf("%ld] PDU/s: %.2f (%zu), send: %" PRIu64 " (%.2f/s), recv: %" PRIu64 " (%.2f/s), written: %.2f/s, read: %.2f/s, syncs: %.2f/s, load: %.2f%%, mem: %u\r\n", now, pdu_count / dtook, pdu_count, bytes_send, bytes_send / dtook, bytes_recv, bytes_recv / dtook, bytes_written / dtook, bytes_read / dtook, n_syncs / dtook, busy * 0.1 / took, get_free_heap_space());
-				pdu_count  = 0;
-				bytes_send = 0;
-				bytes_recv = 0;
-				busy       = 0;
-			}
+				pdu_count++;
+				auto now = millis();
+				auto took = now - prev_output;
+				if (took >= interval) {
+					prev_output = now;
+					double   dtook = took / 1000.;
+					uint64_t bytes_read    = 0;
+					uint64_t bytes_written = 0;
+					uint64_t n_syncs       = 0;
+					s->get_and_reset_stats(&bytes_read, &bytes_written, &n_syncs);
+					Serial.printf("%ld] PDU/s: %.2f (%zu), send: %" PRIu64 " (%.2f/s), recv: %" PRIu64 " (%.2f/s), written: %.2f/s, read: %.2f/s, syncs: %.2f/s, load: %.2f%%, mem: %u\r\n", now, pdu_count / dtook, pdu_count, bytes_send, bytes_send / dtook, bytes_recv, bytes_recv / dtook, bytes_written / dtook, bytes_read / dtook, n_syncs / dtook, busy * 0.1 / took, get_free_heap_space());
+					pdu_count  = 0;
+					bytes_send = 0;
+					bytes_recv = 0;
+					busy       = 0;
+				}
 #endif
-		}
-		while(ok);
+			}
+			while(ok);
 #if defined(ESP32) || defined(RP2040W)
-		Serial.printf("session finished: %d\r\n", WiFi.status());
+			Serial.printf("session finished: %d\r\n", WiFi.status());
 #else
-		DOLOG("session finished\n");
+			DOLOG("session finished\n");
 #endif
 
-		s->sync();
+			s->sync();
 
-		delete cc;
-		delete ses;
+			delete cc;
+			delete ses;
+		});
+
+		th->detach();
+
+		Serial.printf("Heap space: %u\r\n", get_free_heap_space());
+		// TODO join & free-up threads
 	}
 }

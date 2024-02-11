@@ -4,6 +4,8 @@
 #include <atomic>
 #include <csignal>
 #include <cstdio>
+#include <esp_debug_helpers.h>
+#include <esp_heap_caps.h>
 #include <esp_wifi.h>
 #include <ESPmDNS.h>
 // M.A.X.X:
@@ -21,6 +23,13 @@ std::atomic_bool stop { false };
 char name[16] { 0 };
 backend_sdcard  *bs { nullptr };
 scsi *scsi_dev { nullptr };
+
+void heap_caps_alloc_failed_hook(size_t requested_size, uint32_t caps, const char *function_name)
+{
+	printf("%s was called but failed to allocate %zu bytes with 0x%x capabilities (by %p)\r\n", function_name, requested_size, caps, __builtin_return_address(0));
+
+	esp_backtrace_print(25);
+}
 
 bool progress_indicator(const int nr, const int mx, const std::string & which) {
 	printf("%3.2f%%: %s\r\n", nr * 100. / mx, which.c_str());
@@ -115,6 +124,8 @@ void setup()
 	else
 		Serial.println(F("Failed starting mdns responder"));
 
+	heap_caps_register_failed_alloc_callback(heap_caps_alloc_failed_hook);
+
 	Serial.print(F("Will listen on (in a bit): "));
 	Serial.println(WiFi.localIP());
 }
@@ -131,5 +142,12 @@ void loop()
 
 	server s(scsi_dev, &c);
 	Serial.println(F("Go!"));
-	s.handler();
+
+	try {
+		s.handler();
+	}
+	catch(std::bad_alloc & ba) {
+		Serial.println(F("Out of memory"));
+		heap_caps_dump_all();
+	}
 }

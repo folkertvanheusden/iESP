@@ -651,9 +651,14 @@ blob_t iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *const s, const iscsi_pdu
 	size_t out_size = sizeof(pdu_data_in) + pdu_data_in_data.n;
 	out_size = (out_size + 3) & ~3;
 
-	uint8_t *out = new uint8_t[out_size]();
-	memcpy(out, &pdu_data_in, sizeof pdu_data_in);
-	memcpy(&out[sizeof(pdu_data_in)], pdu_data_in_data.data, pdu_data_in_data.n);
+	uint8_t *out = new (std::nothrow) uint8_t[out_size]();
+	if (out) {
+		memcpy(out, &pdu_data_in, sizeof pdu_data_in);
+		memcpy(&out[sizeof(pdu_data_in)], pdu_data_in_data.data, pdu_data_in_data.n);
+	}
+	else {
+		out_size = 0;
+	}
 
 	return { out, out_size };
 }
