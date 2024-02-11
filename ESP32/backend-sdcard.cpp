@@ -22,7 +22,7 @@ backend_sdcard::backend_sdcard()
 	bool ok = false;
 	for(int sp=50; sp>=14; sp -= 4) {
 		Serial.printf("Trying %d MHz...\r\n", sp);
-		if (sd.begin(CS_SD, SD_SCK_MHZ(sp))) {
+		if (sd.begin(SdSpiConfig(CS_SD, DEDICATED_SPI, SD_SCK_MHZ(sp)))) {
 			ok = true;
 			Serial.printf("Accessing SD card at %d MHz\r\n", sp);
 			break;
