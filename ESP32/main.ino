@@ -5,6 +5,7 @@
 #include <csignal>
 #include <cstdio>
 #include <esp_wifi.h>
+#include <ESP32-ENC28J60.h>
 #include <ESPmDNS.h>
 // M.A.X.X:
 #include <LittleFS.h>
@@ -81,6 +82,52 @@ retry:
 		goto retry;
 	}
 }
+
+#define E_MISO_GPIO 12
+#define E_MOSI_GPIO 13
+#define E_SCLK_GPIO 14
+#define E_CS_GPIO   15
+#define E_INT_GPIO  4
+
+volatile bool eth_connected = false;
+
+void WiFiEvent(WiFiEvent_t event)
+{
+	switch (event) {
+		case ARDUINO_EVENT_ETH_START:
+			Serial.println("ETH Started");
+			//set eth hostname here
+			ETH.setHostname(name);
+			break;
+		case ARDUINO_EVENT_ETH_CONNECTED:
+			Serial.println("ETH Connected");
+			break;
+		case ARDUINO_EVENT_ETH_GOT_IP:
+			Serial.print("ETH MAC: ");
+			Serial.print(ETH.macAddress());
+			Serial.print(", IPv4: ");
+			Serial.print(ETH.localIP());
+			if (ETH.fullDuplex())
+				Serial.print(", FULL_DUPLEX");
+			Serial.print(", ");
+			Serial.print(ETH.linkSpeed());
+			Serial.println("Mbps");
+			eth_connected = true;
+			break;
+		case ARDUINO_EVENT_ETH_DISCONNECTED:
+			Serial.println("ETH Disconnected");
+			eth_connected = false;
+			break;
+		case ARDUINO_EVENT_ETH_STOP:
+			Serial.println("ETH Stopped");
+			eth_connected = false;
+			break;
+		default:
+			Serial.printf("Unknown/unexpected event %d\r\n", event);
+			break;
+	}
+}
+
 void setup()
 {
 	Serial.begin(115200);
@@ -106,24 +153,31 @@ void setup()
 	bs = new backend_sdcard();
 	scsi_dev = new scsi(bs);
 
-	setup_wifi();
+//	setup_wifi();
+//	esp_wifi_set_ps(WIFI_PS_NONE);
 
-	esp_wifi_set_ps(WIFI_PS_NONE);
+	WiFi.onEvent(WiFiEvent);
+	ETH.begin(E_MISO_GPIO, E_MOSI_GPIO, E_SCLK_GPIO, E_CS_GPIO, E_INT_GPIO, 10, 1);
 
 	if (MDNS.begin(name))
 		MDNS.addService("iscsi", "tcp", 3260);
 	else
 		Serial.println(F("Failed starting mdns responder"));
 
-	Serial.print(F("Will listen on (in a bit): "));
-	Serial.println(WiFi.localIP());
+	while(eth_connected == false) {
+		delay(200);
+		Serial.print(".");
+	}
 }
 
 void loop()
 {
-	auto ip = WiFi.localIP();
+	auto ip = ETH.localIP();
 	char buffer[16];
 	snprintf(buffer, sizeof buffer, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+
+	Serial.print(F("Will listen on (in a bit): "));
+	Serial.println(buffer);
 
 	com_sockets c(buffer, 3260, &stop);
 	if (c.begin() == false)
