@@ -8,6 +8,26 @@
 #include "utils.h"
 
 
+const std::map<scsi::scsi_opcode, std::vector<uint8_t> > scsi_a3_data {
+	{ scsi::scsi_opcode::o_test_unit_ready, { 0xff, 0x00, 0x00, 0x00, 0x00, 0x07 } },
+	{ scsi::scsi_opcode::o_request_sense,   { 0xff, 0x01, 0x00, 0x00, 0xff, 0x07 } },
+	{ scsi::scsi_opcode::o_read_6,		{ 0xff, 0x1f, 0xff, 0xff, 0xff, 0x07 } },
+	{ scsi::scsi_opcode::o_write_6,		{ 0xff, 0x1f, 0xff, 0xff, 0xff, 0x07 } },
+//	{ scsi::scsi_opcode::o_seek,		{
+	{ scsi::scsi_opcode::o_inquiry,		{ 0xff, 0x01, 0xff, 0xff, 0xff, 0x07 } },
+	{ scsi::scsi_opcode::o_mode_sense_6,	{ 0xff, 0x08, 0xff, 0xff, 0xff, 0x07 } },
+	{ scsi::scsi_opcode::o_read_capacity_10,{ 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07 } },
+	{ scsi::scsi_opcode::o_read_10,		{ 0xff, 0xfe, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 } },
+	{ scsi::scsi_opcode::o_write_10,	{ 0xff, 0xfa, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 } },
+	{ scsi::scsi_opcode::o_write_verify_10,	{ 0xff, 0xf2, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 } },
+	{ scsi::scsi_opcode::o_sync_cache_10,	{ 0xff, 0x06, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 } },
+	{ scsi::scsi_opcode::o_read_16,		{ 0xff, 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 } },
+	{ scsi::scsi_opcode::o_write_16,	{ 0xff, 0xfa, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 } },
+	{ scsi::scsi_opcode::o_get_lba_status,	{ 0xff, 0x1f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 } },
+	{ scsi::scsi_opcode::o_report_luns,	{ 0xff, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 } },
+	{ scsi::scsi_opcode::o_rep_sup_oper,	{ 0xff, 0x1f, 0x87, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 } },
+};
+
 scsi::scsi(backend *const b) : b(b)
 {
 #ifdef ESP32
@@ -352,27 +372,13 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		bool ok = false;
 
 		if (service_action == 0x0c && reporting_options == 1) {
-			if (req_operation_code == o_test_unit_ready ||
-			    req_operation_code == o_request_sense ||
-			    req_operation_code == o_read_6 ||
-			    req_operation_code == o_write_6 ||
-			    req_operation_code == o_seek ||
-			    req_operation_code == o_inquiry ||
-			    req_operation_code == o_mode_sense_6 ||
-			    req_operation_code == o_read_capacity_10 ||
-			    req_operation_code == o_read_10 ||
-			    req_operation_code == o_write_10 ||
-			    req_operation_code == o_write_verify_10 ||
-			    req_operation_code == o_sync_cache_10 ||
-			    req_operation_code == o_read_16 ||
-			    req_operation_code == o_write_16 ||
-			    req_operation_code == o_get_lba_status ||
-			    req_operation_code == o_report_luns ||
-			    req_operation_code == o_rep_sup_oper) {
+			auto it = scsi_a3_data.find(scsi::scsi_opcode(req_operation_code));
+			if (it != scsi_a3_data.end()) {
 				response.io.is_inline           = true;
-				response.io.what.data.second    = 4;
+				response.io.what.data.second    = 4 + it->second.size();
 				response.io.what.data.first     = new uint8_t[response.io.what.data.second]();
-				response.io.what.data.first[1]  = 3;
+				response.io.what.data.first[1]  = 3 + it->second.size();
+				memcpy(response.io.what.data.first + 4, it->second.data(), it->second.size());
 
 				ok = true;
 			}
