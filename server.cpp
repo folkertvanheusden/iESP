@@ -316,8 +316,10 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 
 		uint32_t offset = 0;
 
-		for(uint32_t block_nr = 0; block_nr < stream_parameters.n_sectors; block_nr += block_group_size) {
-			uint32_t n_left = std::min(block_group_size, stream_parameters.n_sectors - block_nr);
+		bool low_ram = false;
+
+		for(uint32_t block_nr = 0; block_nr < stream_parameters.n_sectors;) {
+			uint32_t n_left = low_ram ? 1 : std::min(block_group_size, stream_parameters.n_sectors - block_nr);
 			buffer.n = n_left * 512;
 
 			uint64_t cur_block_nr = block_nr + stream_parameters.lba;
@@ -331,10 +333,13 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 			blob_t out = iscsi_pdu_scsi_data_in::gen_data_in_pdu(ses, reply_to, buffer, use_pdu_data_size, offset);
 
 			if (out.n == 0) {  // gen_data_in_pdu could not allocate memory
+				low_ram = true;
+				delete [] buffer.data;
+				buffer.n = 512;
+				buffer.data = new uint8_t[buffer.n]();
 #ifdef ESP32
 				Serial.printf("Low on memory: %zu bytes failed\r\n", buffer.n);
 #endif
-				buffer.n = 512;
 			}
 			else {
 				if (cc->send(out.data, out.n) == false) {
@@ -343,11 +348,12 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 					ok = false;
 					break;
 				}
-				bytes_send += out.n;
 
 				delete [] out.data;
 
+				bytes_send += out.n;
 				offset += buffer.n;
+				block_nr += n_left;
 			}
 		}
 
@@ -472,11 +478,12 @@ void server::handler()
 				if (took >= interval) {
 					prev_output = now;
 					double   dtook = took / 1000.;
+					double   dkb   = dtook * 1024;
 					uint64_t bytes_read    = 0;
 					uint64_t bytes_written = 0;
 					uint64_t n_syncs       = 0;
 					s->get_and_reset_stats(&bytes_read, &bytes_written, &n_syncs);
-					Serial.printf("%ld] PDU/s: %.2f (%zu), send: %" PRIu64 " (%.2f/s), recv: %" PRIu64 " (%.2f/s), written: %.2f/s, read: %.2f/s, syncs: %.2f/s, load: %.2f%%, mem: %u\r\n", now, pdu_count / dtook, pdu_count, bytes_send, bytes_send / dtook, bytes_recv, bytes_recv / dtook, bytes_written / dtook, bytes_read / dtook, n_syncs / dtook, busy * 0.1 / took, get_free_heap_space());
+					Serial.printf("%ld] PDU/s: %.2f (%zu), send: %" PRIu64 " kB (%.2f kB/s), recv: %" PRIu64 " kB (%.2f kB/s), written: %.2f kB/s, read: %.2f kB/s, syncs: %.2f/s, load: %.2f%%, mem: %u\r\n", now, pdu_count / dtook, pdu_count, bytes_send / 1024, bytes_send / dkb, bytes_recv / 1024, bytes_recv / dkb, bytes_written / wdkb, bytes_read / wdkb, n_syncs / dtook, busy * 0.1 / took, get_free_heap_space());
 					pdu_count  = 0;
 					bytes_send = 0;
 					bytes_recv = 0;
