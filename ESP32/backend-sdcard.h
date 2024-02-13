@@ -12,7 +12,7 @@ private:
 	uint64_t  card_size   { 0 };
 	size_t    sector_size { 0 };
 
-	void init_file();
+	bool reinit(const bool close_first);
 
 public:
 	backend_sdcard();
