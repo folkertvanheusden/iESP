@@ -7,3 +7,5 @@
 - configurable:
   - async writes
   - name of disk-image on SD card
+- serial number so to allow linux to see which is which
+- ntp upstream for logging timestamps?
