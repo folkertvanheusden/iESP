@@ -152,7 +152,14 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 	size_t n_bytes_to_write = n_blocks * iscsi_block_size;
 	bytes_written += n_bytes_to_write;
 
-	bool rc = file.write(data, n_bytes_to_write) == n_bytes_to_write;
+	bool rc = false;
+	for(int i=0; i<5; i++) {  // 5 is arbitrarily chosen
+		rc = file.write(data, n_bytes_to_write) == n_bytes_to_write;
+		if (rc)
+			break;
+		delay((i + 1) * 500);
+		Serial.println(F("Retrying write"));
+	}
 	if (!rc)
 		Serial.printf("Cannot write (%d)\r\n", file.getError());
 #ifdef LED_RED
@@ -182,7 +189,14 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 	size_t n_bytes_to_read = n_blocks * iscsi_block_size;
 	bytes_read += n_bytes_to_read;
 
-	bool rc = file.read(data, n_bytes_to_read) == n_bytes_to_read;
+	bool rc = false;
+	for(int i=0; i<5; i++) {  // 5 is arbitrarily chosen
+		rc = file.read(data, n_bytes_to_read) == n_bytes_to_read;
+		if (rc)
+			break;
+		delay((i + 1) * 500);
+		Serial.println(F("Retrying read"));
+	}
 	if (!rc)
 		Serial.printf("Cannot read (%d)\r\n", file.getError());
 #ifdef LED_GREEN
