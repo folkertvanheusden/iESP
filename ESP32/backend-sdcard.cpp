@@ -6,17 +6,22 @@
 #include "log.h"
 
 #ifdef RP2040W
-#define CS_SD 17
+#define SD_CS 17
 #define SDCARD_SPI SPI1
 #else
 // 18 SCK
 // 19 MISO
 // 23 MOSI
-#define CS_SD 5
+#define SD_CS 5
 #define LED_GREEN 16
 #define LED_RED   17
 #endif
 #define FILENAME "test.dat"
+
+#define SD_MISO     2       // SD-Card
+#define SD_MOSI    15       // SD-Card
+#define SD_SCLK    14       // SD-Card
+#define SD_CS      12       // SD-Card
 
 backend_sdcard::backend_sdcard()
 {
@@ -44,10 +49,12 @@ bool backend_sdcard::reinit(const bool close_first)
 		Serial.println(F("Init SD-card backend..."));
 	}
 
+	SPI.begin(SD_SCLK, SD_MISO, SD_MOSI, SD_CS);
+
 	bool ok = false;
 	for(int sp=50; sp>=14; sp -= 4) {
 		Serial.printf("Trying %d MHz...\r\n", sp);
-		if (sd.begin(SdSpiConfig(CS_SD, DEDICATED_SPI, SD_SCK_MHZ(sp)))) {
+		if (sd.begin(SdSpiConfig(SD_CS, DEDICATED_SPI, SD_SCK_MHZ(sp)))) {
 			ok = true;
 			Serial.printf("Accessing SD card at %d MHz\r\n", sp);
 			break;
@@ -55,7 +62,7 @@ bool backend_sdcard::reinit(const bool close_first)
 	}
 
 	if (ok == false) {
-		Serial.printf("SD-card mount failed (assuming CS is on pin %d)\r\n", CS_SD);
+		Serial.printf("SD-card mount failed (assuming CS is on pin %d)\r\n", SD_CS);
 		sd.initErrorPrint(&Serial);
 		return false;
 	}
