@@ -358,11 +358,11 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		DOLOG("scsi::send: REPORT_LUNS, report: %02xh\n", CDB[2]);
 
 		response.io.is_inline           = true;
-		response.io.what.data.second    = 9;
+		response.io.what.data.second    = 10;
 		response.io.what.data.first     = new uint8_t[response.io.what.data.second]();
-		response.io.what.data.first[3]  = 0x01;
+		response.io.what.data.first[3]  = 8;  // lun lisgt length
 		// 4...7 reserved
-		response.io.what.data.first[8]  = 1;  // LUN1 id
+		response.io.what.data.first[9]  = 1;  // LUN1 id
 	}
 	else if (opcode == o_rep_sup_oper) {  // 0xa3
 		uint8_t service_action     = CDB[1] & 31;
