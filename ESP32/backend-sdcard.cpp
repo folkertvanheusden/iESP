@@ -9,6 +9,9 @@
 #define CS_SD 17
 #define SDCARD_SPI SPI1
 #else
+// 18 SCK
+// 19 MISO
+// 23 MOSI
 #define CS_SD 5
 #define LED_GREEN 16
 #define LED_RED   17
@@ -17,7 +20,29 @@
 
 backend_sdcard::backend_sdcard()
 {
-	Serial.println(F("Init SD-card backend..."));
+#ifdef LED_GREEN
+	pinMode(LED_GREEN, OUTPUT);
+#endif
+#ifdef LED_RED
+	pinMode(LED_RED,   OUTPUT);
+#endif
+
+	bool close_first = false;
+
+	while(!reinit(close_first))
+		close_first = true;
+}
+
+bool backend_sdcard::reinit(const bool close_first)
+{
+	if (close_first) {
+		file.close();
+		sd.end();
+		Serial.println(F("Re-init SD-card backend..."));
+	}
+	else {
+		Serial.println(F("Init SD-card backend..."));
+	}
 
 	bool ok = false;
 	for(int sp=50; sp>=14; sp -= 4) {
@@ -31,48 +56,32 @@ backend_sdcard::backend_sdcard()
 
 	if (ok == false) {
 		Serial.printf("SD-card mount failed (assuming CS is on pin %d)\r\n", CS_SD);
-		sd.initErrorHalt(&Serial);
-		return;
+		sd.initErrorPrint(&Serial);
+		return false;
 	}
 
 	sd.ls(LS_DATE | LS_SIZE);
 
 retry:
-	if (sd.exists(FILENAME) == false)
-		init_file();
-
 	if (file.open(FILENAME, O_RDWR) == false) {
 		Serial.println(F("Cannot access test.dat on SD-card"));
-		return;
+		return false;
 	}
 
 	// virtual sizes
 	card_size   = file.fileSize();
 	sector_size = 512;
 
-	if (card_size == 0) {
-		Serial.println(F("File is 0 bytes, recreating in 5s..."));
-		file.close();
-		sd.remove(FILENAME);
-		delay(5000);
-		goto retry;
-	}
-
 	Serial.printf("Virtual disk size: %zuMB\r\n", size_t(card_size / 1024 / 1024));
 
 	Serial.println(F("Init LEDs"));
-#ifdef LED_GREEN
-	pinMode(LED_GREEN, OUTPUT);
-#endif
-#ifdef LED_RED
-	pinMode(LED_RED,   OUTPUT);
-#endif
+
+	return true;
 }
 
 backend_sdcard::~backend_sdcard()
 {
 	file.close();
-
 	sd.end();
 }
 
@@ -91,31 +100,6 @@ bool backend_sdcard::sync()
 #endif
 
 	return true;
-}
-
-void backend_sdcard::init_file()
-{
-	Serial.println(F("Creating " FILENAME "..."));
-
-	if (file.open(FILENAME, O_RDWR | O_CREAT) == false) {
-		Serial.println(F("Cannot create backend file"));
-		return;
-	}
-
-	uint64_t vol_free = sd.vol()->freeClusterCount();
-	Serial.printf("Free clusters: %zu\r\n", size_t(vol_free));
-
-	uint64_t total_free_bytes = vol_free * sd.vol()->sectorsPerCluster() * 512ll;
-	Serial.printf("Free space in bytes: %zu\r\n", size_t(total_free_bytes));
-
-	total_free_bytes = (total_free_bytes * 7 / 8) & ~511;
-
-	if (file.truncate(total_free_bytes) == false)
-		Serial.printf("Cannot resize file to %zu bytes: %d\r\n", total_free_bytes, file.getError());
-
-	file.close();
-
-	file.ls(LS_DATE | LS_SIZE);
 }
 
 uint64_t backend_sdcard::get_size_in_blocks() const
@@ -149,7 +133,20 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 	size_t n_bytes_to_write = n_blocks * iscsi_block_size;
 	bytes_written += n_bytes_to_write;
 
-	bool rc = file.write(data, n_bytes_to_write) == n_bytes_to_write;
+	bool rc = false;
+	for(int k=2; k>=0; k--) {  // 2 is arbitrarily chosen
+		for(int i=0; i<5; i++) {  // 5 is arbitrarily chosen
+			rc = file.write(data, n_bytes_to_write) == n_bytes_to_write;
+			if (rc)
+				goto ok;
+			delay((i + 1) * 100); // 100ms is arbitrarily chosen
+			Serial.println(F("Retrying write"));
+		}
+
+		if (k)
+			reinit(true);
+	}
+ok:
 	if (!rc)
 		Serial.printf("Cannot write (%d)\r\n", file.getError());
 #ifdef LED_RED
@@ -179,7 +176,20 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 	size_t n_bytes_to_read = n_blocks * iscsi_block_size;
 	bytes_read += n_bytes_to_read;
 
-	bool rc = file.read(data, n_bytes_to_read) == n_bytes_to_read;
+	bool rc = false;
+	for(int k=2; k>=0; k--) {  // 2 is arbitrarily chosen
+		for(int i=0; i<5; i++) {  // 5 is arbitrarily chosen
+			rc = file.read(data, n_bytes_to_read) == n_bytes_to_read;
+			if (rc)
+				goto ok;
+			delay((i + 1) * 100); // 100ms is arbitrarily chosen
+			Serial.println(F("Retrying read"));
+		}
+
+		if (k)
+			reinit(true);
+	}
+ok:
 	if (!rc)
 		Serial.printf("Cannot read (%d)\r\n", file.getError());
 #ifdef LED_GREEN
