@@ -9,6 +9,9 @@
 #define CS_SD 17
 #define SDCARD_SPI SPI1
 #else
+// 18 SCK
+// 19 MISO
+// 23 MOSI
 #define CS_SD 5
 #define LED_GREEN 16
 #define LED_RED   17
