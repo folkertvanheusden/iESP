@@ -5,8 +5,8 @@
 #include <csignal>
 #include <cstdio>
 #include <esp_wifi.h>
-#include <ESP32-ENC28J60.h>
 #include <ESPmDNS.h>
+#include <ETH.h>
 // M.A.X.X:
 #include <LittleFS.h>
 #include <configure.h>
@@ -83,12 +83,6 @@ retry:
 	}
 }
 
-#define E_MISO_GPIO 12
-#define E_MOSI_GPIO 13
-#define E_SCLK_GPIO 14
-#define E_CS_GPIO   15
-#define E_INT_GPIO  4
-
 volatile bool eth_connected = false;
 
 void WiFiEvent(WiFiEvent_t event)
@@ -157,7 +151,7 @@ void setup()
 //	esp_wifi_set_ps(WIFI_PS_NONE);
 
 	WiFi.onEvent(WiFiEvent);
-	ETH.begin(E_MISO_GPIO, E_MOSI_GPIO, E_SCLK_GPIO, E_CS_GPIO, E_INT_GPIO, 10, 1);
+	ETH.begin(1, 16, 23, 18, ETH_PHY_LAN8720);
 
 	if (MDNS.begin(name))
 		MDNS.addService("iscsi", "tcp", 3260);
