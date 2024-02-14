@@ -249,15 +249,25 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		else if (service_action == 0x12) {  // GET LBA STATUS
 			DOLOG("scsi::send: GET_LBA_STATUS\n");
 
-			response.io.is_inline          = true;
-			response.io.what.data.second = 24;
-			response.io.what.data.first = new uint8_t[response.io.what.data.second]();
-			response.io.what.data.first[0] = 0;
-			response.io.what.data.first[1] = 0;
-			response.io.what.data.first[2] = 0;
-			response.io.what.data.first[3] = response.io.what.data.second - 3;
-			memcpy(&response.io.what.data.first[8], &CDB[2], 8);  // LBA STATUS LOGICAL BLOCK ADDRESS
-			memcpy(&response.io.what.data.first[16], &CDB[10], 4);  // ALLOCATIN LENGTH
+			uint64_t lba             = (uint64_t(CDB[2]) << 56) | (uint64_t(CDB[3]) << 48) | (uint64_t(CDB[4]) << 40) | (uint64_t(CDB[5]) << 32) | (uint64_t(CDB[6]) << 24) | (CDB[7] << 16) | (CDB[8] << 8) | CDB[9];
+			uint32_t transfer_length = (uint64_t(CDB[10]) << 24) | (CDB[11] << 16) | (CDB[12] << 8) | CDB[13];
+
+			auto vr = validate_request(lba, transfer_length);
+			if (vr.has_value()) {
+				DOLOG("scsi::send: GET LBA STATUS parameters invalid\n");
+				response.sense_data = vr.value();
+			}
+			else {
+				response.io.is_inline          = true;
+				response.io.what.data.second = 24;
+				response.io.what.data.first = new uint8_t[response.io.what.data.second]();
+				response.io.what.data.first[0] = 0;
+				response.io.what.data.first[1] = 0;
+				response.io.what.data.first[2] = 0;
+				response.io.what.data.first[3] = response.io.what.data.second - 3;
+				memcpy(&response.io.what.data.first[8], &CDB[2], 8);  // LBA STATUS LOGICAL BLOCK ADDRESS
+				memcpy(&response.io.what.data.first[16], &CDB[10], 4);  // ALLOCATION LENGTH
+			}
 		}
 		else {
 			DOLOG("scsi::send: GET LBA STATUS service action %02xh not implemented\n", service_action);
@@ -288,7 +298,12 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 
 		DOLOG("scsi::send: WRITE_1%c, offset %" PRIu64 ", %u sectors\n", opcode == o_write_10 ? '0' : '6', lba, transfer_length);
 
-		if (data.first) {
+		auto vr = validate_request(lba, transfer_length);
+		if (vr.has_value()) {
+			DOLOG("scsi::send: WRITE_1x parameters invalid\n");
+			response.sense_data = vr.value();
+		}
+		else if (data.first) {
 			DOLOG("scsi::send: write command includes data (%zu bytes)\n", data.second);
 
 			auto   backend_block_size = b->get_block_size();
@@ -350,12 +365,19 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 			DOLOG("scsi::send: READ_6, LBA %" PRIu64 ", %u sectors\n", lba, transfer_length);
 		}
 
-		response.io.is_inline               = false;
-		response.io.what.location.lba       = lba;
-		response.io.what.location.n_sectors = transfer_length;
-		response.io.what.data.first         = nullptr;
+		auto vr = validate_request(lba, transfer_length);
+		if (vr.has_value()) {
+			DOLOG("scsi::send: READ_1x parameters invalid\n");
+			response.sense_data = vr.value();
+		}
+		else {
+			response.io.is_inline               = false;
+			response.io.what.location.lba       = lba;
+			response.io.what.location.n_sectors = transfer_length;
+			response.io.what.data.first         = nullptr;
 
-		response.data_is_meta = false;
+			response.data_is_meta = false;
+		}
 	}
 	else if (opcode == o_sync_cache_10) {  // 0x35
 		DOLOG("scsi::send: SYNC CACHE 10\n");
@@ -433,7 +455,12 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		if (expected_data_size != data.second)
 			DOLOG("scsi::send: COMPARE AND WRITE: data count mismatch (%zu versus %zu)\n", size_t(expected_data_size), data.second);
 
-		if (block_count > max_compare_and_write_block_count) {
+		auto vr = validate_request(lba, block_count);
+		if (vr.has_value()) {
+			DOLOG("scsi::send: COMPARE AND WRITE parameters invalid\n");
+			response.sense_data = vr.value();
+		}
+		else if (block_count > max_compare_and_write_block_count) {
 			DOLOG("scsi::send: COMPARE AND WRITE: too many blocks in one go (%u versus %u)\n", block_count, max_compare_and_write_block_count);
 
 			// sense key 0x05, asc 0x24, ascq 0x00
@@ -492,6 +519,17 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 	DOLOG("-> returning %zu bytes of sense data\n", response.sense_data.size());
 
 	return response;
+}
+
+// returns sense data in case of a problem
+std::optional<std::vector<uint8_t> > scsi::validate_request(const uint64_t lba, const uint32_t n_blocks) const
+{
+	if (lba + n_blocks > get_size_in_blocks()) {
+		// ILLEGAL_REQUEST(0x05)/INVALID_FIELD_IN_CDB(0x2400)
+		return { { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x24, 0x00, 0x00, 0x00, 0x00, 0x00 } };
+	}
+
+	return { };  // no error
 }
 
 uint64_t scsi::get_size_in_blocks() const

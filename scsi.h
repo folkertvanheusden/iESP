@@ -35,6 +35,8 @@ private:
 	backend *const b         { nullptr };
 	char           serial[9] { 0       };
 
+	std::optional<std::vector<uint8_t> > validate_request(const uint64_t lba, const uint32_t n_blocks) const;
+
 public:
 	scsi(backend *const b);
 	virtual ~scsi();
