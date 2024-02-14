@@ -110,6 +110,72 @@ void enable_OTA() {
 	Serial.println(F("OTA ready"));
 }
 
+void WiFiEvent(WiFiEvent_t event)
+{
+	Serial.print(F("WiFi event: "));
+
+	switch(event) {
+		case WIFI_REASON_UNSPECIFIED:
+			Serial.println(F("WIFI_REASON_UNSPECIFIED")); break;
+		case WIFI_REASON_AUTH_EXPIRE:
+			Serial.println(F("WIFI_REASON_AUTH_EXPIRE")); break;
+		case WIFI_REASON_AUTH_LEAVE:
+			Serial.println(F("WIFI_REASON_AUTH_LEAVE")); break;
+		case WIFI_REASON_ASSOC_EXPIRE:
+			Serial.println(F("WIFI_REASON_ASSOC_EXPIRE")); break;
+		case WIFI_REASON_ASSOC_TOOMANY:
+			Serial.println(F("WIFI_REASON_ASSOC_TOOMANY")); break;
+		case WIFI_REASON_NOT_AUTHED:
+			Serial.println(F("WIFI_REASON_NOT_AUTHED")); break;
+		case WIFI_REASON_NOT_ASSOCED:
+			Serial.println(F("WIFI_REASON_NOT_ASSOCED")); break;
+		case WIFI_REASON_ASSOC_LEAVE:
+			Serial.println(F("WIFI_REASON_ASSOC_LEAVE")); break;
+		case WIFI_REASON_ASSOC_NOT_AUTHED:
+			Serial.println(F("WIFI_REASON_ASSOC_NOT_AUTHED")); break;
+		case WIFI_REASON_DISASSOC_PWRCAP_BAD:
+			Serial.println(F("WIFI_REASON_DISASSOC_PWRCAP_BAD")); break;
+		case WIFI_REASON_DISASSOC_SUPCHAN_BAD:
+			Serial.println(F("WIFI_REASON_DISASSOC_SUPCHAN_BAD")); break;
+		case WIFI_REASON_IE_INVALID:
+			Serial.println(F("WIFI_REASON_IE_INVALID")); break;
+		case WIFI_REASON_MIC_FAILURE:
+			Serial.println(F("WIFI_REASON_MIC_FAILURE")); break;
+		case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
+			Serial.println(F("WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT")); break;
+		case WIFI_REASON_GROUP_KEY_UPDATE_TIMEOUT:
+			Serial.println(F("WIFI_REASON_GROUP_KEY_UPDATE_TIMEOUT")); break;
+		case WIFI_REASON_IE_IN_4WAY_DIFFERS:
+			Serial.println(F("WIFI_REASON_IE_IN_4WAY_DIFFERS")); break;
+		case WIFI_REASON_GROUP_CIPHER_INVALID:
+			Serial.println(F("WIFI_REASON_GROUP_CIPHER_INVALID")); break;
+		case WIFI_REASON_PAIRWISE_CIPHER_INVALID:
+			Serial.println(F("WIFI_REASON_PAIRWISE_CIPHER_INVALID")); break;
+		case WIFI_REASON_AKMP_INVALID:
+			Serial.println(F("WIFI_REASON_AKMP_INVALID")); break;
+		case WIFI_REASON_UNSUPP_RSN_IE_VERSION:
+			Serial.println(F("WIFI_REASON_UNSUPP_RSN_IE_VERSION")); break;
+		case WIFI_REASON_INVALID_RSN_IE_CAP:
+			Serial.println(F("WIFI_REASON_INVALID_RSN_IE_CAP")); break;
+		case WIFI_REASON_802_1X_AUTH_FAILED:
+			Serial.println(F("WIFI_REASON_802_1X_AUTH_FAILED")); break;
+		case WIFI_REASON_CIPHER_SUITE_REJECTED:
+			Serial.println(F("WIFI_REASON_CIPHER_SUITE_REJECTED")); break;
+		case WIFI_REASON_BEACON_TIMEOUT:
+			Serial.println(F("WIFI_REASON_BEACON_TIMEOUT")); break;
+		case WIFI_REASON_NO_AP_FOUND:
+			Serial.println(F("WIFI_REASON_NO_AP_FOUND")); break;
+		case WIFI_REASON_AUTH_FAIL:
+			Serial.println(F("WIFI_REASON_AUTH_FAIL")); break;
+		case WIFI_REASON_ASSOC_FAIL:
+			Serial.println(F("WIFI_REASON_ASSOC_FAIL")); break;
+		case WIFI_REASON_HANDSHAKE_TIMEOUT:
+			Serial.println(F("WIFI_REASON_HANDSHAKE_TIMEOUT")); break;
+		default:
+			Serial.println(event); break;
+	}
+}
+
 bool progress_indicator(const int nr, const int mx, const std::string & which) {
 	printf("%3.2f%%: %s\r\n", nr * 100. / mx, which.c_str());
 
@@ -118,6 +184,8 @@ bool progress_indicator(const int nr, const int mx, const std::string & which) {
 
 void setup_wifi() {
 	enable_wifi_debug();
+
+	WiFi.onEvent(WiFiEvent);
 
 	scan_access_points_start();
 
