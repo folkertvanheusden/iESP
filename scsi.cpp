@@ -41,14 +41,17 @@ scsi::scsi(backend *const b) : b(b)
 #ifdef ESP32
 	uint64_t temp { 0 };
 	esp_efuse_mac_get_default(reinterpret_cast<uint8_t *>(&temp));
-	snprintf(serial, sizeof serial, "%08x", temp);
+	serial = myformat("%" PRIx64, temp);
 #else
-	snprintf(serial, sizeof serial, "12345678");
-
 	FILE *fh = fopen("/var/lib/dbus/machine-id", "r");
 	if (fh) {
-		fgets(serial, sizeof serial, fh);
+		char buffer[128] { 0 };
+		fgets(buffer, sizeof buffer, fh);
 		fclose(fh);
+		serial = buffer;
+	}
+	else {
+		serial = "12345678";
 	}
 #endif
 }
@@ -106,6 +109,8 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		DOLOG(" INQUIRY: AllocationLength: %d\n", allocation_length);
 		DOLOG(" INQUIRY: ControlByte: %02xh\n", CDB[5]);
 		bool ok = true;
+		uint8_t device_type = lun == 0 ? 0x0c :  // storage array controller
+						 0x00;  // direct access block device
 		if ((CDB[1] & 1) == 0) {  // requests standard inquiry data
 			if (CDB[2])
 				ok = false;
@@ -113,10 +118,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				response.io.is_inline        = true;
 				response.io.what.data.second = 68;
 				response.io.what.data.first  = new uint8_t[response.io.what.data.second]();
-				if (lun == 0)
-					response.io.what.data.first[0] = 0x0c;  // "Storage array controller"
-				else if (lun == 1)
-					response.io.what.data.first[0] = 0x00;  // "Direct access block device"
+				response.io.what.data.first[0] = device_type;
 				response.io.what.data.first[1] = 0;  // not removable
 				response.io.what.data.first[2] = 5;  // VERSION
 				response.io.what.data.first[3] = 2;  // response data format
@@ -125,9 +127,10 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				response.io.what.data.first[6] = 0;
 				response.io.what.data.first[7] = 0;
 				memcpy(&response.io.what.data.first[8],  "vnHeusdn", 8);
-				memcpy(&response.io.what.data.first[16], "iESP", 4);  // TODO
+				memcpy(&response.io.what.data.first[16], "iESP", 4);
 				memcpy(&response.io.what.data.first[32], "1.0", 3);  // TODO
-				memcpy(&response.io.what.data.first[36], serial, 8);
+				memset(&response.io.what.data.first[36], '0', 8);
+				memcpy(&response.io.what.data.first[36], serial.c_str(), std::min(serial.size(), size_t(8)));
 				response.io.what.data.first[58] = 0x04;  // SBC-3
 				response.io.what.data.first[59] = 0xc0;
 				response.io.what.data.first[60] = 0x09;  // iSCSI
@@ -143,7 +146,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				response.io.is_inline          = true;
                                 response.io.what.data.second   = 8;
                                 response.io.what.data.first    = new uint8_t[response.io.what.data.second]();
-                                response.io.what.data.first[0] = 0;  // TODO
+				response.io.what.data.first[0] = device_type;
                                 response.io.what.data.first[1] = CDB[2];
                                 response.io.what.data.first[2] = 0;  // reserved
                                 response.io.what.data.first[3] = response.io.what.data.second - 3;
@@ -154,19 +157,21 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
                         }
 			else if (CDB[2] == 0x83) {  // device identification page
 				response.io.is_inline          = true;
-				response.io.what.data.second = 4 + 5;
+				response.io.what.data.second = 8 + serial.size();
 				response.io.what.data.first = new uint8_t[response.io.what.data.second]();
-				response.io.what.data.first[0] = 0;  // TODO
+				response.io.what.data.first[0] = device_type;
 				response.io.what.data.first[1] = CDB[2];
-				response.io.what.data.first[3] = 1;
-				response.io.what.data.first[4 + 3] = 1;
-				response.io.what.data.first[4 + 4] = 1;
+				response.io.what.data.first[3] = response.io.what.data.second - 3;
+				response.io.what.data.first[4] = 2 | (5 << 4);  // 2 = ascii, 5 = iscsi
+				response.io.what.data.first[5] = 128;  // PIV
+				response.io.what.data.first[7] = serial.size() + 3;
+				memcpy(&response.io.what.data.first[8], serial.c_str(), serial.size());
 			}
 			else if (CDB[2] == 0xb0) {  // block limits
 				response.io.is_inline          = true;
 				response.io.what.data.second = 64;
 				response.io.what.data.first = new uint8_t[response.io.what.data.second]();
-				response.io.what.data.first[0] = 0;  // TODO
+				response.io.what.data.first[0] = device_type;
 				response.io.what.data.first[1] = CDB[2];
 				response.io.what.data.first[2] = 0;
 				response.io.what.data.first[3] = 0x3c;  // page length
@@ -180,10 +185,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				response.io.is_inline          = true;
 				response.io.what.data.second = 64;
 				response.io.what.data.first = new uint8_t[response.io.what.data.second]();
-				if (lun == 0)
-					response.io.what.data.first[0] = 0x0c;  // storage array controller
-				else if (lun == 1)
-					response.io.what.data.first[0] = 0x00;  // direct-access disk
+				response.io.what.data.first[0] = device_type;
 				response.io.what.data.first[1] = CDB[2];
 				response.io.what.data.first[2] = (response.io.what.data.second - 4)>> 8;  // page length
 				response.io.what.data.first[3] = response.io.what.data.second - 4;

@@ -32,8 +32,8 @@ struct scsi_response
 class scsi
 {
 private:
-	backend *const b         { nullptr };
-	char           serial[9] { 0       };
+	backend *const b      { nullptr };
+	std::string    serial;
 
 	std::optional<std::vector<uint8_t> > validate_request(const uint64_t lba, const uint32_t n_blocks) const;
 
