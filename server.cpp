@@ -412,17 +412,18 @@ void server::handler()
 
 		for(size_t i=0; i<threads.size();) {
 			if (*threads.at(i).second) {
+				DOLOG("server::handler: thread cleaned up\n");
 				threads.at(i).first->join();
 				delete threads.at(i).first;
 				delete threads.at(i).second;
-				DOLOG("server::handler: thread cleaned up\n");
+				threads.erase(threads.begin() + i);
 			}
 			else {
 				i++;
 			}
 		}
 
-		size_t nr = threads.size();
+		std::atomic_bool *flag = new std::atomic_bool(false);
 
 		std::thread *th = new std::thread([=]() {
 			std::string endpoint = cc->get_endpoint_name();
@@ -519,12 +520,10 @@ void server::handler()
 			delete cc;
 			delete ses;
 
-			*threads[nr].second = true;
+			*flag = true;
 		});
 
-		std::atomic_bool *flag = new std::atomic_bool(false);
 		threads.push_back({ th, flag });
-		assert(threads.size() == nr + 1);
 
 #if defined(ESP32)
 		Serial.printf("Heap space: %u\r\n", get_free_heap_space());
