@@ -147,21 +147,31 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		else {
                         if (CDB[2] == 0x00) {  // supported vital product page
 				response.io.is_inline          = true;
-                                response.io.what.data.second   = 8;
+                                response.io.what.data.second   = 9;
                                 response.io.what.data.first    = new uint8_t[response.io.what.data.second]();
 				response.io.what.data.first[0] = device_type;
                                 response.io.what.data.first[1] = CDB[2];
                                 response.io.what.data.first[2] = 0;  // reserved
                                 response.io.what.data.first[3] = response.io.what.data.second - 4;
                                 response.io.what.data.first[4] = 0x00;
-                                response.io.what.data.first[5] = 0x83;  // see CDB[2] below
-                                response.io.what.data.first[6] = 0xb0;
-                                response.io.what.data.first[7] = 0xb1;
+                                response.io.what.data.first[5] = 0x80;
+                                response.io.what.data.first[6] = 0x83;  // see CDB[2] below
+                                response.io.what.data.first[7] = 0xb0;
+                                response.io.what.data.first[8] = 0xb1;
                         }
+			else if (CDB[2] == 0x80) {  // unit serial number page
+				response.io.is_inline          = true;
+				response.io.what.data.second   = 4 + serial.size();
+				response.io.what.data.first    = new uint8_t[response.io.what.data.second]();
+				response.io.what.data.first[0] = device_type;
+				response.io.what.data.first[1] = CDB[2];
+				response.io.what.data.first[3] = response.io.what.data.second - 4;
+				memcpy(&response.io.what.data.first[4], serial.c_str(), serial.size());
+			}
 			else if (CDB[2] == 0x83) {  // device identification page
 				response.io.is_inline          = true;
-				response.io.what.data.second = 8 + serial.size();
-				response.io.what.data.first = new uint8_t[response.io.what.data.second]();
+				response.io.what.data.second   = 8 + serial.size();
+				response.io.what.data.first    = new uint8_t[response.io.what.data.second]();
 				response.io.what.data.first[0] = device_type;
 				response.io.what.data.first[1] = CDB[2];
 				response.io.what.data.first[3] = response.io.what.data.second - 4;
