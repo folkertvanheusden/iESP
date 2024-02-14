@@ -57,7 +57,7 @@ scsi::~scsi()
 {
 }
 
-std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data)
+std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data)
 {
 	assert(size >= 16);
 
@@ -113,7 +113,10 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 				response.io.is_inline        = true;
 				response.io.what.data.second = 68;
 				response.io.what.data.first  = new uint8_t[response.io.what.data.second]();
-				response.io.what.data.first[0] = 0x00;  // "Direct access block device"
+				if (lun == 0)
+					response.io.what.data.first[0] = 0x0c;  // "Storage array controller"
+				else if (lun == 1)
+					response.io.what.data.first[0] = 0x00;  // "Direct access block device"
 				response.io.what.data.first[1] = 0;  // not removable
 				response.io.what.data.first[2] = 5;  // VERSION
 				response.io.what.data.first[3] = 2;  // response data format
@@ -177,7 +180,10 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 				response.io.is_inline          = true;
 				response.io.what.data.second = 64;
 				response.io.what.data.first = new uint8_t[response.io.what.data.second]();
-				response.io.what.data.first[0] = 0;  // TODO
+				if (lun == 0)
+					response.io.what.data.first[0] = 0x0c;  // storage array controller
+				else if (lun == 1)
+					response.io.what.data.first[0] = 0x00;  // direct-access disk
 				response.io.what.data.first[1] = CDB[2];
 				response.io.what.data.first[2] = (response.io.what.data.second - 4)>> 8;  // page length
 				response.io.what.data.first[3] = response.io.what.data.second - 4;
@@ -390,7 +396,7 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		response.io.is_inline           = true;
 		response.io.what.data.second    = 10;
 		response.io.what.data.first     = new uint8_t[response.io.what.data.second]();
-		response.io.what.data.first[3]  = 8;  // lun lisgt length
+		response.io.what.data.first[3]  = 8;  // lun list length
 		// 4...7 reserved
 		response.io.what.data.first[9]  = 1;  // LUN1 id
 	}

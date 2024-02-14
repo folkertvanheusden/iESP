@@ -72,5 +72,5 @@ public:
 	bool write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data);
 	bool read (const uint64_t block_nr, const uint32_t n_blocks,       uint8_t *const data);
 
-	std::optional<scsi_response> send(const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
+	std::optional<scsi_response> send(const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
 };

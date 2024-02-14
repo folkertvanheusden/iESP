@@ -1,4 +1,5 @@
 #pragma once
+#include <cinttypes>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -16,6 +17,8 @@
 #include "iscsi.h"
 #include "session.h"
 
+
+#define NTOHLL(x) ((uint64_t(ntohl(x)) << 32) | ntohl((x) >> 32))
 
 // These classes have a 'set' method as to have a way to return validity - an is_valid method would've worked as well.
 // Also no direct retrieval from filedescriptors to help porting to platforms without socket-api.
@@ -189,6 +192,8 @@ public:
 
 	size_t           get_ahs_length()  const { return bhs->ahslen * 4;                                              }
 	bool             set_ahs_segment(std::pair<const uint8_t *, std::size_t> ahs_in);
+
+	uint64_t         get_LUN_nr()      const { return NTOHLL(*reinterpret_cast<const uint64_t *>(bhs->lunfields));  }
 
 	iscsi_bhs_opcode get_opcode()      const { return iscsi_bhs_opcode(get_bits(bhs->b1, 0, 6));                    }
 	virtual blob_t   get_raw()         const { return { reinterpret_cast<uint8_t *>(bhs), sizeof *bhs };            }
