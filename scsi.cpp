@@ -8,25 +8,33 @@
 #include "utils.h"
 
 
-const std::map<scsi::scsi_opcode, std::vector<uint8_t> > scsi_a3_data {
-	{ scsi::scsi_opcode::o_test_unit_ready, { 0xff, 0x00, 0x00, 0x00, 0x00, 0x07 } },
-	{ scsi::scsi_opcode::o_request_sense,   { 0xff, 0x01, 0x00, 0x00, 0xff, 0x07 } },
-	{ scsi::scsi_opcode::o_read_6,		{ 0xff, 0x1f, 0xff, 0xff, 0xff, 0x07 } },
-	{ scsi::scsi_opcode::o_write_6,		{ 0xff, 0x1f, 0xff, 0xff, 0xff, 0x07 } },
+typedef struct {
+	std::vector<uint8_t> data;
+	int cdb_length;
+} scsi_opcode_details;
+
+const std::map<scsi::scsi_opcode, scsi_opcode_details> scsi_a3_data {
+	{ scsi::scsi_opcode::o_test_unit_ready, { { 0xff, 0x00, 0x00, 0x00, 0x00, 0x07 }, 6 } },
+	{ scsi::scsi_opcode::o_request_sense,   { { 0xff, 0x01, 0x00, 0x00, 0xff, 0x07 }, 6 } },
+	{ scsi::scsi_opcode::o_read_6,		{ { 0xff, 0x1f, 0xff, 0xff, 0xff, 0x07 }, 6 } },
+	{ scsi::scsi_opcode::o_write_6,		{ { 0xff, 0x1f, 0xff, 0xff, 0xff, 0x07 }, 6 } },
 //	{ scsi::scsi_opcode::o_seek,		{
-	{ scsi::scsi_opcode::o_inquiry,		{ 0xff, 0x01, 0xff, 0xff, 0xff, 0x07 } },
-	{ scsi::scsi_opcode::o_mode_sense_6,	{ 0xff, 0x08, 0xff, 0xff, 0xff, 0x07 } },
-	{ scsi::scsi_opcode::o_read_capacity_10,{ 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07 } },
-	{ scsi::scsi_opcode::o_read_10,		{ 0xff, 0xfe, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 } },
-	{ scsi::scsi_opcode::o_write_10,	{ 0xff, 0xfa, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 } },
-	{ scsi::scsi_opcode::o_write_verify_10,	{ 0xff, 0xf2, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 } },
-	{ scsi::scsi_opcode::o_sync_cache_10,	{ 0xff, 0x06, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 } },
-	{ scsi::scsi_opcode::o_read_16,		{ 0xff, 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 } },
-	{ scsi::scsi_opcode::o_write_16,	{ 0xff, 0xfa, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 } },
-	{ scsi::scsi_opcode::o_get_lba_status,	{ 0xff, 0x1f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 } },
-	{ scsi::scsi_opcode::o_report_luns,	{ 0xff, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 } },
-	{ scsi::scsi_opcode::o_rep_sup_oper,	{ 0xff, 0x1f, 0x87, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 } },
+	{ scsi::scsi_opcode::o_inquiry,		{ { 0xff, 0x01, 0xff, 0xff, 0xff, 0x07 }, 6 } },
+	{ scsi::scsi_opcode::o_mode_sense_6,	{ { 0xff, 0x08, 0xff, 0xff, 0xff, 0x07 }, 6 } },
+	{ scsi::scsi_opcode::o_read_capacity_10,{ { 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07 }, 10 } },
+	{ scsi::scsi_opcode::o_read_10,		{ { 0xff, 0xfe, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 }, 10 } },
+	{ scsi::scsi_opcode::o_write_10,	{ { 0xff, 0xfa, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 }, 10 } },
+	{ scsi::scsi_opcode::o_write_verify_10,	{ { 0xff, 0xf2, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 }, 10 } },
+	{ scsi::scsi_opcode::o_sync_cache_10,	{ { 0xff, 0x06, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 }, 10 } },
+	{ scsi::scsi_opcode::o_read_16,		{ { 0xff, 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 }, 16 } },
+	{ scsi::scsi_opcode::o_compare_and_write, { { 0xff, 0xfa, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x07 }, 16 } },
+	{ scsi::scsi_opcode::o_write_16,	{ { 0xff, 0xfa, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 }, 16 } },
+	{ scsi::scsi_opcode::o_get_lba_status,	{ { 0xff, 0x1f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 }, 16 } },
+	{ scsi::scsi_opcode::o_report_luns,	{ { 0xff, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 }, 12 } },
+	{ scsi::scsi_opcode::o_rep_sup_oper,	{ { 0xff, 0x1f, 0x87, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 }, 12 } },
 };
+
+constexpr const uint8_t max_compare_and_write_block_count = 1;
 
 scsi::scsi(backend *const b) : b(b)
 {
@@ -157,10 +165,10 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 				response.io.what.data.first = new uint8_t[response.io.what.data.second]();
 				response.io.what.data.first[0] = 0;  // TODO
 				response.io.what.data.first[1] = CDB[2];
-				response.io.what.data.first[2] = (response.io.what.data.second - 4) >> 8;  // page length
-				response.io.what.data.first[3] = response.io.what.data.second - 4;
+				response.io.what.data.first[2] = 0;
+				response.io.what.data.first[3] = 0x3c;  // page length
 				response.io.what.data.first[4] = 0;  // WSNZ bit
-				response.io.what.data.first[5] = 0;  // compare and write not supported
+				response.io.what.data.first[5] = max_compare_and_write_block_count;  // compare and write
 				response.io.what.data.first[6] = 0;  // OPTIMAL TRANSFER LENGTH GRANULARITY
 				response.io.what.data.first[7] = 0;
 				// ... set all to 'not set'
@@ -241,15 +249,25 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		else if (service_action == 0x12) {  // GET LBA STATUS
 			DOLOG("scsi::send: GET_LBA_STATUS\n");
 
-			response.io.is_inline          = true;
-			response.io.what.data.second = 24;
-			response.io.what.data.first = new uint8_t[response.io.what.data.second]();
-			response.io.what.data.first[0] = 0;
-			response.io.what.data.first[1] = 0;
-			response.io.what.data.first[2] = 0;
-			response.io.what.data.first[3] = response.io.what.data.second - 3;
-			memcpy(&response.io.what.data.first[8], &CDB[2], 8);  // LBA STATUS LOGICAL BLOCK ADDRESS
-			memcpy(&response.io.what.data.first[16], &CDB[10], 4);  // ALLOCATIN LENGTH
+			uint64_t lba             = (uint64_t(CDB[2]) << 56) | (uint64_t(CDB[3]) << 48) | (uint64_t(CDB[4]) << 40) | (uint64_t(CDB[5]) << 32) | (uint64_t(CDB[6]) << 24) | (CDB[7] << 16) | (CDB[8] << 8) | CDB[9];
+			uint32_t transfer_length = (uint64_t(CDB[10]) << 24) | (CDB[11] << 16) | (CDB[12] << 8) | CDB[13];
+
+			auto vr = validate_request(lba, transfer_length);
+			if (vr.has_value()) {
+				DOLOG("scsi::send: GET LBA STATUS parameters invalid\n");
+				response.sense_data = vr.value();
+			}
+			else {
+				response.io.is_inline          = true;
+				response.io.what.data.second = 24;
+				response.io.what.data.first = new uint8_t[response.io.what.data.second]();
+				response.io.what.data.first[0] = 0;
+				response.io.what.data.first[1] = 0;
+				response.io.what.data.first[2] = 0;
+				response.io.what.data.first[3] = response.io.what.data.second - 3;
+				memcpy(&response.io.what.data.first[8], &CDB[2], 8);  // LBA STATUS LOGICAL BLOCK ADDRESS
+				memcpy(&response.io.what.data.first[16], &CDB[10], 4);  // ALLOCATION LENGTH
+			}
 		}
 		else {
 			DOLOG("scsi::send: GET LBA STATUS service action %02xh not implemented\n", service_action);
@@ -280,7 +298,12 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 
 		DOLOG("scsi::send: WRITE_1%c, offset %" PRIu64 ", %u sectors\n", opcode == o_write_10 ? '0' : '6', lba, transfer_length);
 
-		if (data.first) {
+		auto vr = validate_request(lba, transfer_length);
+		if (vr.has_value()) {
+			DOLOG("scsi::send: WRITE_1x parameters invalid\n");
+			response.sense_data = vr.value();
+		}
+		else if (data.first) {
 			DOLOG("scsi::send: write command includes data (%zu bytes)\n", data.second);
 
 			auto   backend_block_size = b->get_block_size();
@@ -327,27 +350,34 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		if (opcode == o_read_16) {
 			lba             = (uint64_t(CDB[2]) << 56) | (uint64_t(CDB[3]) << 48) | (uint64_t(CDB[4]) << 40) | (uint64_t(CDB[5]) << 32) | (uint64_t(CDB[6]) << 24) | (CDB[7] << 16) | (CDB[8] << 8) | CDB[9];
 			transfer_length = (uint64_t(CDB[10]) << 24) | (CDB[11] << 16) | (CDB[12] << 8) | CDB[13];
-			DOLOG("scsi::send: READ_16, LBA %zu, %u sectors\n", size_t(lba), transfer_length);
+			DOLOG("scsi::send: READ_16, LBA %" PRIu64 ", %u sectors\n", lba, transfer_length);
 		}
 		else if (opcode == o_read_10) {
 			lba             = (uint64_t(CDB[2]) << 24) | (uint64_t(CDB[3]) << 16) | (uint64_t(CDB[4]) << 8) | uint64_t(CDB[5]);
 			transfer_length =  (CDB[7] << 8) | CDB[8];
-			DOLOG("scsi::send: READ_10, LBA %zu, %u sectors\n", size_t(lba), transfer_length);
+			DOLOG("scsi::send: READ_10, LBA %" PRIu64 ", %u sectors\n", lba, transfer_length);
 		}
 		else {
 			lba             = ((CDB[1] & 31) << 16) | (CDB[2] << 8) | CDB[3];
 			transfer_length = CDB[4];
 			if (transfer_length == 0)
 				transfer_length = 256;
-			DOLOG("scsi::send: READ_6, LBA %zu, %u sectors\n", size_t(lba), transfer_length);
+			DOLOG("scsi::send: READ_6, LBA %" PRIu64 ", %u sectors\n", lba, transfer_length);
 		}
 
-		response.io.is_inline               = false;
-		response.io.what.location.lba       = lba;
-		response.io.what.location.n_sectors = transfer_length;
-		response.io.what.data.first         = nullptr;
+		auto vr = validate_request(lba, transfer_length);
+		if (vr.has_value()) {
+			DOLOG("scsi::send: READ_1x parameters invalid\n");
+			response.sense_data = vr.value();
+		}
+		else {
+			response.io.is_inline               = false;
+			response.io.what.location.lba       = lba;
+			response.io.what.location.n_sectors = transfer_length;
+			response.io.what.data.first         = nullptr;
 
-		response.data_is_meta = false;
+			response.data_is_meta = false;
+		}
 	}
 	else if (opcode == o_sync_cache_10) {  // 0x35
 		DOLOG("scsi::send: SYNC CACHE 10\n");
@@ -371,22 +401,114 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 		DOLOG("scsi::send: REPORT SUPPORTED OPERATION CODES, service action %02xh, requested operation code %02xh, reporting options: %xh\n", service_action, req_operation_code, reporting_options);
 		bool ok = false;
 
-		if (service_action == 0x0c && reporting_options == 1) {
-			auto it = scsi_a3_data.find(scsi::scsi_opcode(req_operation_code));
-			if (it != scsi_a3_data.end()) {
+		if (service_action == 0x0c) {
+			if (reporting_options == 0) {  // all
+				size_t n_elements = scsi_a3_data.size();
+				size_t total_size = n_elements * 8;
+
 				response.io.is_inline           = true;
-				response.io.what.data.second    = 4 + it->second.size();
+				response.io.what.data.second    = 4 + total_size;
 				response.io.what.data.first     = new uint8_t[response.io.what.data.second]();
-				response.io.what.data.first[1]  = 3 + it->second.size();
-				memcpy(response.io.what.data.first + 4, it->second.data(), it->second.size());
+				response.io.what.data.first[0] = (total_size + 0) >> 24;
+				response.io.what.data.first[1] = (total_size + 0) >> 16;
+				response.io.what.data.first[2] = (total_size + 0) >>  8;
+				response.io.what.data.first[3] = (total_size + 0);
+
+				assert(total_size < 256);
+
+				size_t add_offset = 0;
+				for(auto & it: scsi_a3_data) {
+					size_t offset = 4 + add_offset;
+					response.io.what.data.first[offset + 0] = it.first;
+					response.io.what.data.first[offset + 7] = it.second.cdb_length;
+					add_offset += 8;
+				}
 
 				ok = true;
+			}
+			else if (reporting_options == 1) {  // one
+				auto it = scsi_a3_data.find(scsi::scsi_opcode(req_operation_code));
+				if (it != scsi_a3_data.end()) {
+					response.io.is_inline           = true;
+					response.io.what.data.second    = 4 + it->second.data.size();
+					response.io.what.data.first     = new uint8_t[response.io.what.data.second]();
+					response.io.what.data.first[1]  = 3 + it->second.data.size();
+					memcpy(response.io.what.data.first + 4, it->second.data.data(), it->second.data.size());
+
+					ok = true;
+				}
 			}
 		}
 
 		if (!ok) {
 			DOLOG("scsi::send: 0xa3 not fully implemented\n");
 			response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00 };
+		}
+	}
+	else if (opcode == o_compare_and_write) {  // 0x89
+		uint64_t lba         = (uint64_t(CDB[2]) << 56) | (uint64_t(CDB[3]) << 48) | (uint64_t(CDB[4]) << 40) | (uint64_t(CDB[5]) << 32) | (uint64_t(CDB[6]) << 24) | (CDB[7] << 16) | (CDB[8] << 8) | CDB[9];
+		uint32_t block_count = CDB[13];
+		DOLOG("scsi::send: COMPARE AND WRITE: LBA %" PRIu64 ", transfer length: %u\n", lba, block_count);
+
+		auto block_size = b->get_block_size();
+		auto expected_data_size = block_size * block_count * 2;
+		if (expected_data_size != data.second)
+			DOLOG("scsi::send: COMPARE AND WRITE: data count mismatch (%zu versus %zu)\n", size_t(expected_data_size), data.second);
+
+		auto vr = validate_request(lba, block_count);
+		if (vr.has_value()) {
+			DOLOG("scsi::send: COMPARE AND WRITE parameters invalid\n");
+			response.sense_data = vr.value();
+		}
+		else if (block_count > max_compare_and_write_block_count) {
+			DOLOG("scsi::send: COMPARE AND WRITE: too many blocks in one go (%u versus %u)\n", block_count, max_compare_and_write_block_count);
+
+			// sense key 0x05, asc 0x24, ascq 0x00
+			response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x24, 0x00, 0x00, 0x00, 0x00, 0x00 };
+			//                                  ^^^^                                                        ^^^^  ^^^^
+		}
+		else {
+			bool match = true;
+			uint8_t *buffer = new uint8_t[block_size]();
+			for(uint32_t i=0; i<block_count; i++) {
+				if (b->read(lba + i, 1, buffer) == false) {
+					match = false;
+					DOLOG("scsi::send: read from backend error\n");
+					break;
+				}
+
+				if (memcmp(buffer, &data.first[i * block_size], block_size) != 0) {
+					match = false;
+					DOLOG("scsi::send: block %u (LBA: %" PRIu64 ") mismatch\n", i, lba + i);
+					break;
+				}
+			}
+			delete [] buffer;
+
+			if (match) {
+				bool write_succeeded = true;
+
+				for(uint32_t i=0; i<block_count; i++) {
+					if (b->write(lba + i, 1, &data.first[i * block_size + block_count * block_size]) == false) {
+						DOLOG("scsi::send: write to backend error\n");
+						write_succeeded = false;
+						break;
+					}
+				}
+
+				if (write_succeeded)
+					response.type = ir_empty_sense;
+				else {
+					// sense key 0x01, asc 0x03, ascq 0x00; 'peripheral device write'
+					response.sense_data = { 0x70, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00 };
+					//                                  ^^^^                                                        ^^^^  ^^^^
+				}
+			}
+			else {
+				// sense key 0x0e, asc 0x1d, ascq 0x00
+				response.sense_data = { 0x70, 0x00, 0x0e, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x1d, 0x00, 0x00, 0x00, 0x00, 0x00 };
+				//                                  ^^^^                                                        ^^^^  ^^^^
+			}
 		}
 	}
 	else {
@@ -397,6 +519,17 @@ std::optional<scsi_response> scsi::send(const uint8_t *const CDB, const size_t s
 	DOLOG("-> returning %zu bytes of sense data\n", response.sense_data.size());
 
 	return response;
+}
+
+// returns sense data in case of a problem
+std::optional<std::vector<uint8_t> > scsi::validate_request(const uint64_t lba, const uint32_t n_blocks) const
+{
+	if (lba + n_blocks > get_size_in_blocks()) {
+		// ILLEGAL_REQUEST(0x05)/INVALID_FIELD_IN_CDB(0x2400)
+		return { { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x24, 0x00, 0x00, 0x00, 0x00, 0x00 } };
+	}
+
+	return { };  // no error
 }
 
 uint64_t scsi::get_size_in_blocks() const

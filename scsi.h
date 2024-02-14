@@ -35,6 +35,8 @@ private:
 	backend *const b         { nullptr };
 	char           serial[9] { 0       };
 
+	std::optional<std::vector<uint8_t> > validate_request(const uint64_t lba, const uint32_t n_blocks) const;
+
 public:
 	scsi(backend *const b);
 	virtual ~scsi();
@@ -53,6 +55,7 @@ public:
 		o_write_verify_10  = 0x2e,
 		o_sync_cache_10    = 0x35,
 		o_read_16          = 0x88,
+		o_compare_and_write= 0x89,
 		o_write_16         = 0x8a,
 		o_get_lba_status   = 0x9e,
 		o_report_luns      = 0xa0,
