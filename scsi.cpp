@@ -391,6 +391,10 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			DOLOG("scsi::send: READ_1x parameters invalid\n");
 			response.sense_data = vr.value();
 		}
+		else if (transfer_length == 0) {
+			DOLOG("scsi::send: READ_1x 0-read\n");
+			response.type = ir_empty_sense;
+		}
 		else {
 			response.io.is_inline               = false;
 			response.io.what.location.lba       = lba;
@@ -549,7 +553,9 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 // returns sense data in case of a problem
 std::optional<std::vector<uint8_t> > scsi::validate_request(const uint64_t lba, const uint32_t n_blocks) const
 {
-	if (lba + n_blocks > get_size_in_blocks()) {
+	auto size_in_blocks = get_size_in_blocks();
+
+	if (lba + n_blocks > size_in_blocks || lba + n_blocks < lba) {
 		// ILLEGAL_REQUEST(0x05)/LBA out of range(0x2100)
 		return { { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x21, 0x00, 0x00, 0x00, 0x00, 0x00 } };
 	}
