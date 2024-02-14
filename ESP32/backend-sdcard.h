@@ -15,7 +15,7 @@ private:
 
 	std::mutex serial_access_lock;
 
-	void init_file();
+	bool reinit(const bool close_first);
 
 public:
 	backend_sdcard();

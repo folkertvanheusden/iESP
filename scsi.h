@@ -32,8 +32,10 @@ struct scsi_response
 class scsi
 {
 private:
-	backend *const b         { nullptr };
-	char           serial[9] { 0       };
+	backend *const b      { nullptr };
+	std::string    serial;
+
+	std::optional<std::vector<uint8_t> > validate_request(const uint64_t lba, const uint32_t n_blocks) const;
 
 public:
 	scsi(backend *const b);
@@ -51,9 +53,12 @@ public:
 		o_read_10          = 0x28,
 		o_write_10         = 0x2a,
 		o_write_verify_10  = 0x2e,
+		o_prefetch_10      = 0x34,
 		o_sync_cache_10    = 0x35,
 		o_read_16          = 0x88,
+		o_compare_and_write= 0x89,
 		o_write_16         = 0x8a,
+		o_prefetch_16      = 0x90,
 		o_get_lba_status   = 0x9e,
 		o_report_luns      = 0xa0,
 		o_rep_sup_oper     = 0xa3,
@@ -69,5 +74,5 @@ public:
 	bool write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data);
 	bool read (const uint64_t block_nr, const uint32_t n_blocks,       uint8_t *const data);
 
-	std::optional<scsi_response> send(const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
+	std::optional<scsi_response> send(const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
 };

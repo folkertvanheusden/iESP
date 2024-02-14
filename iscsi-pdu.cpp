@@ -383,9 +383,11 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *cons
 
 std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *const s, const iscsi_response_parameters *const parameters_in)
 {
-	DOLOG("iscsi_pdu_scsi_cmd::get_response: working on ITT %08x\n", get_Itasktag());
+	const uint64_t lun = get_LUN_nr();	
+	DOLOG("iscsi_pdu_scsi_cmd::get_response: working on ITT %08x for LUN %" PRIu64 "\n", get_Itasktag(), lun);
+
 	auto parameters = static_cast<const iscsi_response_parameters_scsi_cmd *>(parameters_in);
-	auto scsi_reply = parameters->sd->send(get_CDB(), 16, data);
+	auto scsi_reply = parameters->sd->send(lun, get_CDB(), 16, data);
 	if (scsi_reply.has_value() == false) {
 		DOLOG("iscsi_pdu_scsi_cmd::get_response: scsi::send returned nothing\n");
 		return { };

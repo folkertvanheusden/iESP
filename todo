@@ -7,3 +7,4 @@
 - configurable:
   - async writes
   - name of disk-image on SD card
+- ntp upstream for logging timestamps?
