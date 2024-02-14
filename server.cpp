@@ -526,6 +526,8 @@ void server::handler()
 		threads.push_back({ th, flag });
 		assert(threads.size() == nr + 1);
 
+#if defined(ESP32)
 		Serial.printf("Heap space: %u\r\n", get_free_heap_space());
+#endif
 	}
 }
