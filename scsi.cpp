@@ -48,6 +48,9 @@ scsi::scsi(backend *const b) : b(b)
 		char buffer[128] { 0 };
 		fgets(buffer, sizeof buffer, fh);
 		fclose(fh);
+		char *lf = strchr(buffer, '\n');
+		if (lf)
+			*lf = 0x00;
 		serial = buffer;
 	}
 	else {
@@ -149,7 +152,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				response.io.what.data.first[0] = device_type;
                                 response.io.what.data.first[1] = CDB[2];
                                 response.io.what.data.first[2] = 0;  // reserved
-                                response.io.what.data.first[3] = response.io.what.data.second - 3;
+                                response.io.what.data.first[3] = response.io.what.data.second - 4;
                                 response.io.what.data.first[4] = 0x00;
                                 response.io.what.data.first[5] = 0x83;  // see CDB[2] below
                                 response.io.what.data.first[6] = 0xb0;
@@ -161,10 +164,10 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				response.io.what.data.first = new uint8_t[response.io.what.data.second]();
 				response.io.what.data.first[0] = device_type;
 				response.io.what.data.first[1] = CDB[2];
-				response.io.what.data.first[3] = response.io.what.data.second - 3;
+				response.io.what.data.first[3] = response.io.what.data.second - 4;
 				response.io.what.data.first[4] = 2 | (5 << 4);  // 2 = ascii, 5 = iscsi
 				response.io.what.data.first[5] = 128;  // PIV
-				response.io.what.data.first[7] = serial.size() + 3;
+				response.io.what.data.first[7] = serial.size();
 				memcpy(&response.io.what.data.first[8], serial.c_str(), serial.size());
 			}
 			else if (CDB[2] == 0xb0) {  // block limits
