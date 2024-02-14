@@ -522,6 +522,10 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			}
 		}
 	}
+	else if (opcode == o_prefetch_10 || opcode == o_prefetch_16) {  // 0x34 & 0x90
+		DOLOG("scsi::send: PREFETCH 10/16\n");
+		response.type = ir_empty_sense;
+	}
 	else {
 		DOLOG("scsi::send: opcode %02xh not implemented\n", opcode);
 		response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00 };
