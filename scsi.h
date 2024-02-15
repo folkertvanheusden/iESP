@@ -1,6 +1,8 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
+#include <mutex>
+#include <thread>
 #include <utility>
 
 #include "backend.h"
@@ -35,6 +37,9 @@ private:
 	backend *const b      { nullptr };
 	std::string    serial;
 
+	std::mutex locked_by_lock;
+	std::optional<std::thread::id> locked_by;
+
 	std::optional<std::vector<uint8_t> > validate_request(const uint64_t lba, const uint32_t n_blocks) const;
 
 public:
@@ -48,6 +53,8 @@ public:
 		o_write_6          = 0x0a,
 		o_seek             = 0x0b,
 		o_inquiry          = 0x12,
+		o_reserve_6        = 0x16,
+		o_release_6        = 0x17,
 		o_mode_sense_6     = 0x1a,
 		o_read_capacity_10 = 0x25,
 		o_read_10          = 0x28,
@@ -64,15 +71,30 @@ public:
 		o_rep_sup_oper     = 0xa3,
 	};
 
+	enum scsi_lock_status {
+		l_not_locked,
+		l_locked,  // locked by caller
+		l_locked_other,  // locked by someone else
+	};
+
+	enum scsi_rw_result {
+		rw_ok,
+		rw_fail_general,
+		rw_fail_locked,
+	};
+
         uint64_t get_size_in_blocks() const;
         uint64_t get_block_size()     const;
 
-	bool sync();
-
 	void get_and_reset_stats(uint64_t *const bytes_read, uint64_t *const bytes_written, uint64_t *const n_syncs);
 
-	bool write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data);
-	bool read (const uint64_t block_nr, const uint32_t n_blocks,       uint8_t *const data);
+	scsi_lock_status reserve_device();
+	bool unlock_device();
+	scsi_lock_status locking_status();
+
+	scsi_rw_result sync();
+	scsi_rw_result write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data);
+	scsi_rw_result read (const uint64_t block_nr, const uint32_t n_blocks,       uint8_t *const data);
 
 	std::optional<scsi_response> send(const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
 };

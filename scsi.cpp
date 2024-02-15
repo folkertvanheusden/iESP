@@ -2,6 +2,7 @@
 #include <cinttypes>
 #include <cstdio>
 #include <cstring>
+#include <thread>
 
 #include "log.h"
 #include "scsi.h"
@@ -20,6 +21,8 @@ const std::map<scsi::scsi_opcode, scsi_opcode_details> scsi_a3_data {
 	{ scsi::scsi_opcode::o_write_6,		{ { 0xff, 0x1f, 0xff, 0xff, 0xff, 0x07 }, 6 } },
 //	{ scsi::scsi_opcode::o_seek,		{
 	{ scsi::scsi_opcode::o_inquiry,		{ { 0xff, 0x01, 0xff, 0xff, 0xff, 0x07 }, 6 } },
+	{ scsi::scsi_opcode::o_reserve_6,	{ { 0xff, 0x00, 0x00, 0x00, 0x00, 0x07 }, 6 } },
+	{ scsi::scsi_opcode::o_release_6,	{ { 0xff, 0x00, 0x00, 0x00, 0x00, 0x07 }, 6 } },
 	{ scsi::scsi_opcode::o_mode_sense_6,	{ { 0xff, 0x08, 0xff, 0xff, 0xff, 0x07 }, 6 } },
 	{ scsi::scsi_opcode::o_read_capacity_10,{ { 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07 }, 10 } },
 	{ scsi::scsi_opcode::o_read_10,		{ { 0xff, 0xfe, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 }, 10 } },
@@ -341,14 +344,30 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			size_t received_blocks    = received_size / backend_block_size;
 			if (received_blocks)
 				DOLOG("scsi::send: WRITE_xx to LBA %" PRIu64 " is %zu in bytes, %zu bytes\n", lba, lba * backend_block_size, received_size);
-			if (received_blocks > 0 && b->write(lba, received_blocks, data.first) == false) {
-				DOLOG("scsi::send: WRITE_xx, failed writing\n");
 
-				// sense key 0x01, asc 0x03, ascq 0x00; 'peripheral device write'
-				response.sense_data = { 0x70, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00 };
-				//                                  ^^^^                                                        ^^^^  ^^^^
+			bool ok = true;
+			if (received_blocks > 0) {
+				auto rc = write(lba, received_blocks, data.first);
+
+				if (rc == scsi_rw_result::rw_fail_general) {
+					DOLOG("scsi::send: WRITE_xx, general write error\n");
+
+					// sense key 0x01, asc 0x03, ascq 0x00; 'peripheral device write'
+					response.sense_data = { 0x70, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00 };
+					//                                  ^^^^                                                        ^^^^  ^^^^
+					ok = false;
+				}
+				else if (rc == rw_fail_locked) {
+					DOLOG("scsi::send: WRITE_xx, failed writing due to reservations\n");
+
+					// sense key 0x05, asc 0x2c, ascq 0x09; 'illegal request':: 'PREVIOUS RESERVATION CONFLICT STATUS'
+					response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x09, 0x00, 0x00, 0x00, 0x00 };
+					//                                  ^^^^                                                        ^^^^  ^^^^
+					ok = false;
+				}
 			}
-			else {
+
+			if (ok) {
 				if (received_size == expected_size) {
 					response.type = ir_empty_sense;
 					DOLOG("scsi::send: received_size == expected_size\n");
@@ -503,41 +522,53 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			//                                  ^^^^                                                        ^^^^  ^^^^
 		}
 		else {
-			bool match = true;
+			scsi_rw_result match = rw_ok;
 			uint8_t *buffer = new uint8_t[block_size]();
 			for(uint32_t i=0; i<block_count; i++) {
-				if (b->read(lba + i, 1, buffer) == false) {
-					match = false;
+				match = read(lba + i, 1, buffer);
+
+				if (match != rw_ok) {
 					DOLOG("scsi::send: read from backend error\n");
 					break;
 				}
 
 				if (memcmp(buffer, &data.first[i * block_size], block_size) != 0) {
-					match = false;
+					match = rw_fail_general;
 					DOLOG("scsi::send: block %u (LBA: %" PRIu64 ") mismatch\n", i, lba + i);
 					break;
 				}
 			}
 			delete [] buffer;
 
-			if (match) {
-				bool write_succeeded = true;
+			if (match == rw_ok) {
+				scsi_rw_result write_result = rw_ok;
 
 				for(uint32_t i=0; i<block_count; i++) {
-					if (b->write(lba + i, 1, &data.first[i * block_size + block_count * block_size]) == false) {
+					write_result = write(lba + i, 1, &data.first[i * block_size + block_count * block_size]);
+
+					if (write_result != rw_ok) {
 						DOLOG("scsi::send: write to backend error\n");
-						write_succeeded = false;
 						break;
 					}
 				}
 
-				if (write_succeeded)
+				if (write_result == rw_ok)
 					response.type = ir_empty_sense;
+				else if (write_result == rw_fail_locked) {
+					// sense key 0x05, asc 0x2c, ascq 0x09; 'illegal request':: 'PREVIOUS RESERVATION CONFLICT STATUS'
+					response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x09, 0x00, 0x00, 0x00, 0x00 };
+					//                                  ^^^^                                                        ^^^^  ^^^^
+				}
 				else {
 					// sense key 0x01, asc 0x03, ascq 0x00; 'peripheral device write'
 					response.sense_data = { 0x70, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00 };
 					//                                  ^^^^                                                        ^^^^  ^^^^
 				}
+			}
+			else if (match == rw_fail_locked) {
+				// sense key 0x05, asc 0x2c, ascq 0x09; 'illegal request':: 'PREVIOUS RESERVATION CONFLICT STATUS'
+				response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x09, 0x00, 0x00, 0x00, 0x00 };
+				//                                  ^^^^                                                        ^^^^  ^^^^
 			}
 			else {
 				// sense key 0x0e, asc 0x1d, ascq 0x00
@@ -549,6 +580,24 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 	else if (opcode == o_prefetch_10 || opcode == o_prefetch_16) {  // 0x34 & 0x90
 		DOLOG("scsi::send: PREFETCH 10/16\n");
 		response.type = ir_empty_sense;
+	}
+	else if (opcode == o_reserve_6) {
+		if (reserve_device() == l_locked)
+			response.type = ir_empty_sense;
+		else {
+			// sense key 0x05, asc 0x2c, ascq 0x09; 'illegal request':: 'PREVIOUS RESERVATION CONFLICT STATUS'
+			response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x09, 0x00, 0x00, 0x00, 0x00 };
+			//                                  ^^^^                                                        ^^^^  ^^^^
+		}
+	}
+	else if (opcode == o_release_6) {
+		if (unlock_device())
+			response.type = ir_empty_sense;
+		else {
+			// sense key 0x05, asc 0x2c, ascq 0x09; 'illegal request':: 'PREVIOUS RESERVATION CONFLICT STATUS'
+			response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x09, 0x00, 0x00, 0x00, 0x00 };
+			//                                  ^^^^                                                        ^^^^  ^^^^
+		}
 	}
 	else {
 		DOLOG("scsi::send: opcode %02xh not implemented\n", opcode);
@@ -583,9 +632,16 @@ uint64_t scsi::get_block_size() const
 	return b->get_block_size();
 }
 
-bool scsi::sync()
+scsi::scsi_rw_result scsi::sync()
 {
-	return b->sync();
+	if (locking_status() != l_locked_other) {  // locked by myself or not cloedk?
+		if (b->sync())
+			return rw_ok;
+
+		return rw_fail_general;
+	}
+
+	return rw_fail_locked;
 }
 
 void scsi::get_and_reset_stats(uint64_t *const bytes_read, uint64_t *const bytes_written, uint64_t *const n_syncs)
@@ -593,12 +649,76 @@ void scsi::get_and_reset_stats(uint64_t *const bytes_read, uint64_t *const bytes
 	return b->get_and_reset_stats(bytes_read, bytes_written, n_syncs);
 }
 
-bool scsi::write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data)
+scsi::scsi_rw_result scsi::write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data)
 {
-	return b->write(block_nr, n_blocks, data);
+	if (locking_status() != l_locked_other) {  // locked by myself or not cloedk?
+		if (b->write(block_nr, n_blocks, data))
+			return rw_ok;
+
+		return rw_fail_general;
+	}
+
+	return rw_fail_locked;
 }
 
-bool scsi::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_t *const data)
+scsi::scsi_rw_result scsi::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_t *const data)
 {
-	return b->read(block_nr, n_blocks, data);
+	if (locking_status() != l_locked_other) {  // locked by myself or not cloedk?
+		if (b->read(block_nr, n_blocks, data))
+			return rw_ok;
+
+		return rw_fail_general;
+	}
+	
+	return rw_fail_locked;
+}
+
+scsi::scsi_lock_status scsi::reserve_device()
+{
+	std::unique_lock lck(locked_by_lock);
+
+	auto cur_id = std::this_thread::get_id();
+
+	if (locked_by.has_value()) {
+		if (locked_by.value() == cur_id)
+			return l_locked;
+
+		return l_locked_other;
+	}
+
+	locked_by = std::this_thread::get_id();
+
+	return l_locked;
+}
+
+bool scsi::unlock_device()
+{
+	std::unique_lock lck(locked_by_lock);
+
+	if (locked_by.has_value() == false) {
+		DOLOG("scsi::unlock_device: device was NOT locked!\n");
+		return false;
+	}
+
+	if (locked_by.value() == std::this_thread::get_id()) {
+		locked_by.reset();
+		return true;
+	}
+
+	DOLOG("scsi::unlock_device: device is locked by someone else!\n");
+
+	return false;
+}
+
+scsi::scsi_lock_status scsi::locking_status()
+{
+	std::unique_lock lck(locked_by_lock);
+
+	if (locked_by.has_value() == false)
+		return l_not_locked;
+
+	if (locked_by.value() == std::this_thread::get_id())
+		return l_locked;
+
+	return l_locked_other;
 }
