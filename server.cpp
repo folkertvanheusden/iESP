@@ -215,26 +215,32 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 
 		// create response
 		if (F) {
-			DOLOG("server::push-response: end of batch\n");
+			DOLOG("server::push_response: end of batch\n");
 
 			iscsi_pdu_scsi_cmd response;
-			response.set(ses, session->PDU_initiator.data, session->PDU_initiator.n);  // TODO check for false
+			if (response.set(ses, session->PDU_initiator.data, session->PDU_initiator.n) == false) {
+				DOLOG("server::push_response: response.set failed\n");
+				return false;
+			}
 			response_set = response.get_response(ses, parameters, session->bytes_left);
 
 			if (session->bytes_left == 0) {
-				DOLOG("server::push-response: end of task\n");
+				DOLOG("server::push_response: end of task\n");
 
 				ses->remove_r2t_session(TTT);
 			}
 			else {
-				DOLOG("server::push-response: ask for more (%u bytes left)\n", session->bytes_left);
+				DOLOG("server::push_response: ask for more (%u bytes left)\n", session->bytes_left);
 				// send 0x31 for range
 				iscsi_pdu_scsi_cmd temp;
 				temp.set(ses, session->PDU_initiator.data, session->PDU_initiator.n);
 
 				auto *response = new iscsi_pdu_scsi_r2t() /* 0x31 */;
-				response->set(ses, temp, TTT, session->bytes_done, session->bytes_left);  // TODO check for false
-				// ^ ADD TO RESPONSE SET TODO
+				if (response->set(ses, temp, TTT, session->bytes_done, session->bytes_left) == false) {
+					DOLOG("server::push_response: response->set failed\n");
+					delete response;
+					return false;
+				}
 
 				response_set.value().responses.push_back(response);
 			}
