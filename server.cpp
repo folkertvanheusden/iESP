@@ -180,9 +180,13 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 		auto     pdu_data_out = reinterpret_cast<iscsi_pdu_scsi_data_out *>(pdu);
 		uint32_t offset       = pdu_data_out->get_BufferOffset();
 		auto     data         = pdu_data_out->get_data();
-		uint32_t TTT          = pdu_data_out->get_Itasktag();  // this software uses the ITT as TTT
+		uint32_t TTT          = pdu_data_out->get_TTT();
 		bool     F            = pdu_data_out->get_F();
 		auto     session      = ses->get_r2t_sesion(TTT);
+
+		if (TTT == 0xffffffff) {  // unsollicited data
+			TTT = pdu_data_out->get_Itasktag();
+		}
 
 		if (session == nullptr) {
 			DOLOG("server::push_response: DATA-OUT PDU references unknown TTT (%08x)\n", TTT);
