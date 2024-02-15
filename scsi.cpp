@@ -248,24 +248,31 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		if (service_action == 0x10) {  // READ CAPACITY
 			DOLOG("scsi::send: READ_CAPACITY(16)\n");
 
-			response.io.is_inline          = true;
-			response.io.what.data.second = 32;
-			response.io.what.data.first = new uint8_t[response.io.what.data.second]();
-			auto device_size = b->get_size_in_blocks() - 1;
-			response.io.what.data.first[0] = device_size >> 56;
-			response.io.what.data.first[1] = device_size >> 48;
-			response.io.what.data.first[2] = device_size >> 40;
-			response.io.what.data.first[3] = device_size >> 32;
-			response.io.what.data.first[4] = device_size >> 24;
-			response.io.what.data.first[5] = device_size >> 16;
-			response.io.what.data.first[6] = device_size >>  8;
-			response.io.what.data.first[7] = device_size;
-			uint32_t block_size = b->get_block_size();
-			response.io.what.data.first[8] = block_size >> 24;
-			response.io.what.data.first[9] = block_size >> 16;
-			response.io.what.data.first[10] = block_size >>  8;
-			response.io.what.data.first[11] = block_size;
-			response.io.what.data.first[12] = 1 << 4;  // RC BASIS: "The RETURNED LOGICAL BLOCK ADDRESS field indicates the LBA of the last logical block on the logical unit."
+			uint16_t allocation_length = (CDB[10] << 24) | (CDB[11] << 16) | (CDB[12] << 8) | CDB[13];
+
+			if (allocation_length == 0)
+				response.type = ir_empty_sense;
+			else {
+				response.io.is_inline          = true;
+				response.io.what.data.second   = 32;
+				response.io.what.data.first    = new uint8_t[response.io.what.data.second]();
+				auto device_size = b->get_size_in_blocks() - 1;
+				response.io.what.data.first[0] = device_size >> 56;
+				response.io.what.data.first[1] = device_size >> 48;
+				response.io.what.data.first[2] = device_size >> 40;
+				response.io.what.data.first[3] = device_size >> 32;
+				response.io.what.data.first[4] = device_size >> 24;
+				response.io.what.data.first[5] = device_size >> 16;
+				response.io.what.data.first[6] = device_size >>  8;
+				response.io.what.data.first[7] = device_size;
+				uint32_t block_size = b->get_block_size();
+				response.io.what.data.first[8] = block_size >> 24;
+				response.io.what.data.first[9] = block_size >> 16;
+				response.io.what.data.first[10] = block_size >>  8;
+				response.io.what.data.first[11] = block_size;
+				response.io.what.data.first[12] = 1 << 4;  // RC BASIS: "The RETURNED LOGICAL BLOCK ADDRESS field indicates the LBA of the last logical block on the logical unit."
+				response.io.what.data.second = std::min(response.io.what.data.second, size_t(allocation_length));
+			}
 		}
 		else if (service_action == 0x12) {  // GET LBA STATUS
 			DOLOG("scsi::send: GET_LBA_STATUS\n");
@@ -280,8 +287,8 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			}
 			else {
 				response.io.is_inline          = true;
-				response.io.what.data.second = 24;
-				response.io.what.data.first = new uint8_t[response.io.what.data.second]();
+				response.io.what.data.second   = 24;
+				response.io.what.data.first    = new uint8_t[response.io.what.data.second]();
 				response.io.what.data.first[0] = 0;
 				response.io.what.data.first[1] = 0;
 				response.io.what.data.first[2] = 0;

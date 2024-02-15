@@ -569,6 +569,9 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get() const
 
 	if (use_pdu_data_size > size_t(reply_to_copy.get_ExpDatLen()))
 		DOLOG("iscsi_pdu_scsi_data_in: requested less (%zu) than wat is available (%zu)\n", size_t(reply_to_copy.get_ExpDatLen()), use_pdu_data_size);
+	else if (use_pdu_data_size == 0)
+		DOLOG("iscsi_pdu_scsi_data_in: trying to send DATA-IN without data\n");
+
 	use_pdu_data_size = std::min(use_pdu_data_size, size_t(reply_to_copy.get_ExpDatLen()));
 
 	size_t n_to_do = (use_pdu_data_size + 511) / 512;
@@ -608,10 +611,13 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get() const
 
 		uint8_t *out = new uint8_t[out_size]();
 		memcpy(out, pdu_data_in, sizeof *pdu_data_in);
-		memcpy(&out[sizeof(*pdu_data_in)], pdu_data_in_data.first + i, cur_len);
+		if (cur_len)
+			memcpy(&out[sizeof(*pdu_data_in)], pdu_data_in_data.first + i, cur_len);
 
 		v_out.push_back({ out, out_size });
 	}
+
+	DOLOG("iscsi_pdu_scsi_data_in::get: returning %zu PDUs\n", v_out.size());
 
 	return v_out;
 }
