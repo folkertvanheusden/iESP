@@ -29,21 +29,21 @@ uint32_t session::get_inc_datasn(const uint32_t data_sn_itt)
 
 uint32_t session::init_r2t_session(const r2t_session & rs, iscsi_pdu_scsi_cmd *const pdu)
 {
-	uint32_t TTT = pdu->get_Itasktag();
+	uint32_t ITT = pdu->get_Itasktag();
 
-	auto it = r2t_sessions.find(TTT);
+	auto it = r2t_sessions.find(ITT);
 	if (it != r2t_sessions.end())
-		return TTT;
+		return ITT;
 
 	r2t_session *copy = new r2t_session;
 	*copy = rs;
 
 	copy->PDU_initiator = pdu->get_raw();
 
-	DOLOG("session::init_r2t_session: register TTT %08x\n", TTT);
-	r2t_sessions.insert({ TTT, copy });
+	DOLOG("session::init_r2t_session: register ITT %08x\n", ITT);
+	r2t_sessions.insert({ ITT, copy });
 
-	return TTT;
+	return ITT;
 }
 
 r2t_session *session::get_r2t_sesion(const uint32_t ttt)
