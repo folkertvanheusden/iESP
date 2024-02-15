@@ -368,8 +368,10 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 
 			if (transfer_length)
 				response.type = ir_r2t;  // allow R2T packets to come in
-			else
+			else {
+				response.type = ir_empty_sense;
 				DOLOG("scsi::send: WRITE with 0 transfer_length\n");
+			}
 		}
 	}
 	else if (opcode == o_read_16 || opcode == o_read_10 || opcode == o_read_6) {  // 0x88, 0x28, 0x08
