@@ -232,7 +232,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 				iscsi_pdu_scsi_cmd temp;
 				temp.set(ses, session->PDU_initiator.data, session->PDU_initiator.n);
 
-				auto *response = new iscsi_pdu_scsi_r2t /* 0x31 */;
+				auto *response = new iscsi_pdu_scsi_r2t() /* 0x31 */;
 				response->set(ses, temp, TTT, session->bytes_done, session->bytes_left);  // TODO check for false
 				// ^ ADD TO RESPONSE SET TODO
 
