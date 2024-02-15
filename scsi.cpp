@@ -292,6 +292,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		}
 		else {
 			DOLOG("scsi::send: GET LBA STATUS service action %02xh not implemented\n", service_action);
+			response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00 };
 		}
 	}
 	else if (opcode == o_write_6 || opcode == o_write_10 || opcode == o_write_verify_10 || opcode == o_write_16) {
