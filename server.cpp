@@ -271,7 +271,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 		delete pdu_out;
 	}
 
-	// e.g. for READ_xx (as buffering may be RAM-wise too costly)
+	// e.g. for READ_xx (as buffering may be RAM-wise too costly (on the ESP32))
 	if (response_set.value().to_stream.has_value()) {
 		auto & stream_parameters = response_set.value().to_stream.value();
 
@@ -322,9 +322,14 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 			uint32_t n_left = low_ram ? 1 : std::min(block_group_size, stream_parameters.n_sectors - block_nr);
 			buffer.n = n_left * 512;
 
+			if (offset < use_pdu_data_size)
+				buffer.n = std::min(buffer.n, size_t(use_pdu_data_size - offset));
+			else
+				buffer.n = 0;
+
 			uint64_t cur_block_nr = block_nr + stream_parameters.lba;
-			DOLOG("server::push_response: reading %u block(s) %zu from backend\n", n_left, size_t(cur_block_nr));
-			if (s->read(cur_block_nr, n_left, buffer.data) == false) {
+			DOLOG("server::push_response: reading %u block(s) nr %zu from backend\n", n_left, size_t(cur_block_nr));
+			if (buffer.n > 0 && s->read(cur_block_nr, n_left, buffer.data) == false) {
 				DOLOG("server::push_response: reading %u block(s) %zu from backend failed\n", n_left, size_t(cur_block_nr));
 				ok = false;
 				break;
@@ -339,6 +344,8 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 				buffer.data = new uint8_t[buffer.n]();
 #ifdef ESP32
 				Serial.printf("Low on memory: %zu bytes failed\r\n", buffer.n);
+#else
+				DOLOG("Possibly low on memory: %zu bytes failed\r\n", buffer.n);
 #endif
 			}
 			else {
@@ -355,6 +362,9 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 				offset += buffer.n;
 				block_nr += n_left;
 			}
+
+			if (buffer.n == 0)
+				break;
 		}
 
 		delete [] buffer.data;
