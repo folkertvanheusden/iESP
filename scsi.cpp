@@ -634,7 +634,7 @@ uint64_t scsi::get_block_size() const
 
 scsi::scsi_rw_result scsi::sync()
 {
-	if (locking_status() != l_locked_other) {  // locked by myself or not cloedk?
+	if (locking_status() != l_locked_other) {  // locked by myself or not locked?
 		if (b->sync())
 			return rw_ok;
 
@@ -651,7 +651,7 @@ void scsi::get_and_reset_stats(uint64_t *const bytes_read, uint64_t *const bytes
 
 scsi::scsi_rw_result scsi::write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data)
 {
-	if (locking_status() != l_locked_other) {  // locked by myself or not cloedk?
+	if (locking_status() != l_locked_other) {  // locked by myself or not locked?
 		if (b->write(block_nr, n_blocks, data))
 			return rw_ok;
 
@@ -663,7 +663,7 @@ scsi::scsi_rw_result scsi::write(const uint64_t block_nr, const uint32_t n_block
 
 scsi::scsi_rw_result scsi::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_t *const data)
 {
-	if (locking_status() != l_locked_other) {  // locked by myself or not cloedk?
+	if (locking_status() != l_locked_other) {  // locked by myself or not locked?
 		if (b->read(block_nr, n_blocks, data))
 			return rw_ok;
 

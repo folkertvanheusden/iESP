@@ -197,12 +197,12 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 			assert((offset % block_size) == 0);
 			assert((data.value().second % block_size) == 0);
 
-			bool rc = s->write(session->buffer_lba + offset / block_size, data.value().second / block_size, data.value().first);
+			auto rc = s->write(session->buffer_lba + offset / block_size, data.value().second / block_size, data.value().first);
 			delete [] data.value().first;
 
-			if (rc == false) {
-				DOLOG("server::push_response: DATA-OUT problem writing to backend\n");
-				return rc;
+			if (rc != scsi::rw_ok) {
+				DOLOG("server::push_response: DATA-OUT problem writing to backend (%d)\n", rc);
+				return false;
 			}
 
 			session->bytes_done += data.value().second;
@@ -329,10 +329,14 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 
 			uint64_t cur_block_nr = block_nr + stream_parameters.lba;
 			DOLOG("server::push_response: reading %u block(s) nr %zu from backend\n", n_left, size_t(cur_block_nr));
-			if (buffer.n > 0 && s->read(cur_block_nr, n_left, buffer.data) == false) {
-				DOLOG("server::push_response: reading %u block(s) %zu from backend failed\n", n_left, size_t(cur_block_nr));
-				ok = false;
-				break;
+			if (buffer.n > 0) {
+				auto rc = s->read(cur_block_nr, n_left, buffer.data);
+
+				if (rc != scsi::rw_ok) {
+					DOLOG("server::push_response: reading %u block(s) %zu from backend failed (%d)\n", n_left, size_t(cur_block_nr), rc);
+					ok = false;
+					break;
+				}
 			}
 
 			blob_t out = iscsi_pdu_scsi_data_in::gen_data_in_pdu(ses, reply_to, buffer, use_pdu_data_size, offset);
@@ -526,6 +530,7 @@ void server::handler()
 #endif
 
 			s->sync();
+			s->unlock_device();
 
 			delete cc;
 			delete ses;
