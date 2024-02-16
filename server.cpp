@@ -540,7 +540,8 @@ void server::handler()
 #endif
 
 			s->sync();
-			s->unlock_device();
+			if (s->locking_status() == scsi::l_locked)
+				s->unlock_device();
 
 			delete cc;
 			delete ses;
