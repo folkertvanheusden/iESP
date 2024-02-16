@@ -6,6 +6,8 @@
 #include <ArduinoOTA.h>
 #include <csignal>
 #include <cstdio>
+#include <esp_debug_helpers.h>
+#include <esp_heap_caps.h>
 #include <esp_wifi.h>
 #include <ESPmDNS.h>
 #include <ETH.h>
@@ -111,6 +113,79 @@ void enable_OTA() {
 	Serial.println(F("OTA ready"));
 }
 
+void WiFiEvent(WiFiEvent_t event)
+{
+	Serial.print(F("WiFi event: "));
+
+	switch(event) {
+		case WIFI_REASON_UNSPECIFIED:
+			Serial.println(F("WIFI_REASON_UNSPECIFIED")); break;
+		case WIFI_REASON_AUTH_EXPIRE:
+			Serial.println(F("WIFI_REASON_AUTH_EXPIRE")); break;
+		case WIFI_REASON_AUTH_LEAVE:
+			Serial.println(F("WIFI_REASON_AUTH_LEAVE")); break;
+		case WIFI_REASON_ASSOC_EXPIRE:
+			Serial.println(F("WIFI_REASON_ASSOC_EXPIRE")); break;
+		case WIFI_REASON_ASSOC_TOOMANY:
+			Serial.println(F("WIFI_REASON_ASSOC_TOOMANY")); break;
+		case WIFI_REASON_NOT_AUTHED:
+			Serial.println(F("WIFI_REASON_NOT_AUTHED")); break;
+		case WIFI_REASON_NOT_ASSOCED:
+			Serial.println(F("WIFI_REASON_NOT_ASSOCED")); break;
+		case WIFI_REASON_ASSOC_LEAVE:
+			Serial.println(F("WIFI_REASON_ASSOC_LEAVE")); break;
+		case WIFI_REASON_ASSOC_NOT_AUTHED:
+			Serial.println(F("WIFI_REASON_ASSOC_NOT_AUTHED")); break;
+		case WIFI_REASON_DISASSOC_PWRCAP_BAD:
+			Serial.println(F("WIFI_REASON_DISASSOC_PWRCAP_BAD")); break;
+		case WIFI_REASON_DISASSOC_SUPCHAN_BAD:
+			Serial.println(F("WIFI_REASON_DISASSOC_SUPCHAN_BAD")); break;
+		case WIFI_REASON_IE_INVALID:
+			Serial.println(F("WIFI_REASON_IE_INVALID")); break;
+		case WIFI_REASON_MIC_FAILURE:
+			Serial.println(F("WIFI_REASON_MIC_FAILURE")); break;
+		case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
+			Serial.println(F("WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT")); break;
+		case WIFI_REASON_GROUP_KEY_UPDATE_TIMEOUT:
+			Serial.println(F("WIFI_REASON_GROUP_KEY_UPDATE_TIMEOUT")); break;
+		case WIFI_REASON_IE_IN_4WAY_DIFFERS:
+			Serial.println(F("WIFI_REASON_IE_IN_4WAY_DIFFERS")); break;
+		case WIFI_REASON_GROUP_CIPHER_INVALID:
+			Serial.println(F("WIFI_REASON_GROUP_CIPHER_INVALID")); break;
+		case WIFI_REASON_PAIRWISE_CIPHER_INVALID:
+			Serial.println(F("WIFI_REASON_PAIRWISE_CIPHER_INVALID")); break;
+		case WIFI_REASON_AKMP_INVALID:
+			Serial.println(F("WIFI_REASON_AKMP_INVALID")); break;
+		case WIFI_REASON_UNSUPP_RSN_IE_VERSION:
+			Serial.println(F("WIFI_REASON_UNSUPP_RSN_IE_VERSION")); break;
+		case WIFI_REASON_INVALID_RSN_IE_CAP:
+			Serial.println(F("WIFI_REASON_INVALID_RSN_IE_CAP")); break;
+		case WIFI_REASON_802_1X_AUTH_FAILED:
+			Serial.println(F("WIFI_REASON_802_1X_AUTH_FAILED")); break;
+		case WIFI_REASON_CIPHER_SUITE_REJECTED:
+			Serial.println(F("WIFI_REASON_CIPHER_SUITE_REJECTED")); break;
+		case WIFI_REASON_BEACON_TIMEOUT:
+			Serial.println(F("WIFI_REASON_BEACON_TIMEOUT")); break;
+		case WIFI_REASON_NO_AP_FOUND:
+			Serial.println(F("WIFI_REASON_NO_AP_FOUND")); break;
+		case WIFI_REASON_AUTH_FAIL:
+			Serial.println(F("WIFI_REASON_AUTH_FAIL")); break;
+		case WIFI_REASON_ASSOC_FAIL:
+			Serial.println(F("WIFI_REASON_ASSOC_FAIL")); break;
+		case WIFI_REASON_HANDSHAKE_TIMEOUT:
+			Serial.println(F("WIFI_REASON_HANDSHAKE_TIMEOUT")); break;
+		default:
+			Serial.println(event); break;
+	}
+}
+
+void heap_caps_alloc_failed_hook(size_t requested_size, uint32_t caps, const char *function_name)
+{
+	printf("%s was called but failed to allocate %zu bytes with 0x%x capabilities (by %p)\r\n", function_name, requested_size, caps, __builtin_return_address(0));
+
+	esp_backtrace_print(25);
+}
+
 bool progress_indicator(const int nr, const int mx, const std::string & which) {
 	printf("%3.2f%%: %s\r\n", nr * 100. / mx, which.c_str());
 
@@ -119,6 +194,8 @@ bool progress_indicator(const int nr, const int mx, const std::string & which) {
 
 void setup_wifi() {
 	enable_wifi_debug();
+
+	WiFi.onEvent(WiFiEvent);
 
 	scan_access_points_start();
 
@@ -254,6 +331,8 @@ void setup() {
 		MDNS.addService("iscsi", "tcp", 3260);
 	else
 		Serial.println(F("Failed starting mdns responder"));
+
+	heap_caps_register_failed_alloc_callback(heap_caps_alloc_failed_hook);
 
 	Serial.print("Waiting for Ethernet: ");
 	while(eth_connected == false) {

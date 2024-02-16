@@ -383,9 +383,11 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *cons
 
 std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *const s, const iscsi_response_parameters *const parameters_in)
 {
-	DOLOG("iscsi_pdu_scsi_cmd::get_response: working on ITT %08x\n", get_Itasktag());
+	const uint64_t lun = get_LUN_nr();	
+	DOLOG("iscsi_pdu_scsi_cmd::get_response: working on ITT %08x for LUN %" PRIu64 "\n", get_Itasktag(), lun);
+
 	auto parameters = static_cast<const iscsi_response_parameters_scsi_cmd *>(parameters_in);
-	auto scsi_reply = parameters->sd->send(get_CDB(), 16, data);
+	auto scsi_reply = parameters->sd->send(lun, get_CDB(), 16, data);
 	if (scsi_reply.has_value() == false) {
 		DOLOG("iscsi_pdu_scsi_cmd::get_response: scsi::send returned nothing\n");
 		return { };
@@ -567,6 +569,9 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get() const
 
 	if (use_pdu_data_size > size_t(reply_to_copy.get_ExpDatLen()))
 		DOLOG("iscsi_pdu_scsi_data_in: requested less (%zu) than wat is available (%zu)\n", size_t(reply_to_copy.get_ExpDatLen()), use_pdu_data_size);
+	else if (use_pdu_data_size == 0)
+		DOLOG("iscsi_pdu_scsi_data_in: trying to send DATA-IN without data\n");
+
 	use_pdu_data_size = std::min(use_pdu_data_size, size_t(reply_to_copy.get_ExpDatLen()));
 
 	size_t n_to_do = (use_pdu_data_size + 511) / 512;
@@ -606,10 +611,13 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get() const
 
 		uint8_t *out = new uint8_t[out_size]();
 		memcpy(out, pdu_data_in, sizeof *pdu_data_in);
-		memcpy(&out[sizeof(*pdu_data_in)], pdu_data_in_data.first + i, cur_len);
+		if (cur_len)
+			memcpy(&out[sizeof(*pdu_data_in)], pdu_data_in_data.first + i, cur_len);
 
 		v_out.push_back({ out, out_size });
 	}
+
+	DOLOG("iscsi_pdu_scsi_data_in::get: returning %zu PDUs\n", v_out.size());
 
 	return v_out;
 }
@@ -651,9 +659,15 @@ blob_t iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *const s, const iscsi_pdu
 	size_t out_size = sizeof(pdu_data_in) + pdu_data_in_data.n;
 	out_size = (out_size + 3) & ~3;
 
-	uint8_t *out = new uint8_t[out_size]();
-	memcpy(out, &pdu_data_in, sizeof pdu_data_in);
-	memcpy(&out[sizeof(pdu_data_in)], pdu_data_in_data.data, pdu_data_in_data.n);
+	uint8_t *out = new (std::nothrow) uint8_t[out_size]();
+	if (out) {
+		memcpy(out, &pdu_data_in, sizeof pdu_data_in);
+		if (pdu_data_in_data.n)
+			memcpy(&out[sizeof(pdu_data_in)], pdu_data_in_data.data, pdu_data_in_data.n);
+	}
+	else {
+		out_size = 0;
+	}
 
 	return { out, out_size };
 }

@@ -1,3 +1,4 @@
+#include <mutex>
 #include <SdFat.h>
 #include <string>
 
@@ -11,6 +12,8 @@ private:
 	FsFile    file;
 	uint64_t  card_size   { 0 };
 	size_t    sector_size { 0 };
+
+	std::mutex serial_access_lock;
 
 	bool reinit(const bool close_first);
 

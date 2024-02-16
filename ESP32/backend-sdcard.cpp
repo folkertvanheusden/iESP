@@ -99,6 +99,8 @@ bool backend_sdcard::sync()
 #endif
 	n_syncs++;
 
+	std::lock_guard<std::mutex> lck(serial_access_lock);
+
 	if (file.sync() == false)
 		Serial.println(F("SD card backend: sync failed"));
 
@@ -128,6 +130,8 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 
 	uint64_t iscsi_block_size = get_block_size();
 	uint64_t byte_address     = block_nr * iscsi_block_size;  // iSCSI to bytes
+
+	std::lock_guard<std::mutex> lck(serial_access_lock);
 
 	if (file.seekSet(byte_address) == false) {
 		Serial.println(F("Cannot seek to position"));
@@ -171,6 +175,8 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 
 	uint64_t iscsi_block_size = get_block_size();
 	uint64_t byte_address     = block_nr * iscsi_block_size;  // iSCSI to bytes
+
+	std::lock_guard<std::mutex> lck(serial_access_lock);
 
 	if (file.seekSet(byte_address) == false) {
 		Serial.println(F("Cannot seek to position"));
