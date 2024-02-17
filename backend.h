@@ -21,5 +21,6 @@ public:
 	void get_and_reset_stats(uint64_t *const bytes_read, uint64_t *const bytes_written, uint64_t *const n_syncs);
 
 	virtual bool write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data) = 0;
+	virtual bool trim (const uint64_t block_nr, const uint32_t n_blocks                           ) = 0;
 	virtual bool read (const uint64_t block_nr, const uint32_t n_blocks,       uint8_t *const data) = 0;
 };

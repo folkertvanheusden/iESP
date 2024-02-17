@@ -29,6 +29,7 @@ const std::map<scsi::scsi_opcode, scsi_opcode_details> scsi_a3_data {
 	{ scsi::scsi_opcode::o_write_10,	{ { 0xff, 0xfa, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 }, 10 } },
 	{ scsi::scsi_opcode::o_write_verify_10,	{ { 0xff, 0xf2, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 }, 10 } },
 	{ scsi::scsi_opcode::o_sync_cache_10,	{ { 0xff, 0x06, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 }, 10 } },
+	{ scsi::scsi_opcode::o_unmap,           { { 0xff, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0x07 }, 10 } },
 	{ scsi::scsi_opcode::o_read_16,		{ { 0xff, 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 }, 16 } },
 	{ scsi::scsi_opcode::o_compare_and_write, { { 0xff, 0xfa, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x07 }, 16 } },
 	{ scsi::scsi_opcode::o_write_16,	{ { 0xff, 0xfa, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 }, 16 } },
@@ -137,8 +138,8 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				memcpy(&response.io.what.data.first[32], "1.0", 3);  // TODO
 				memset(&response.io.what.data.first[36], '0', 8);
 				memcpy(&response.io.what.data.first[36], serial.c_str(), std::min(serial.size(), size_t(8)));
-				response.io.what.data.first[58] = 0x04;  // SBC-3
-				response.io.what.data.first[59] = 0xc0;
+				response.io.what.data.first[58] = 0x06;  // SBC-4
+				response.io.what.data.first[59] = 0x00;
 				response.io.what.data.first[60] = 0x09;  // iSCSI
 				response.io.what.data.first[61] = 0x60;
 				response.io.what.data.first[62] = 0x01;  // SCC-2
@@ -195,7 +196,10 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				response.io.what.data.first[5] = max_compare_and_write_block_count;  // compare and write
 				response.io.what.data.first[6] = 0;  // OPTIMAL TRANSFER LENGTH GRANULARITY
 				response.io.what.data.first[7] = 0;
-				// ... set all to 'not set'
+				response.io.what.data.first[23] = 128;  // LSB of 'MAXIMUM UNMAP LBA COUNT'
+				response.io.what.data.first[27] = 8;  // LSB of 'MAXIMUM UNMAP BLOCK DESCRIPTOR COUNT'
+				response.io.what.data.first[31] = 8;  // LSB of 'OPTIMAL UNMAP GRANULARITY'
+				// ... set rest to 'not set'
 			}
 			else if (CDB[2] == 0xb1) {  // block device characteristics
 				response.io.is_inline          = true;
@@ -274,6 +278,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				response.io.what.data.first[10] = block_size >>  8;
 				response.io.what.data.first[11] = block_size;
 				response.io.what.data.first[12] = 1 << 4;  // RC BASIS: "The RETURNED LOGICAL BLOCK ADDRESS field indicates the LBA of the last logical block on the logical unit."
+				response.io.what.data.first[14] = 128 | 64;  // LBPME (Logical Block Provisioning Management Enabled), LBPRZ (Logical Block Provisioning Read Zeros)
 				response.io.what.data.second = std::min(response.io.what.data.second, size_t(allocation_length));
 			}
 		}
@@ -491,11 +496,19 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 
 					ok = true;
 				}
+				else {
+					DOLOG("scsi::send: 0xa3 for opcode %02x not implemented\n", req_operation_code);
+				}
 			}
+			else {
+				DOLOG("scsi::send: 0xa3 reporting option %d not implemented\n", reporting_options);
+			}
+		}
+		else {
+			DOLOG("scsi::send: 0xa3 service action %02x not implemented\n", service_action);
 		}
 
 		if (!ok) {
-			DOLOG("scsi::send: 0xa3 not fully implemented\n");
 			response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00 };
 		}
 	}
@@ -582,6 +595,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		response.type = ir_empty_sense;
 	}
 	else if (opcode == o_reserve_6) {
+		DOLOG("scsi::send: RESERVE 6\n");
 		if (reserve_device() == l_locked)
 			response.type = ir_empty_sense;
 		else {
@@ -591,11 +605,47 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		}
 	}
 	else if (opcode == o_release_6) {
+		DOLOG("scsi::send: RELEASE 6\n");
 		if (unlock_device())
 			response.type = ir_empty_sense;
 		else {
 			// sense key 0x05, asc 0x2c, ascq 0x09; 'illegal request':: 'PREVIOUS RESERVATION CONFLICT STATUS'
 			response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x09, 0x00, 0x00, 0x00, 0x00 };
+			//                                  ^^^^                                                        ^^^^  ^^^^
+		}
+	}
+	else if (opcode == o_unmap) {
+		DOLOG("scsi::send: UNMAP\n");
+#ifndef NDEBUG
+		DOLOG("GREP unmap CDB size %zu\n", size);
+		DOLOG("GREP unmap data size %zu\n", data.second);
+		uint16_t parameter_list_length = (CDB[7] << 8) | CDB[8];
+		DOLOG("GREP parameter_list_length %u\n", parameter_list_length);
+		uint16_t unmap_data_length = (CDB[10 + 0] << 8) | CDB[10 + 1];
+		DOLOG("GREP unmap_data_length %u\n", unmap_data_length);
+		uint16_t unmap_block_descriptor_data_length = (CDB[10 + 2] << 8) | CDB[10 + 3];
+		DOLOG("GREP unmap_block_descriptor_data_length %u\n", unmap_block_descriptor_data_length);
+#endif
+		const uint8_t *const pd = data.first;
+		scsi_rw_result rc = rw_ok;
+		for(size_t i=8; i<data.second; i+= 14) {
+			uint64_t lba             = (uint64_t(pd[i + 0]) << 56) | (uint64_t(pd[i + 1]) << 48) | (uint64_t(pd[i + 2]) << 40) | (uint64_t(pd[i + 3]) << 32) | (uint64_t(pd[i + 4]) << 24) | (pd[i + 5] << 16) | (pd[i + 6] << 8) | pd[i + 7];
+			uint32_t transfer_length = (uint64_t(pd[i + 8]) << 24) | (pd[i + 9] << 16) | (pd[i + 10] << 8) | pd[i + 11];
+			rc = trim(lba, transfer_length);
+			if (rc != rw_ok)
+				break;
+		}
+
+		if (rc == rw_ok)
+			response.type = ir_empty_sense;
+		else if (rc == rw_fail_locked) {
+			// sense key 0x05, asc 0x2c, ascq 0x09; 'illegal request':: 'PREVIOUS RESERVATION CONFLICT STATUS'
+			response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x09, 0x00, 0x00, 0x00, 0x00 };
+			//                                  ^^^^                                                        ^^^^  ^^^^
+		}
+		else {
+			// sense key 0x01, asc 0x03, ascq 0x00; 'peripheral device write'
+			response.sense_data = { 0x70, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00 };
 			//                                  ^^^^                                                        ^^^^  ^^^^
 		}
 	}
@@ -653,6 +703,18 @@ scsi::scsi_rw_result scsi::write(const uint64_t block_nr, const uint32_t n_block
 {
 	if (locking_status() != l_locked_other) {  // locked by myself or not locked?
 		if (b->write(block_nr, n_blocks, data))
+			return rw_ok;
+
+		return rw_fail_general;
+	}
+
+	return rw_fail_locked;
+}
+
+scsi::scsi_rw_result scsi::trim(const uint64_t block_nr, const uint32_t n_blocks)
+{
+	if (locking_status() != l_locked_other) {  // locked by myself or not locked?
+		if (b->trim(block_nr, n_blocks))
 			return rw_ok;
 
 		return rw_fail_general;
