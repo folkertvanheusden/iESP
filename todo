@@ -1,7 +1,5 @@
 - multiple LUNs
-- SCSI TRIM support
-- multiple concurrent sessions
-  - SCSI RESERVE
+- SCSI TRIM (UNMAP, 42h) support
 - VMware initiator compatibility
 - nmap 'compatibility'
 - configurable:
