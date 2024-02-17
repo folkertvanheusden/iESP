@@ -1,5 +1,4 @@
 - multiple LUNs
-- SCSI TRIM (UNMAP, 42h) support
 - VMware initiator compatibility
 - nmap 'compatibility'
 - configurable:
