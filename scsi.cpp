@@ -307,7 +307,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		}
 		else {
 			DOLOG("scsi::send: GET LBA STATUS service action %02xh not implemented\n", service_action);
-			response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00 };
+			response.sense_data = error_not_implemented();
 		}
 	}
 	else if (opcode == o_write_6 || opcode == o_write_10 || opcode == o_write_verify_10 || opcode == o_write_16) {
@@ -356,18 +356,12 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 
 				if (rc == scsi_rw_result::rw_fail_general) {
 					DOLOG("scsi::send: WRITE_xx, general write error\n");
-
-					// sense key 0x01, asc 0x03, ascq 0x00; 'peripheral device write'
-					response.sense_data = { 0x70, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00 };
-					//                                  ^^^^                                                        ^^^^  ^^^^
+					response.sense_data = error_write_error();
 					ok = false;
 				}
 				else if (rc == rw_fail_locked) {
 					DOLOG("scsi::send: WRITE_xx, failed writing due to reservations\n");
-
-					// sense key 0x05, asc 0x2c, ascq 0x09; 'illegal request':: 'PREVIOUS RESERVATION CONFLICT STATUS'
-					response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x09, 0x00, 0x00, 0x00, 0x00 };
-					//                                  ^^^^                                                        ^^^^  ^^^^
+					response.sense_data = error_reserve_6();
 					ok = false;
 				}
 			}
@@ -508,9 +502,8 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			DOLOG("scsi::send: 0xa3 service action %02x not implemented\n", service_action);
 		}
 
-		if (!ok) {
-			response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00 };
-		}
+		if (!ok)
+			response.sense_data = error_not_implemented();
 	}
 	else if (opcode == o_compare_and_write) {  // 0x89
 		uint64_t lba         = (uint64_t(CDB[2]) << 56) | (uint64_t(CDB[3]) << 48) | (uint64_t(CDB[4]) << 40) | (uint64_t(CDB[5]) << 32) | (uint64_t(CDB[6]) << 24) | (CDB[7] << 16) | (CDB[8] << 8) | CDB[9];
@@ -529,10 +522,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		}
 		else if (block_count > max_compare_and_write_block_count) {
 			DOLOG("scsi::send: COMPARE AND WRITE: too many blocks in one go (%u versus %u)\n", block_count, max_compare_and_write_block_count);
-
-			// sense key 0x05, asc 0x24, ascq 0x00
-			response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x24, 0x00, 0x00, 0x00, 0x00, 0x00 };
-			//                                  ^^^^                                                        ^^^^  ^^^^
+			response.sense_data = error_compare_and_write_count();
 		}
 		else {
 			scsi_rw_result match = rw_ok;
@@ -567,26 +557,15 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 
 				if (write_result == rw_ok)
 					response.type = ir_empty_sense;
-				else if (write_result == rw_fail_locked) {
-					// sense key 0x05, asc 0x2c, ascq 0x09; 'illegal request':: 'PREVIOUS RESERVATION CONFLICT STATUS'
-					response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x09, 0x00, 0x00, 0x00, 0x00 };
-					//                                  ^^^^                                                        ^^^^  ^^^^
-				}
-				else {
-					// sense key 0x01, asc 0x03, ascq 0x00; 'peripheral device write'
-					response.sense_data = { 0x70, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00 };
-					//                                  ^^^^                                                        ^^^^  ^^^^
-				}
+				else if (write_result == rw_fail_locked)
+					response.sense_data = error_reserve_6();
+				else
+					response.sense_data = error_write_error();
 			}
-			else if (match == rw_fail_locked) {
-				// sense key 0x05, asc 0x2c, ascq 0x09; 'illegal request':: 'PREVIOUS RESERVATION CONFLICT STATUS'
-				response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x09, 0x00, 0x00, 0x00, 0x00 };
-				//                                  ^^^^                                                        ^^^^  ^^^^
-			}
+			else if (match == rw_fail_locked)
+				response.sense_data = error_reserve_6();
 			else {
-				// sense key 0x0e, asc 0x1d, ascq 0x00
-				response.sense_data = { 0x70, 0x00, 0x0e, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x1d, 0x00, 0x00, 0x00, 0x00, 0x00 };
-				//                                  ^^^^                                                        ^^^^  ^^^^
+				response.sense_data = error_miscompare();
 			}
 		}
 	}
@@ -598,21 +577,15 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		DOLOG("scsi::send: RESERVE 6\n");
 		if (reserve_device() == l_locked)
 			response.type = ir_empty_sense;
-		else {
-			// sense key 0x05, asc 0x2c, ascq 0x09; 'illegal request':: 'PREVIOUS RESERVATION CONFLICT STATUS'
-			response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x09, 0x00, 0x00, 0x00, 0x00 };
-			//                                  ^^^^                                                        ^^^^  ^^^^
-		}
+		else
+			response.sense_data = error_reserve_6();
 	}
 	else if (opcode == o_release_6) {
 		DOLOG("scsi::send: RELEASE 6\n");
 		if (unlock_device())
 			response.type = ir_empty_sense;
-		else {
-			// sense key 0x05, asc 0x2c, ascq 0x09; 'illegal request':: 'PREVIOUS RESERVATION CONFLICT STATUS'
-			response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x09, 0x00, 0x00, 0x00, 0x00 };
-			//                                  ^^^^                                                        ^^^^  ^^^^
-		}
+		else
+			response.sense_data = error_reserve_6();
 	}
 	else if (opcode == o_unmap) {
 		DOLOG("scsi::send: UNMAP\n");
@@ -650,20 +623,15 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		else if (response.sense_data.empty() == false) {
 			// error already set
 		}
-		else if (rc == rw_fail_locked) {
-			// sense key 0x05, asc 0x2c, ascq 0x09; 'illegal request':: 'PREVIOUS RESERVATION CONFLICT STATUS'
-			response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x09, 0x00, 0x00, 0x00, 0x00 };
-			//                                  ^^^^                                                        ^^^^  ^^^^
-		}
+		else if (rc == rw_fail_locked)
+			response.sense_data = error_reserve_6();
 		else {
-			// sense key 0x01, asc 0x03, ascq 0x00; 'peripheral device write'
-			response.sense_data = { 0x70, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00 };
-			//                                  ^^^^                                                        ^^^^  ^^^^
+			response.sense_data = error_write_error();
 		}
 	}
 	else {
 		DOLOG("scsi::send: opcode %02xh not implemented\n", opcode);
-		response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00 };
+		response.sense_data = error_not_implemented();
 	}
 
 	DOLOG("-> returning %zu bytes of sense data\n", response.sense_data.size());
@@ -676,10 +644,8 @@ std::optional<std::vector<uint8_t> > scsi::validate_request(const uint64_t lba, 
 {
 	auto size_in_blocks = get_size_in_blocks();
 
-	if (lba + n_blocks > size_in_blocks || lba + n_blocks < lba) {
-		// ILLEGAL_REQUEST(0x05)/LBA out of range(0x2100)
-		return { { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x21, 0x00, 0x00, 0x00, 0x00, 0x00 } };
-	}
+	if (lba + n_blocks > size_in_blocks || lba + n_blocks < lba)
+		return error_out_of_range();
 
 	return { };  // no error
 }
@@ -795,4 +761,42 @@ scsi::scsi_lock_status scsi::locking_status()
 		return l_locked;
 
 	return l_locked_other;
+}
+
+std::vector<uint8_t> scsi::error_reserve_6() const
+{
+	// sense key 0x05, asc 0x2c, ascq 0x09; 'illegal request':: 'PREVIOUS RESERVATION CONFLICT STATUS'
+	return  { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x09, 0x00, 0x00, 0x00, 0x00 };
+	//                    ^^^^                                                        ^^^^  ^^^^
+}
+
+std::vector<uint8_t> scsi::error_not_implemented() const
+{
+	return { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00 };
+}
+
+std::vector<uint8_t> scsi::error_write_error() const
+{
+	return { 0x70, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00 };
+}
+
+std::vector<uint8_t> scsi::error_compare_and_write_count() const
+{
+	// sense key 0x05, asc 0x24, ascq 0x00
+	return { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x24, 0x00, 0x00, 0x00, 0x00, 0x00 };
+	//                   ^^^^                                                        ^^^^  ^^^^
+}
+
+std::vector<uint8_t> scsi::error_out_of_range() const
+{
+	// ILLEGAL_REQUEST(0x05)/LBA out of range(0x2100)
+	return { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x21, 0x00, 0x00, 0x00, 0x00, 0x00 };
+}
+
+std::vector<uint8_t> scsi::error_miscompare() const
+{
+	// Miscompare - the source data did not match the data read from the medium
+	// sense key 0x0e, asc 0x1d, ascq 0x00
+	return { 0x70, 0x00, 0x0e, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x1d, 0x00, 0x00, 0x00, 0x00, 0x00 };
+	//                   ^^^^                                                        ^^^^  ^^^^
 }

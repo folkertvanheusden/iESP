@@ -42,6 +42,13 @@ private:
 
 	std::optional<std::vector<uint8_t> > validate_request(const uint64_t lba, const uint32_t n_blocks) const;
 
+	std::vector<uint8_t> error_reserve_6()               const;
+	std::vector<uint8_t> error_not_implemented()         const;
+	std::vector<uint8_t> error_write_error()             const;
+	std::vector<uint8_t> error_compare_and_write_count() const;
+	std::vector<uint8_t> error_out_of_range()            const;
+	std::vector<uint8_t> error_miscompare()              const;
+
 public:
 	scsi(backend *const b);
 	virtual ~scsi();
