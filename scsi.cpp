@@ -81,8 +81,6 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 	response.type         = ir_as_is;
 	response.data_is_meta = true;
 
-	// TODO: if LBA or TRANSFER LENGTH out of range, return error
-
 	if (opcode == o_test_unit_ready) {
 		DOLOG("scsi::send: TEST UNIT READY\n");
 		response.type = ir_empty_sense;
