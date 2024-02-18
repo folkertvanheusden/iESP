@@ -631,13 +631,25 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		for(size_t i=8; i<data.second; i+= 14) {
 			uint64_t lba             = (uint64_t(pd[i + 0]) << 56) | (uint64_t(pd[i + 1]) << 48) | (uint64_t(pd[i + 2]) << 40) | (uint64_t(pd[i + 3]) << 32) | (uint64_t(pd[i + 4]) << 24) | (pd[i + 5] << 16) | (pd[i + 6] << 8) | pd[i + 7];
 			uint32_t transfer_length = (uint64_t(pd[i + 8]) << 24) | (pd[i + 9] << 16) | (pd[i + 10] << 8) | pd[i + 11];
-			rc = trim(lba, transfer_length);
-			if (rc != rw_ok)
-				break;
+
+			auto vr = validate_request(lba, transfer_length);
+			if (vr.has_value()) {
+				DOLOG("scsi::send: GET LBA STATUS parameters invalid\n");
+				response.sense_data = vr.value();
+				rc = rw_fail_general;
+			}
+			else {
+				rc = trim(lba, transfer_length);
+				if (rc != rw_ok)
+					break;
+			}
 		}
 
 		if (rc == rw_ok)
 			response.type = ir_empty_sense;
+		else if (response.sense_data.empty() == false) {
+			// error already set
+		}
 		else if (rc == rw_fail_locked) {
 			// sense key 0x05, asc 0x2c, ascq 0x09; 'illegal request':: 'PREVIOUS RESERVATION CONFLICT STATUS'
 			response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x09, 0x00, 0x00, 0x00, 0x00 };
