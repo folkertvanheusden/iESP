@@ -166,6 +166,21 @@ ok:
 	return rc;
 }
 
+bool backend_sdcard::trim(const uint64_t block_nr, const uint32_t n_blocks)
+{
+	bool rc = true;
+	uint8_t *data = new uint8_t[get_block_size()];
+	for(uint32_t i=0; i<n_blocks; i++) {
+		if (write(block_nr + i, 1, data) == false) {
+			Serial.printf("Cannot \"trim\"\r\n");
+			rc = false;
+			break;
+		}
+	}
+	delete [] data;
+	return rc;
+}
+
 bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_t *const data)
 {
 #ifdef LED_GREEN
