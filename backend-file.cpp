@@ -56,6 +56,18 @@ bool backend_file::write(const uint64_t block_nr, const uint32_t n_blocks, const
 	return rc == n_bytes;
 }
 
+bool backend_file::trim(const uint64_t block_nr, const uint32_t n_blocks)
+{
+	auto   block_size = get_block_size();
+	off_t  offset     = block_nr * block_size;
+	size_t n_bytes    = n_blocks * block_size;
+	DOLOG("backend_file::trim: block %" PRIu64 " (%lu), %d blocks, block size: %" PRIu64 "\n", block_nr, offset, n_blocks, block_size);
+	int rc = fallocate(fd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, offset, n_bytes);
+	if (rc == -1)
+		DOLOG("backend_file::trim: ERROR unmaping; %s\n", strerror(errno));
+	return rc == 0;
+}
+
 bool backend_file::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_t *const data)
 {
 	auto   block_size = get_block_size();

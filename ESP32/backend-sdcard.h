@@ -1,3 +1,4 @@
+#include <mutex>
 #include <SdFat.h>
 #include <string>
 
@@ -12,6 +13,8 @@ private:
 	uint64_t  card_size   { 0 };
 	size_t    sector_size { 0 };
 
+	std::mutex serial_access_lock;
+
 	bool reinit(const bool close_first);
 
 public:
@@ -24,5 +27,6 @@ public:
 	bool sync() override;
 
 	bool write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data) override;
+	bool trim (const uint64_t block_nr, const uint32_t n_blocks                           ) override;
 	bool read (const uint64_t block_nr, const uint32_t n_blocks,       uint8_t *const data) override;
 };

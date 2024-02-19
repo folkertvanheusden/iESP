@@ -2,6 +2,7 @@
 #include <cinttypes>
 #include <cstdio>
 #include <cstring>
+#include <thread>
 
 #include "log.h"
 #include "scsi.h"
@@ -20,12 +21,15 @@ const std::map<scsi::scsi_opcode, scsi_opcode_details> scsi_a3_data {
 	{ scsi::scsi_opcode::o_write_6,		{ { 0xff, 0x1f, 0xff, 0xff, 0xff, 0x07 }, 6 } },
 //	{ scsi::scsi_opcode::o_seek,		{
 	{ scsi::scsi_opcode::o_inquiry,		{ { 0xff, 0x01, 0xff, 0xff, 0xff, 0x07 }, 6 } },
+	{ scsi::scsi_opcode::o_reserve_6,	{ { 0xff, 0x00, 0x00, 0x00, 0x00, 0x07 }, 6 } },
+	{ scsi::scsi_opcode::o_release_6,	{ { 0xff, 0x00, 0x00, 0x00, 0x00, 0x07 }, 6 } },
 	{ scsi::scsi_opcode::o_mode_sense_6,	{ { 0xff, 0x08, 0xff, 0xff, 0xff, 0x07 }, 6 } },
 	{ scsi::scsi_opcode::o_read_capacity_10,{ { 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07 }, 10 } },
 	{ scsi::scsi_opcode::o_read_10,		{ { 0xff, 0xfe, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 }, 10 } },
 	{ scsi::scsi_opcode::o_write_10,	{ { 0xff, 0xfa, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 }, 10 } },
 	{ scsi::scsi_opcode::o_write_verify_10,	{ { 0xff, 0xf2, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 }, 10 } },
 	{ scsi::scsi_opcode::o_sync_cache_10,	{ { 0xff, 0x06, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 }, 10 } },
+	{ scsi::scsi_opcode::o_unmap,           { { 0xff, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0x07 }, 10 } },
 	{ scsi::scsi_opcode::o_read_16,		{ { 0xff, 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 }, 16 } },
 	{ scsi::scsi_opcode::o_compare_and_write, { { 0xff, 0xfa, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x07 }, 16 } },
 	{ scsi::scsi_opcode::o_write_16,	{ { 0xff, 0xfa, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 }, 16 } },
@@ -76,8 +80,6 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 	scsi_response response { };
 	response.type         = ir_as_is;
 	response.data_is_meta = true;
-
-	// TODO: if LBA or TRANSFER LENGTH out of range, return error
 
 	if (opcode == o_test_unit_ready) {
 		DOLOG("scsi::send: TEST UNIT READY\n");
@@ -134,8 +136,8 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				memcpy(&response.io.what.data.first[32], "1.0", 3);  // TODO
 				memset(&response.io.what.data.first[36], '0', 8);
 				memcpy(&response.io.what.data.first[36], serial.c_str(), std::min(serial.size(), size_t(8)));
-				response.io.what.data.first[58] = 0x04;  // SBC-3
-				response.io.what.data.first[59] = 0xc0;
+				response.io.what.data.first[58] = 0x06;  // SBC-4
+				response.io.what.data.first[59] = 0x00;
 				response.io.what.data.first[60] = 0x09;  // iSCSI
 				response.io.what.data.first[61] = 0x60;
 				response.io.what.data.first[62] = 0x01;  // SCC-2
@@ -147,21 +149,31 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		else {
                         if (CDB[2] == 0x00) {  // supported vital product page
 				response.io.is_inline          = true;
-                                response.io.what.data.second   = 8;
+                                response.io.what.data.second   = 9;
                                 response.io.what.data.first    = new uint8_t[response.io.what.data.second]();
 				response.io.what.data.first[0] = device_type;
                                 response.io.what.data.first[1] = CDB[2];
                                 response.io.what.data.first[2] = 0;  // reserved
                                 response.io.what.data.first[3] = response.io.what.data.second - 4;
                                 response.io.what.data.first[4] = 0x00;
-                                response.io.what.data.first[5] = 0x83;  // see CDB[2] below
-                                response.io.what.data.first[6] = 0xb0;
-                                response.io.what.data.first[7] = 0xb1;
+                                response.io.what.data.first[5] = 0x80;
+                                response.io.what.data.first[6] = 0x83;  // see CDB[2] below
+                                response.io.what.data.first[7] = 0xb0;
+                                response.io.what.data.first[8] = 0xb1;
                         }
+			else if (CDB[2] == 0x80) {  // unit serial number page
+				response.io.is_inline          = true;
+				response.io.what.data.second   = 4 + serial.size();
+				response.io.what.data.first    = new uint8_t[response.io.what.data.second]();
+				response.io.what.data.first[0] = device_type;
+				response.io.what.data.first[1] = CDB[2];
+				response.io.what.data.first[3] = response.io.what.data.second - 4;
+				memcpy(&response.io.what.data.first[4], serial.c_str(), serial.size());
+			}
 			else if (CDB[2] == 0x83) {  // device identification page
 				response.io.is_inline          = true;
-				response.io.what.data.second = 8 + serial.size();
-				response.io.what.data.first = new uint8_t[response.io.what.data.second]();
+				response.io.what.data.second   = 8 + serial.size();
+				response.io.what.data.first    = new uint8_t[response.io.what.data.second]();
 				response.io.what.data.first[0] = device_type;
 				response.io.what.data.first[1] = CDB[2];
 				response.io.what.data.first[3] = response.io.what.data.second - 4;
@@ -182,7 +194,10 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				response.io.what.data.first[5] = max_compare_and_write_block_count;  // compare and write
 				response.io.what.data.first[6] = 0;  // OPTIMAL TRANSFER LENGTH GRANULARITY
 				response.io.what.data.first[7] = 0;
-				// ... set all to 'not set'
+				response.io.what.data.first[23] = 128;  // LSB of 'MAXIMUM UNMAP LBA COUNT'
+				response.io.what.data.first[27] = 8;  // LSB of 'MAXIMUM UNMAP BLOCK DESCRIPTOR COUNT'
+				response.io.what.data.first[31] = 8;  // LSB of 'OPTIMAL UNMAP GRANULARITY'
+				// ... set rest to 'not set'
 			}
 			else if (CDB[2] == 0xb1) {  // block device characteristics
 				response.io.is_inline          = true;
@@ -238,24 +253,32 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		if (service_action == 0x10) {  // READ CAPACITY
 			DOLOG("scsi::send: READ_CAPACITY(16)\n");
 
-			response.io.is_inline          = true;
-			response.io.what.data.second = 32;
-			response.io.what.data.first = new uint8_t[response.io.what.data.second]();
-			auto device_size = b->get_size_in_blocks() - 1;
-			response.io.what.data.first[0] = device_size >> 56;
-			response.io.what.data.first[1] = device_size >> 48;
-			response.io.what.data.first[2] = device_size >> 40;
-			response.io.what.data.first[3] = device_size >> 32;
-			response.io.what.data.first[4] = device_size >> 24;
-			response.io.what.data.first[5] = device_size >> 16;
-			response.io.what.data.first[6] = device_size >>  8;
-			response.io.what.data.first[7] = device_size;
-			uint32_t block_size = b->get_block_size();
-			response.io.what.data.first[8] = block_size >> 24;
-			response.io.what.data.first[9] = block_size >> 16;
-			response.io.what.data.first[10] = block_size >>  8;
-			response.io.what.data.first[11] = block_size;
-			response.io.what.data.first[12] = 1 << 4;  // RC BASIS: "The RETURNED LOGICAL BLOCK ADDRESS field indicates the LBA of the last logical block on the logical unit."
+			uint16_t allocation_length = (CDB[10] << 24) | (CDB[11] << 16) | (CDB[12] << 8) | CDB[13];
+
+			if (allocation_length == 0)
+				response.type = ir_empty_sense;
+			else {
+				response.io.is_inline          = true;
+				response.io.what.data.second   = 32;
+				response.io.what.data.first    = new uint8_t[response.io.what.data.second]();
+				auto device_size = b->get_size_in_blocks() - 1;
+				response.io.what.data.first[0] = device_size >> 56;
+				response.io.what.data.first[1] = device_size >> 48;
+				response.io.what.data.first[2] = device_size >> 40;
+				response.io.what.data.first[3] = device_size >> 32;
+				response.io.what.data.first[4] = device_size >> 24;
+				response.io.what.data.first[5] = device_size >> 16;
+				response.io.what.data.first[6] = device_size >>  8;
+				response.io.what.data.first[7] = device_size;
+				uint32_t block_size = b->get_block_size();
+				response.io.what.data.first[8] = block_size >> 24;
+				response.io.what.data.first[9] = block_size >> 16;
+				response.io.what.data.first[10] = block_size >>  8;
+				response.io.what.data.first[11] = block_size;
+				response.io.what.data.first[12] = 1 << 4;  // RC BASIS: "The RETURNED LOGICAL BLOCK ADDRESS field indicates the LBA of the last logical block on the logical unit."
+				response.io.what.data.first[14] = 128 | 64;  // LBPME (Logical Block Provisioning Management Enabled), LBPRZ (Logical Block Provisioning Read Zeros)
+				response.io.what.data.second = std::min(response.io.what.data.second, size_t(allocation_length));
+			}
 		}
 		else if (service_action == 0x12) {  // GET LBA STATUS
 			DOLOG("scsi::send: GET_LBA_STATUS\n");
@@ -270,8 +293,8 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			}
 			else {
 				response.io.is_inline          = true;
-				response.io.what.data.second = 24;
-				response.io.what.data.first = new uint8_t[response.io.what.data.second]();
+				response.io.what.data.second   = 24;
+				response.io.what.data.first    = new uint8_t[response.io.what.data.second]();
 				response.io.what.data.first[0] = 0;
 				response.io.what.data.first[1] = 0;
 				response.io.what.data.first[2] = 0;
@@ -282,6 +305,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		}
 		else {
 			DOLOG("scsi::send: GET LBA STATUS service action %02xh not implemented\n", service_action);
+			response.sense_data = error_not_implemented();
 		}
 	}
 	else if (opcode == o_write_6 || opcode == o_write_10 || opcode == o_write_verify_10 || opcode == o_write_16) {
@@ -323,14 +347,24 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			size_t received_blocks    = received_size / backend_block_size;
 			if (received_blocks)
 				DOLOG("scsi::send: WRITE_xx to LBA %" PRIu64 " is %zu in bytes, %zu bytes\n", lba, lba * backend_block_size, received_size);
-			if (received_blocks > 0 && b->write(lba, received_blocks, data.first) == false) {
-				DOLOG("scsi::send: WRITE_xx, failed writing\n");
 
-				// sense key 0x01, asc 0x03, ascq 0x00; 'peripheral device write'
-				response.sense_data = { 0x70, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00 };
-				//                                  ^^^^                                                        ^^^^  ^^^^
+			bool ok = true;
+			if (received_blocks > 0) {
+				auto rc = write(lba, received_blocks, data.first);
+
+				if (rc == scsi_rw_result::rw_fail_general) {
+					DOLOG("scsi::send: WRITE_xx, general write error\n");
+					response.sense_data = error_write_error();
+					ok = false;
+				}
+				else if (rc == rw_fail_locked) {
+					DOLOG("scsi::send: WRITE_xx, failed writing due to reservations\n");
+					response.sense_data = error_reserve_6();
+					ok = false;
+				}
 			}
-			else {
+
+			if (ok) {
 				if (received_size == expected_size) {
 					response.type = ir_empty_sense;
 					DOLOG("scsi::send: received_size == expected_size\n");
@@ -350,8 +384,10 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 
 			if (transfer_length)
 				response.type = ir_r2t;  // allow R2T packets to come in
-			else
+			else {
+				response.type = ir_empty_sense;
 				DOLOG("scsi::send: WRITE with 0 transfer_length\n");
+			}
 		}
 	}
 	else if (opcode == o_read_16 || opcode == o_read_10 || opcode == o_read_6) {  // 0x88, 0x28, 0x08
@@ -380,6 +416,10 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		if (vr.has_value()) {
 			DOLOG("scsi::send: READ_1x parameters invalid\n");
 			response.sense_data = vr.value();
+		}
+		else if (transfer_length == 0) {
+			DOLOG("scsi::send: READ_1x 0-read\n");
+			response.type = ir_empty_sense;
 		}
 		else {
 			response.io.is_inline               = false;
@@ -448,13 +488,20 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 
 					ok = true;
 				}
+				else {
+					DOLOG("scsi::send: 0xa3 for opcode %02x not implemented\n", req_operation_code);
+				}
+			}
+			else {
+				DOLOG("scsi::send: 0xa3 reporting option %d not implemented\n", reporting_options);
 			}
 		}
-
-		if (!ok) {
-			DOLOG("scsi::send: 0xa3 not fully implemented\n");
-			response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00 };
+		else {
+			DOLOG("scsi::send: 0xa3 service action %02x not implemented\n", service_action);
 		}
+
+		if (!ok)
+			response.sense_data = error_not_implemented();
 	}
 	else if (opcode == o_compare_and_write) {  // 0x89
 		uint64_t lba         = (uint64_t(CDB[2]) << 56) | (uint64_t(CDB[3]) << 48) | (uint64_t(CDB[4]) << 40) | (uint64_t(CDB[5]) << 32) | (uint64_t(CDB[6]) << 24) | (CDB[7] << 16) | (CDB[8] << 8) | CDB[9];
@@ -473,58 +520,116 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		}
 		else if (block_count > max_compare_and_write_block_count) {
 			DOLOG("scsi::send: COMPARE AND WRITE: too many blocks in one go (%u versus %u)\n", block_count, max_compare_and_write_block_count);
-
-			// sense key 0x05, asc 0x24, ascq 0x00
-			response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x24, 0x00, 0x00, 0x00, 0x00, 0x00 };
-			//                                  ^^^^                                                        ^^^^  ^^^^
+			response.sense_data = error_compare_and_write_count();
 		}
 		else {
-			bool match = true;
+			scsi_rw_result match = rw_ok;
 			uint8_t *buffer = new uint8_t[block_size]();
 			for(uint32_t i=0; i<block_count; i++) {
-				if (b->read(lba + i, 1, buffer) == false) {
-					match = false;
+				match = read(lba + i, 1, buffer);
+
+				if (match != rw_ok) {
 					DOLOG("scsi::send: read from backend error\n");
 					break;
 				}
 
 				if (memcmp(buffer, &data.first[i * block_size], block_size) != 0) {
-					match = false;
+					match = rw_fail_general;
 					DOLOG("scsi::send: block %u (LBA: %" PRIu64 ") mismatch\n", i, lba + i);
 					break;
 				}
 			}
 			delete [] buffer;
 
-			if (match) {
-				bool write_succeeded = true;
+			if (match == rw_ok) {
+				scsi_rw_result write_result = rw_ok;
 
 				for(uint32_t i=0; i<block_count; i++) {
-					if (b->write(lba + i, 1, &data.first[i * block_size + block_count * block_size]) == false) {
+					write_result = write(lba + i, 1, &data.first[i * block_size + block_count * block_size]);
+
+					if (write_result != rw_ok) {
 						DOLOG("scsi::send: write to backend error\n");
-						write_succeeded = false;
 						break;
 					}
 				}
 
-				if (write_succeeded)
+				if (write_result == rw_ok)
 					response.type = ir_empty_sense;
-				else {
-					// sense key 0x01, asc 0x03, ascq 0x00; 'peripheral device write'
-					response.sense_data = { 0x70, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00 };
-					//                                  ^^^^                                                        ^^^^  ^^^^
-				}
+				else if (write_result == rw_fail_locked)
+					response.sense_data = error_reserve_6();
+				else
+					response.sense_data = error_write_error();
+			}
+			else if (match == rw_fail_locked)
+				response.sense_data = error_reserve_6();
+			else {
+				response.sense_data = error_miscompare();
+			}
+		}
+	}
+	else if (opcode == o_prefetch_10 || opcode == o_prefetch_16) {  // 0x34 & 0x90
+		DOLOG("scsi::send: PREFETCH 10/16\n");
+		response.type = ir_empty_sense;
+	}
+	else if (opcode == o_reserve_6) {
+		DOLOG("scsi::send: RESERVE 6\n");
+		if (reserve_device() == l_locked)
+			response.type = ir_empty_sense;
+		else
+			response.sense_data = error_reserve_6();
+	}
+	else if (opcode == o_release_6) {
+		DOLOG("scsi::send: RELEASE 6\n");
+		if (unlock_device())
+			response.type = ir_empty_sense;
+		else
+			response.sense_data = error_reserve_6();
+	}
+	else if (opcode == o_unmap) {
+		DOLOG("scsi::send: UNMAP\n");
+#ifndef NDEBUG
+		DOLOG("GREP unmap CDB size %zu\n", size);
+		DOLOG("GREP unmap data size %zu\n", data.second);
+		uint16_t parameter_list_length = (CDB[7] << 8) | CDB[8];
+		DOLOG("GREP parameter_list_length %u\n", parameter_list_length);
+		uint16_t unmap_data_length = (CDB[10 + 0] << 8) | CDB[10 + 1];
+		DOLOG("GREP unmap_data_length %u\n", unmap_data_length);
+		uint16_t unmap_block_descriptor_data_length = (CDB[10 + 2] << 8) | CDB[10 + 3];
+		DOLOG("GREP unmap_block_descriptor_data_length %u\n", unmap_block_descriptor_data_length);
+#endif
+		const uint8_t *const pd = data.first;
+		scsi_rw_result rc = rw_ok;
+		for(size_t i=8; i<data.second; i+= 14) {
+			uint64_t lba             = (uint64_t(pd[i + 0]) << 56) | (uint64_t(pd[i + 1]) << 48) | (uint64_t(pd[i + 2]) << 40) | (uint64_t(pd[i + 3]) << 32) | (uint64_t(pd[i + 4]) << 24) | (pd[i + 5] << 16) | (pd[i + 6] << 8) | pd[i + 7];
+			uint32_t transfer_length = (uint64_t(pd[i + 8]) << 24) | (pd[i + 9] << 16) | (pd[i + 10] << 8) | pd[i + 11];
+
+			auto vr = validate_request(lba, transfer_length);
+			if (vr.has_value()) {
+				DOLOG("scsi::send: GET LBA STATUS parameters invalid\n");
+				response.sense_data = vr.value();
+				rc = rw_fail_general;
 			}
 			else {
-				// sense key 0x0e, asc 0x1d, ascq 0x00
-				response.sense_data = { 0x70, 0x00, 0x0e, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x1d, 0x00, 0x00, 0x00, 0x00, 0x00 };
-				//                                  ^^^^                                                        ^^^^  ^^^^
+				rc = trim(lba, transfer_length);
+				if (rc != rw_ok)
+					break;
 			}
+		}
+
+		if (rc == rw_ok)
+			response.type = ir_empty_sense;
+		else if (response.sense_data.empty() == false) {
+			// error already set
+		}
+		else if (rc == rw_fail_locked)
+			response.sense_data = error_reserve_6();
+		else {
+			response.sense_data = error_write_error();
 		}
 	}
 	else {
 		DOLOG("scsi::send: opcode %02xh not implemented\n", opcode);
-		response.sense_data = { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00 };
+		response.sense_data = error_not_implemented();
 	}
 
 	DOLOG("-> returning %zu bytes of sense data\n", response.sense_data.size());
@@ -535,10 +640,10 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 // returns sense data in case of a problem
 std::optional<std::vector<uint8_t> > scsi::validate_request(const uint64_t lba, const uint32_t n_blocks) const
 {
-	if (lba + n_blocks > get_size_in_blocks()) {
-		// ILLEGAL_REQUEST(0x05)/INVALID_FIELD_IN_CDB(0x2400)
-		return { { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x24, 0x00, 0x00, 0x00, 0x00, 0x00 } };
-	}
+	auto size_in_blocks = get_size_in_blocks();
+
+	if (lba + n_blocks > size_in_blocks || lba + n_blocks < lba)
+		return error_out_of_range();
 
 	return { };  // no error
 }
@@ -553,9 +658,16 @@ uint64_t scsi::get_block_size() const
 	return b->get_block_size();
 }
 
-bool scsi::sync()
+scsi::scsi_rw_result scsi::sync()
 {
-	return b->sync();
+	if (locking_status() != l_locked_other) {  // locked by myself or not locked?
+		if (b->sync())
+			return rw_ok;
+
+		return rw_fail_general;
+	}
+
+	return rw_fail_locked;
 }
 
 void scsi::get_and_reset_stats(uint64_t *const bytes_read, uint64_t *const bytes_written, uint64_t *const n_syncs)
@@ -563,12 +675,126 @@ void scsi::get_and_reset_stats(uint64_t *const bytes_read, uint64_t *const bytes
 	return b->get_and_reset_stats(bytes_read, bytes_written, n_syncs);
 }
 
-bool scsi::write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data)
+scsi::scsi_rw_result scsi::write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data)
 {
-	return b->write(block_nr, n_blocks, data);
+	if (locking_status() != l_locked_other) {  // locked by myself or not locked?
+		if (b->write(block_nr, n_blocks, data))
+			return rw_ok;
+
+		return rw_fail_general;
+	}
+
+	return rw_fail_locked;
 }
 
-bool scsi::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_t *const data)
+scsi::scsi_rw_result scsi::trim(const uint64_t block_nr, const uint32_t n_blocks)
 {
-	return b->read(block_nr, n_blocks, data);
+	if (locking_status() != l_locked_other) {  // locked by myself or not locked?
+		if (b->trim(block_nr, n_blocks))
+			return rw_ok;
+
+		return rw_fail_general;
+	}
+
+	return rw_fail_locked;
+}
+
+scsi::scsi_rw_result scsi::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_t *const data)
+{
+	if (locking_status() != l_locked_other) {  // locked by myself or not locked?
+		if (b->read(block_nr, n_blocks, data))
+			return rw_ok;
+
+		return rw_fail_general;
+	}
+	
+	return rw_fail_locked;
+}
+
+scsi::scsi_lock_status scsi::reserve_device()
+{
+	std::unique_lock lck(locked_by_lock);
+
+	auto cur_id = std::this_thread::get_id();
+
+	if (locked_by.has_value()) {
+		if (locked_by.value() == cur_id)
+			return l_locked;
+
+		return l_locked_other;
+	}
+
+	locked_by = std::this_thread::get_id();
+
+	return l_locked;
+}
+
+bool scsi::unlock_device()
+{
+	std::unique_lock lck(locked_by_lock);
+
+	if (locked_by.has_value() == false) {
+		DOLOG("scsi::unlock_device: device was NOT locked!\n");
+		return false;
+	}
+
+	if (locked_by.value() == std::this_thread::get_id()) {
+		locked_by.reset();
+		return true;
+	}
+
+	DOLOG("scsi::unlock_device: device is locked by someone else!\n");
+
+	return false;
+}
+
+scsi::scsi_lock_status scsi::locking_status()
+{
+	std::unique_lock lck(locked_by_lock);
+
+	if (locked_by.has_value() == false)
+		return l_not_locked;
+
+	if (locked_by.value() == std::this_thread::get_id())
+		return l_locked;
+
+	return l_locked_other;
+}
+
+std::vector<uint8_t> scsi::error_reserve_6() const
+{
+	// sense key 0x05, asc 0x2c, ascq 0x09; 'illegal request':: 'PREVIOUS RESERVATION CONFLICT STATUS'
+	return  { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x09, 0x00, 0x00, 0x00, 0x00 };
+	//                    ^^^^                                                        ^^^^  ^^^^
+}
+
+std::vector<uint8_t> scsi::error_not_implemented() const
+{
+	return { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00 };
+}
+
+std::vector<uint8_t> scsi::error_write_error() const
+{
+	return { 0x70, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00 };
+}
+
+std::vector<uint8_t> scsi::error_compare_and_write_count() const
+{
+	// sense key 0x05, asc 0x24, ascq 0x00
+	return { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x24, 0x00, 0x00, 0x00, 0x00, 0x00 };
+	//                   ^^^^                                                        ^^^^  ^^^^
+}
+
+std::vector<uint8_t> scsi::error_out_of_range() const
+{
+	// ILLEGAL_REQUEST(0x05)/LBA out of range(0x2100)
+	return { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x21, 0x00, 0x00, 0x00, 0x00, 0x00 };
+}
+
+std::vector<uint8_t> scsi::error_miscompare() const
+{
+	// Miscompare - the source data did not match the data read from the medium
+	// sense key 0x0e, asc 0x1d, ascq 0x00
+	return { 0x70, 0x00, 0x0e, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x1d, 0x00, 0x00, 0x00, 0x00, 0x00 };
+	//                   ^^^^                                                        ^^^^  ^^^^
 }
