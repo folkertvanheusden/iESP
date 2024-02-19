@@ -21,7 +21,7 @@ unique_perc = int(sys.argv[4])  # how many of the blocks should be unique, %
 random.seed()
 
 seed = int(time.time())
-fd = os.open(dev, os.O_RDWR)
+fd = os.open(dev, os.O_RDWR | os.O_DIRECT)
 dev_size = os.lseek(fd, 0, os.SEEK_END)
 
 n_blocks = dev_size // blocksize
@@ -84,6 +84,7 @@ while True:
         seen[nr + i] = new_seen
         b += gen_block(blocksize, offset + i * blocksize, seen[nr + i])
     os.pwrite(fd, b, offset)
+    os.fsync(fd)
 
     n += 1
     total_n += cur_n_blocks
