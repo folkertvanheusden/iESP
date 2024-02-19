@@ -28,7 +28,7 @@ void help()
 int main(int argc, char *argv[])
 {
 	signal(SIGPIPE, SIG_IGN);
-	signal(SIGINT, sigh);
+	signal(SIGINT,  sigh);
 
 	std::string ip_address = "192.168.64.206";
 	int         port       = 3260;

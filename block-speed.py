@@ -12,7 +12,7 @@ jobs_depth = int(sys.argv[3])
 duration = int(sys.argv[4])
 
 def do_(duration, bs, results, results_index):
-    fd = os.open(dev, os.O_RDONLY)
+    fd = os.open(dev, os.O_RDONLY | os.O_DIRECT)
     dev_size = os.lseek(fd, 0, os.SEEK_END)
     start = time.time()
     iop = 0
