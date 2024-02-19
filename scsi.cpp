@@ -599,20 +599,24 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 #endif
 		const uint8_t *const pd = data.first;
 		scsi_rw_result rc = rw_ok;
-		for(size_t i=8; i<data.second; i+= 14) {
+		for(size_t i=8; i<data.second; i+= 16) {
 			uint64_t lba             = (uint64_t(pd[i + 0]) << 56) | (uint64_t(pd[i + 1]) << 48) | (uint64_t(pd[i + 2]) << 40) | (uint64_t(pd[i + 3]) << 32) | (uint64_t(pd[i + 4]) << 24) | (pd[i + 5] << 16) | (pd[i + 6] << 8) | pd[i + 7];
 			uint32_t transfer_length = (uint64_t(pd[i + 8]) << 24) | (pd[i + 9] << 16) | (pd[i + 10] << 8) | pd[i + 11];
 
 			auto vr = validate_request(lba, transfer_length);
 			if (vr.has_value()) {
-				DOLOG("scsi::send: GET LBA STATUS parameters invalid\n");
+				DOLOG("scsi::send: UNMAP parameters invalid\n");
 				response.sense_data = vr.value();
 				rc = rw_fail_general;
 			}
 			else {
+				DOLOG("scsi::send: UNMAP trim LBA %" PRIu64 ", %u blocks\n", lba, transfer_length);
+
 				rc = trim(lba, transfer_length);
-				if (rc != rw_ok)
+				if (rc != rw_ok) {
+					DOLOG("scsi::send: UNMAP trim failed\n");
 					break;
+				}
 			}
 		}
 
