@@ -113,6 +113,8 @@ void enable_OTA() {
 	Serial.println(F("OTA ready"));
 }
 
+volatile bool eth_connected = false;
+
 void WiFiEvent(WiFiEvent_t event)
 {
 	Serial.print(F("WiFi event: "));
@@ -150,16 +152,16 @@ void WiFiEvent(WiFiEvent_t event)
 			Serial.println(F("WIFI_REASON_GROUP_KEY_UPDATE_TIMEOUT")); break;
 		case WIFI_REASON_IE_IN_4WAY_DIFFERS:
 			Serial.println(F("WIFI_REASON_IE_IN_4WAY_DIFFERS")); break;
-		case WIFI_REASON_GROUP_CIPHER_INVALID:
-			Serial.println(F("WIFI_REASON_GROUP_CIPHER_INVALID")); break;
-		case WIFI_REASON_PAIRWISE_CIPHER_INVALID:
-			Serial.println(F("WIFI_REASON_PAIRWISE_CIPHER_INVALID")); break;
-		case WIFI_REASON_AKMP_INVALID:
-			Serial.println(F("WIFI_REASON_AKMP_INVALID")); break;
-		case WIFI_REASON_UNSUPP_RSN_IE_VERSION:
-			Serial.println(F("WIFI_REASON_UNSUPP_RSN_IE_VERSION")); break;
-		case WIFI_REASON_INVALID_RSN_IE_CAP:
-			Serial.println(F("WIFI_REASON_INVALID_RSN_IE_CAP")); break;
+//		case WIFI_REASON_GROUP_CIPHER_INVALID:
+//			Serial.println(F("WIFI_REASON_GROUP_CIPHER_INVALID")); break;
+//		case WIFI_REASON_PAIRWISE_CIPHER_INVALID:
+//			Serial.println(F("WIFI_REASON_PAIRWISE_CIPHER_INVALID")); break;
+//		case WIFI_REASON_AKMP_INVALID:
+//			Serial.println(F("WIFI_REASON_AKMP_INVALID")); break;
+//		case WIFI_REASON_UNSUPP_RSN_IE_VERSION:
+//			Serial.println(F("WIFI_REASON_UNSUPP_RSN_IE_VERSION")); break;
+//		case WIFI_REASON_INVALID_RSN_IE_CAP:
+//			Serial.println(F("WIFI_REASON_INVALID_RSN_IE_CAP")); break;
 		case WIFI_REASON_802_1X_AUTH_FAILED:
 			Serial.println(F("WIFI_REASON_802_1X_AUTH_FAILED")); break;
 		case WIFI_REASON_CIPHER_SUITE_REJECTED:
@@ -174,8 +176,37 @@ void WiFiEvent(WiFiEvent_t event)
 			Serial.println(F("WIFI_REASON_ASSOC_FAIL")); break;
 		case WIFI_REASON_HANDSHAKE_TIMEOUT:
 			Serial.println(F("WIFI_REASON_HANDSHAKE_TIMEOUT")); break;
+		case ARDUINO_EVENT_ETH_START:
+			Serial.println("ETH Started");
+			//set eth hostname here
+			ETH.setHostname(name);
+			break;
+		case ARDUINO_EVENT_ETH_CONNECTED:
+			Serial.println("ETH Connected");
+			break;
+		case ARDUINO_EVENT_ETH_GOT_IP:
+			Serial.print("ETH MAC: ");
+			Serial.print(ETH.macAddress());
+			Serial.print(", IPv4: ");
+			Serial.print(ETH.localIP());
+			if (ETH.fullDuplex())
+				Serial.print(", FULL_DUPLEX");
+			Serial.print(", ");
+			Serial.print(ETH.linkSpeed());
+			Serial.println("Mbps");
+			eth_connected = true;
+			break;
+		case ARDUINO_EVENT_ETH_DISCONNECTED:
+			Serial.println("ETH Disconnected");
+			eth_connected = false;
+			break;
+		case ARDUINO_EVENT_ETH_STOP:
+			Serial.println("ETH Stopped");
+			eth_connected = false;
+			break;
 		default:
-			Serial.println(event); break;
+			Serial.printf("Unknown/unexpected ETH event %d\r\n", event);
+			break;
 	}
 }
 
@@ -243,45 +274,6 @@ retry:
 		Serial.println(F("Failed to connect"));
 
 		goto retry;
-	}
-}
-
-volatile bool eth_connected = false;
-
-void WiFiEvent(WiFiEvent_t event)
-{
-	switch (event) {
-		case ARDUINO_EVENT_ETH_START:
-			Serial.println("ETH Started");
-			//set eth hostname here
-			ETH.setHostname(name);
-			break;
-		case ARDUINO_EVENT_ETH_CONNECTED:
-			Serial.println("ETH Connected");
-			break;
-		case ARDUINO_EVENT_ETH_GOT_IP:
-			Serial.print("ETH MAC: ");
-			Serial.print(ETH.macAddress());
-			Serial.print(", IPv4: ");
-			Serial.print(ETH.localIP());
-			if (ETH.fullDuplex())
-				Serial.print(", FULL_DUPLEX");
-			Serial.print(", ");
-			Serial.print(ETH.linkSpeed());
-			Serial.println("Mbps");
-			eth_connected = true;
-			break;
-		case ARDUINO_EVENT_ETH_DISCONNECTED:
-			Serial.println("ETH Disconnected");
-			eth_connected = false;
-			break;
-		case ARDUINO_EVENT_ETH_STOP:
-			Serial.println("ETH Stopped");
-			eth_connected = false;
-			break;
-		default:
-			Serial.printf("Unknown/unexpected event %d\r\n", event);
-			break;
 	}
 }
 
