@@ -10,13 +10,12 @@
 #include <esp_heap_caps.h>
 #include <esp_wifi.h>
 #include <ESPmDNS.h>
-// M.A.X.X:
 #include <LittleFS.h>
-#include <configure.h>
-#include <wifi.h>
+#include "wifi.h"
 
 #include "backend-sdcard.h"
 #include "com-sockets.h"
+#include "log.h"
 #include "server.h"
 #include "version.h"
 
@@ -29,7 +28,8 @@ scsi *scsi_dev { nullptr };
 
 DynamicJsonDocument cfg(4096);
 #define IESP_CFG_FILE "/cfg-iESP.json"
-AsyncWebServer web_server(80);
+
+std::vector<std::pair<std::string, std::string> > wifi_targets;
 
 TaskHandle_t task2;
 
@@ -39,9 +39,29 @@ bool load_configuration() {
 		return false;
 
 	auto error = deserializeJson(cfg, data_file);
-	data_file.close();
-	if (error)  // this should not happen
+	if (error) {  // this should not happen
+		data_file.close();
 		return false;
+	}
+
+	JsonArray w_aps_ar = cfg["wifi"].as<JsonArray>();
+	for(JsonObject p: w_aps_ar) {
+		auto ssid = p["ssid"];
+		auto psk  = p["psk"];
+
+		Serial.print(F("Will search for: "));
+		Serial.println(ssid.as<String>());
+
+		wifi_targets.push_back({ ssid, psk });
+	}
+
+	syslog_host = cfg["syslog-host"].as<const char *>();
+	if (syslog_host.value().empty())
+		syslog_host.reset();
+
+	data_file.close();
+
+	Serial.printf("Loaded %zu configured WiFi access points\r\n", wifi_targets.size());
 
 	return true;
 }
@@ -56,30 +76,6 @@ bool save_configuration()
 	data_file.close();
 
 	return true;
-}
-
-void setup_web_server() {
-	web_server.on("/", HTTP_GET, [] (AsyncWebServerRequest *request) {
-		Serial.println(request->url().c_str());
-
-		request->redirect("/index.html");
-	});
-
-	web_server.on("/index.html", HTTP_GET, [] (AsyncWebServerRequest *request) {
-		Serial.println(request->url().c_str());
-
-		AsyncResponseStream *response = request->beginResponseStream("text/html");
-
-		response->printf("<!DOCTYPE html><html><head><link rel=\"stylesheet\" href=\"/stylesheet.css\"><title>iESP (%s)</title><body><h1>iESP (%s)</h1>"
-			"<h2>website</h2>"
-			"<p><a href=\"https://vanheusden.com/electronics/iESP/\">https://vanheusden.com/electronics/iESP/</a></p>"
-			"<h2>copyrights</h2>"
-			"<p>(c) 2023-2024 by Folkert van Heusden <mail@vanheusden.com></p></body></html>", name, name);
-
-		request->send(response);
-	});
-
-	web_server.begin();
 }
 
 void enable_OTA() {
@@ -196,53 +192,37 @@ void setup_wifi() {
 
 	WiFi.onEvent(WiFiEvent);
 
-	scan_access_points_start();
-
-	if (!LittleFS.begin())
-		printf("LittleFS.begin() failed\r\n");
-
-	configure_wifi cw;
-
-	if (cw.is_configured() == false) {
-retry:
-		Serial.println(F("Cannot connect to WiFi: accesspoint for configuration started"));
-		start_wifi(name);  // enable wifi with AP (empty string for no AP)
-
-		cw.configure_aps();
-	}
-	else {
-		Serial.println(F("Connecting to WiFi..."));
-		start_wifi("");
-	}
-
-	Serial.println(F("Scanning for accesspoints"));
-	scan_access_points_start();
-
-	while(scan_access_points_wait() == false)
-		delay(100);
-
-	auto available_access_points = scan_access_points_get();
-
-	auto state = try_connect_init(cw.get_targets(), available_access_points, 300, progress_indicator);
 	connect_status_t cs = CS_IDLE;
+	do {
+		start_wifi({ });
 
-	Serial.println(F("Connecting..."));
-	for(;;) {
-		cs = try_connect_tick(state);
+		Serial.print(F("Scanning for accesspoints"));
+		scan_access_points_start();
 
-		if (cs != CS_IDLE)
-			break;
+		while(scan_access_points_wait() == false) {
+			Serial.print(F("."));
+			delay(100);
+		}
 
-		delay(100);
+		auto available_access_points = scan_access_points_get();
+		Serial.printf("Found %zu accesspoints\r\n", available_access_points.size());
+
+		auto state = try_connect_init(wifi_targets, available_access_points, 300, progress_indicator);
+
+		Serial.println(F("Connecting"));
+		for(;;) {
+			cs = try_connect_tick(state);
+
+			if (cs != CS_IDLE)
+				break;
+
+			Serial.print(F("."));
+			delay(100);
+		}
+
+		// could not connect
 	}
-
-	// could not connect, restart esp
-	// you could also re-run the portal
-	if (cs == CS_FAILURE) {
-		Serial.println(F("Failed to connect"));
-
-		goto retry;
-	}
+	while(cs == CS_FAILURE);
 }
 
 void loopw(void *) {
@@ -272,10 +252,9 @@ void setup() {
 	Serial.print(F("System name: "));
 	Serial.println(name);
 
-	auto reset_reason = esp_reset_reason();
-	if (reset_reason != ESP_RST_POWERON)
-		Serial.printf("Reset reason: %d\r\n", reset_reason);
-
+	if (!LittleFS.begin())
+		Serial.println(F("LittleFS.begin() failed"));
+	
 	if (load_configuration() == false)
 		Serial.println(F("Failed to load configuration, using defaults!"));
 
@@ -284,6 +263,10 @@ void setup() {
 
 	set_hostname(name);
 	setup_wifi();
+
+	auto reset_reason = esp_reset_reason();
+	if (reset_reason != ESP_RST_POWERON)
+		Serial.printf("Reset reason: %d\r\n", reset_reason);
 
 	esp_wifi_set_ps(WIFI_PS_NONE);
 
@@ -295,8 +278,6 @@ void setup() {
 	heap_caps_register_failed_alloc_callback(heap_caps_alloc_failed_hook);
 
 	enable_OTA();
-
-	setup_web_server();
 
 	xTaskCreate(loopw, /* Function to implement the task */
 			"loop2", /* Name of the task */

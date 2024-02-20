@@ -1,0 +1,8 @@
+{
+	"wifi" : [
+		{ "ssid": "my-access-point-name", "psk": "password" },
+		{ "ssid": "another", "psk": "another" },
+		{ "ssid": "and so on", "psk": "and so on" }
+	],
+	"syslog-host" : "94.142.246.161"
+}

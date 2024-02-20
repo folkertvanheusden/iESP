@@ -1,3 +1,4 @@
 build
 */.pio
 */version.cpp
+ESP32/data/cfg-iESP.json
