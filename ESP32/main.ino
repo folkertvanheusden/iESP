@@ -33,6 +33,15 @@ std::vector<std::pair<std::string, std::string> > wifi_targets;
 
 TaskHandle_t task2;
 
+void fail_flash() {
+	for(;;) {
+		digitalWrite(LED_BUILTIN, HIGH);
+		delay(200);
+		digitalWrite(LED_BUILTIN, LOW);
+		delay(200);
+	}
+}
+
 bool load_configuration() {
 	File data_file = LittleFS.open(IESP_CFG_FILE, "r");
 	if (!data_file)
@@ -63,7 +72,12 @@ bool load_configuration() {
 
 	data_file.close();
 
-	Serial.printf("Loaded %zu configured WiFi access points\r\n", wifi_targets.size());
+	auto n = wifi_targets.size();
+	Serial.printf("Loaded %zu configured WiFi access points\r\n", n);
+	if (n == 0) {
+		Serial.println(F("Cannot continue without WiFi access"));
+		fail_flash();
+	}
 
 	return true;
 }
@@ -184,7 +198,9 @@ void heap_caps_alloc_failed_hook(size_t requested_size, uint32_t caps, const cha
 }
 
 bool progress_indicator(const int nr, const int mx, const std::string & which) {
+	digitalWrite(LED_BUILTIN, HIGH);
 	printf("%3.2f%%: %s\r\n", nr * 100. / mx, which.c_str());
+	digitalWrite(LED_BUILTIN, LOW);
 
 	return true;
 }
@@ -202,7 +218,9 @@ void setup_wifi() {
 		scan_access_points_start();
 
 		while(scan_access_points_wait() == false) {
+			digitalWrite(LED_BUILTIN, HIGH);
 			Serial.print(F("."));
+			digitalWrite(LED_BUILTIN, LOW);
 			delay(100);
 		}
 
@@ -285,12 +303,15 @@ void setup() {
 	Serial.print(F("System name: "));
 	Serial.println(name);
 
+	pinMode(LED_BUILTIN, OUTPUT);
+
 	if (!LittleFS.begin())
 		Serial.println(F("LittleFS.begin() failed"));
 	
 	if (load_configuration() == false) {
 		Serial.println(F("Failed to load configuration, using defaults!"));
 		ls(LittleFS, "/");
+		fail_flash();
 	}
 
 	bs = new backend_sdcard();
@@ -337,8 +358,10 @@ void loop()
 		Serial.println(buffer);
 
 		com_sockets c(buffer, 3260, &stop);
-		if (c.begin() == false)
+		if (c.begin() == false) {
 			errlog("Failed to initialize communication layer!");
+			fail_flash();
+		}
 
 		server s(scsi_dev, &c);
 		Serial.println(F("Go!"));
