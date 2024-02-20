@@ -75,7 +75,7 @@ bool load_configuration() {
 	data_file.close();
 
 	auto n = wifi_targets.size();
-	Serial.printf("Loaded %zu configured WiFi access points\r\n", n);
+	Serial.printf("Loaded configuration parameters for %zu WiFi access points\r\n", n);
 	if (n == 0) {
 		Serial.println(F("Cannot continue without WiFi access"));
 		fail_flash();
@@ -365,9 +365,9 @@ void setup() {
 		fail_flash();
 	}
 
-	init_logger(name);
 	set_hostname(name);
 	setup_wifi();
+	init_logger(name);
 
 	bs = new backend_sdcard();
 	if (bs->begin() == false) {
