@@ -13,6 +13,8 @@ public:
 	backend();
 	virtual ~backend();
 
+	virtual bool begin() = 0;
+
 	virtual uint64_t get_size_in_blocks() const = 0;
 	virtual uint64_t get_block_size()     const = 0;
 

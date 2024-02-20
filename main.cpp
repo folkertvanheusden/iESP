@@ -52,6 +52,10 @@ int main(int argc, char *argv[])
 	init_logger(hostname);
 
 	backend_file bf(dev);
+	if (bf.begin() == false) {
+		fprintf(stderr, "Failed to initialize storage backend\n");
+		return 1;
+	}
 	scsi         sd(&bf);
 
 	com_sockets c(ip_address, port, &stop);

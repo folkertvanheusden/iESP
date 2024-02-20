@@ -21,6 +21,8 @@ public:
 	backend_sdcard();
 	virtual ~backend_sdcard();
 
+	bool begin() override;
+
 	uint64_t get_size_in_blocks() const override;
 	uint64_t get_block_size()     const override;
 

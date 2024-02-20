@@ -365,12 +365,17 @@ void setup() {
 		fail_flash();
 	}
 
-	bs = new backend_sdcard();
-	scsi_dev = new scsi(bs);
-
+	init_logger(name);
 	set_hostname(name);
 	setup_wifi();
-	init_logger(name);
+
+	bs = new backend_sdcard();
+	if (bs->begin() == false) {
+		errlog("Failed to load initialize storage backend!");
+		fail_flash();
+	}
+
+	scsi_dev = new scsi(bs);
 
 	auto reset_reason = esp_reset_reason();
 	if (reset_reason != ESP_RST_POWERON)

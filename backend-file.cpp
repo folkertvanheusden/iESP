@@ -8,16 +8,24 @@
 #include "log.h"
 
 
-backend_file::backend_file(const std::string & filename)
+backend_file::backend_file(const std::string & filename): filename(filename), fd(-1)
 {
-	fd = open(filename.c_str(), O_RDWR);
-	if (fd == -1)
-		DOLOG("backend_file:: cannot access file %s: %s\n", filename.c_str(), strerror(errno));
 }
 
 backend_file::~backend_file()
 {
 	close(fd);
+}
+
+bool backend_file::begin()
+{
+	fd = open(filename.c_str(), O_RDWR);
+	if (fd == -1) {
+		DOLOG("backend_file:: cannot access file %s: %s\n", filename.c_str(), strerror(errno));
+		return false;
+	}
+
+	return true;
 }
 
 uint64_t backend_file::get_size_in_blocks() const

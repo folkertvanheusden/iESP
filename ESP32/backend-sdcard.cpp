@@ -26,11 +26,16 @@ backend_sdcard::backend_sdcard()
 #ifdef LED_RED
 	pinMode(LED_RED,   OUTPUT);
 #endif
+}
 
-	bool close_first = false;
+bool backend_sdcard::begin()
+{
+	for(int i=0; i<3; i++) {
+		if (reinit(i))
+			return true;
+	}
 
-	while(!reinit(close_first))
-		close_first = true;
+	return false;
 }
 
 bool backend_sdcard::reinit(const bool close_first)
