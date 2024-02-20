@@ -1,6 +1,7 @@
 #include <cstdarg>
 #include <cstdio>
 #ifdef linux
+#include <string>
 #include <syslog.h>
 #else
 #include <WiFi.h>
@@ -12,14 +13,17 @@
 std::optional<std::string> syslog_host;
 WiFiUDP UDP;
 #endif
+std::string name { "?" };
 
-thread_local char err_log_buf[128];
+thread_local char err_log_buf[192];
 
 void errlog(const char *const fmt, ...)
 {
+	int offset = snprintf(err_log_buf, sizeof err_log_buf, "%s] ", name.c_str());
+
 	va_list ap;
 	va_start(ap, fmt);
-	(void)vsnprintf(err_log_buf, sizeof err_log_buf, fmt, ap);
+	(void)vsnprintf(&err_log_buf[offset], sizeof(err_log_buf) - offset, fmt, ap);
 	va_end(ap);
 
 #ifdef linux
@@ -45,8 +49,10 @@ void errlog(const char *const fmt, ...)
 #endif
 }
 
-void init_logger()
+void init_logger(const std::string & new_name)
 {
+	name = new_name;
+
 #ifndef linux
 	if (UDP.begin(514) == 0)
 		Serial.println(F("UDP.begin(514) failed"));

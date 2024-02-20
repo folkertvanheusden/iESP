@@ -34,6 +34,8 @@ std::vector<std::pair<std::string, std::string> > wifi_targets;
 TaskHandle_t task2;
 
 void fail_flash() {
+	errlog("System cannot continue");
+
 	for(;;) {
 		digitalWrite(LED_BUILTIN, HIGH);
 		delay(200);
@@ -286,6 +288,55 @@ void ls(fs::FS &fs, const String & name)
 	dir.close();
 }
 
+const char *reset_name(const esp_reset_reason_t rr)
+{
+	switch(rr) {
+		case ESP_RST_UNKNOWN:
+			return "Reset reason can not be determined";
+
+		case ESP_RST_POWERON:
+			return "Reset due to power-on event";
+
+		case ESP_RST_EXT:
+			return "Reset by external pin (not applicable for ESP32)";
+
+		case ESP_RST_SW:
+			return "Software reset via esp_restart";
+
+		case ESP_RST_PANIC:
+			return "Software reset due to exception/panic";
+
+		case ESP_RST_INT_WDT:
+			return "Reset (software or hardware) due to interrupt watchdog";
+
+		case ESP_RST_TASK_WDT:
+			return "Reset due to task watchdog";
+
+		case ESP_RST_WDT:
+			return "Reset due to other watchdogs";
+
+		case ESP_RST_DEEPSLEEP:
+			return "Reset after exiting deep sleep mode";
+
+		case ESP_RST_BROWNOUT:
+			return "Brownout reset (software or hardware)";
+
+		case ESP_RST_SDIO:
+			return "Reset over SDIO";
+
+//		case ESP_RST_USB:
+//			return "Reset by USB peripheral";
+
+//		case ESP_RST_JTAG:
+//			return "Reset by JTAG";
+
+		default:
+			return "?";
+	}
+
+	return nullptr;
+}
+
 void setup() {
 	Serial.begin(115200);
 	while(!Serial)
@@ -319,13 +370,13 @@ void setup() {
 
 	set_hostname(name);
 	setup_wifi();
-	init_logger();
+	init_logger(name);
 
 	auto reset_reason = esp_reset_reason();
 	if (reset_reason != ESP_RST_POWERON)
-		errlog("Reset of %s reason: %d", name, reset_reason);
+		errlog("Reset reason: %s (%d)", reset_name(reset_reason), reset_reason);
 	else
-		errlog("System %s (re-)started", name);
+		errlog("System (re-)started");
 
 	esp_wifi_set_ps(WIFI_PS_NONE);
 

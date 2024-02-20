@@ -47,6 +47,10 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	char hostname[64] { 0 };
+	gethostname(hostname, sizeof hostname);
+	init_logger(hostname);
+
 	backend_file bf(dev);
 	scsi         sd(&bf);
 
