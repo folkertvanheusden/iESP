@@ -30,11 +30,25 @@ void errlog(const char *const fmt, ...)
 
 	if (syslog_host.has_value()) {
 		IPAddress ip;
-		ip.fromString(syslog_host.value().c_str());
+		static bool failed = false;
+		if (!ip.fromString(syslog_host.value().c_str()) && failed == false) {
+			failed = true;
+			Serial.printf("Problem converting \"%s\" to an internal representation\r\n", syslog_host.value().c_str());
+		}
 
-		UDP.beginPacket(ip, 514);
-		UDP.printf(err_log_buf);
-		UDP.endPacket();
+		if (!failed) {
+			UDP.beginPacket(ip, 514);
+			UDP.printf(err_log_buf);
+			UDP.endPacket();
+		}
 	}
+#endif
+}
+
+void init_logger()
+{
+#ifndef linux
+	if (UDP.begin(514) == 0)
+		Serial.println(F("UDP.begin(514) failed"));
 #endif
 }

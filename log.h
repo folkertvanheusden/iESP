@@ -32,3 +32,4 @@ void errlog(const char *const fmt, ...);
 #include <string>
 extern std::optional<std::string> syslog_host;
 #endif
+void init_logger();

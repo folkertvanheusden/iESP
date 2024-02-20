@@ -237,6 +237,37 @@ void loopw(void *) {
 	}
 }
 
+void ls(fs::FS &fs, const String & name)
+{
+	Serial.print(F("Directory: "));
+	Serial.print(name);
+
+	File dir = fs.open(name);
+	if (!dir) {
+		Serial.println(F("Can't open"));
+		return;
+	}
+
+	File file = dir.openNextFile();
+	while(file) {
+		if (file.isDirectory()) {
+			Serial.print("Dir: ");
+			Serial.println(file.name());
+			ls(fs, name + "/" + file.name());
+		}
+		else {
+			Serial.print("File: ");
+			Serial.print(file.name());
+			Serial.print(", size: ");
+			Serial.println(file.size());
+		}
+
+		file = dir.openNextFile();
+	}
+
+	dir.close();
+}
+
 void setup() {
 	Serial.begin(115200);
 	while(!Serial)
@@ -257,14 +288,17 @@ void setup() {
 	if (!LittleFS.begin())
 		Serial.println(F("LittleFS.begin() failed"));
 	
-	if (load_configuration() == false)
+	if (load_configuration() == false) {
 		Serial.println(F("Failed to load configuration, using defaults!"));
+		ls(LittleFS, "/");
+	}
 
 	bs = new backend_sdcard();
 	scsi_dev = new scsi(bs);
 
 	set_hostname(name);
 	setup_wifi();
+	init_logger();
 
 	auto reset_reason = esp_reset_reason();
 	if (reset_reason != ESP_RST_POWERON)
