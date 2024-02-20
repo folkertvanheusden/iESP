@@ -213,7 +213,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				// ... set all to 'not set'
 			}
 			else {
-				DOLOG("scsi::send: INQUIRY page code %02xh not implemented\n", CDB[2]);
+				errlog("scsi::send: INQUIRY page code %02xh not implemented\n", CDB[2]);
 				ok = false;
 			}
 		}
@@ -289,7 +289,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 
 			auto vr = validate_request(lba, transfer_length);
 			if (vr.has_value()) {
-				DOLOG("scsi::send: GET LBA STATUS parameters invalid\n");
+				errlog("scsi::send: GET LBA STATUS parameters invalid\n");
 				response.sense_data = vr.value();
 			}
 			else {
@@ -305,7 +305,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			}
 		}
 		else {
-			DOLOG("scsi::send: GET LBA STATUS service action %02xh not implemented\n", service_action);
+			errlog("scsi::send: GET LBA STATUS service action %02xh not implemented\n", service_action);
 			response.sense_data = error_not_implemented();
 		}
 	}
@@ -329,14 +329,14 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			transfer_length = (uint64_t(CDB[10]) << 24) | (CDB[11] << 16) | (CDB[12] << 8) | CDB[13];
 		}
 		else {
-			DOLOG("scsi::send: WRITE_1x internal error\n");
+			errlog("scsi::send: WRITE_1x internal error\n");
 		}
 
 		DOLOG("scsi::send: WRITE_1%c, offset %" PRIu64 ", %u sectors\n", opcode == o_write_10 ? '0' : '6', lba, transfer_length);
 
 		auto vr = validate_request(lba, transfer_length);
 		if (vr.has_value()) {
-			DOLOG("scsi::send: WRITE_1x parameters invalid\n");
+			errlog("scsi::send: WRITE_1x parameters invalid\n");
 			response.sense_data = vr.value();
 		}
 		else if (data.first) {
@@ -354,12 +354,12 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				auto rc = write(lba, received_blocks, data.first);
 
 				if (rc == scsi_rw_result::rw_fail_general) {
-					DOLOG("scsi::send: WRITE_xx, general write error\n");
+					errlog("scsi::send: WRITE_xx, general write error\n");
 					response.sense_data = error_write_error();
 					ok = false;
 				}
 				else if (rc == rw_fail_locked) {
-					DOLOG("scsi::send: WRITE_xx, failed writing due to reservations\n");
+					errlog("scsi::send: WRITE_xx, failed writing due to reservations\n");
 					response.sense_data = error_reserve_6();
 					ok = false;
 				}
@@ -415,7 +415,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 
 		auto vr = validate_request(lba, transfer_length);
 		if (vr.has_value()) {
-			DOLOG("scsi::send: READ_1x parameters invalid\n");
+			errlog("scsi::send: READ_1x parameters invalid\n");
 			response.sense_data = vr.value();
 		}
 		else if (transfer_length == 0) {
@@ -490,15 +490,15 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 					ok = true;
 				}
 				else {
-					DOLOG("scsi::send: 0xa3 for opcode %02x not implemented\n", req_operation_code);
+					errlog("scsi::send: 0xa3 for opcode %02x not implemented\n", req_operation_code);
 				}
 			}
 			else {
-				DOLOG("scsi::send: 0xa3 reporting option %d not implemented\n", reporting_options);
+				errlog("scsi::send: 0xa3 reporting option %d not implemented\n", reporting_options);
 			}
 		}
 		else {
-			DOLOG("scsi::send: 0xa3 service action %02x not implemented\n", service_action);
+			errlog("scsi::send: 0xa3 service action %02x not implemented\n", service_action);
 		}
 
 		if (!ok)
@@ -530,13 +530,13 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				match = read(lba + i, 1, buffer);
 
 				if (match != rw_ok) {
-					DOLOG("scsi::send: read from backend error\n");
+					errlog("scsi::send: read from backend error\n");
 					break;
 				}
 
 				if (memcmp(buffer, &data.first[i * block_size], block_size) != 0) {
 					match = rw_fail_general;
-					DOLOG("scsi::send: block %u (LBA: %" PRIu64 ") mismatch\n", i, lba + i);
+					errlog("scsi::send: block %u (LBA: %" PRIu64 ") mismatch\n", i, lba + i);
 					break;
 				}
 			}
@@ -549,7 +549,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 					write_result = write(lba + i, 1, &data.first[i * block_size + block_count * block_size]);
 
 					if (write_result != rw_ok) {
-						DOLOG("scsi::send: write to backend error\n");
+						errlog("scsi::send: write to backend error\n");
 						break;
 					}
 				}
@@ -606,7 +606,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 
 			auto vr = validate_request(lba, transfer_length);
 			if (vr.has_value()) {
-				DOLOG("scsi::send: UNMAP parameters invalid\n");
+				errlog("scsi::send: UNMAP parameters invalid\n");
 				response.sense_data = vr.value();
 				rc = rw_fail_general;
 			}
@@ -615,7 +615,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 
 				rc = trim(lba, transfer_length);
 				if (rc != rw_ok) {
-					DOLOG("scsi::send: UNMAP trim failed\n");
+					errlog("scsi::send: UNMAP trim failed\n");
 					break;
 				}
 			}
@@ -633,7 +633,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		}
 	}
 	else {
-		DOLOG("scsi::send: opcode %02xh not implemented\n", opcode);
+		errlog("scsi::send: opcode %02xh not implemented\n", opcode);
 		response.sense_data = error_not_implemented();
 	}
 
@@ -739,7 +739,7 @@ bool scsi::unlock_device()
 	std::unique_lock lck(locked_by_lock);
 
 	if (locked_by.has_value() == false) {
-		DOLOG("scsi::unlock_device: device was NOT locked!\n");
+		errlog("scsi::unlock_device: device was NOT locked!\n");
 		return false;
 	}
 
@@ -748,7 +748,7 @@ bool scsi::unlock_device()
 		return true;
 	}
 
-	DOLOG("scsi::unlock_device: device is locked by someone else!\n");
+	errlog("scsi::unlock_device: device is locked by someone else!\n");
 
 	return false;
 }

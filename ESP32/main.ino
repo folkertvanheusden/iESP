@@ -84,24 +84,24 @@ void enable_OTA() {
 	ArduinoOTA.setPassword("iojasdsjiasd");
 
 	ArduinoOTA.onStart([]() {
-			Serial.println(F("OTA start"));
+			errlog("OTA start\n");
 			ota_update = true;
 			stop = true;
 			LittleFS.end();
 			});
 	ArduinoOTA.onEnd([]() {
-			Serial.println(F("OTA end"));
+			errlog("OTA end\n");
 			});
 	ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
 			Serial.printf("OTA progress: %u%%\r", progress * 100 / total);
 			});
 	ArduinoOTA.onError([](ota_error_t error) {
-			Serial.printf("Error[%u]: ", error);
-			if (error == OTA_AUTH_ERROR) Serial.println(F("auth failed"));
-			else if (error == OTA_BEGIN_ERROR) Serial.println(F("begin failed"));
-			else if (error == OTA_CONNECT_ERROR) Serial.println(F("connect failed"));
-			else if (error == OTA_RECEIVE_ERROR) Serial.println(F("receive failed"));
-			else if (error == OTA_END_ERROR) Serial.println(F("end failed"));
+			errlog("OTA error[%u]: ", error);
+			if (error == OTA_AUTH_ERROR) errlog("auth failed\n");
+			else if (error == OTA_BEGIN_ERROR) errlog("begin failed\n");
+			else if (error == OTA_CONNECT_ERROR) errlog("connect failed\n");
+			else if (error == OTA_RECEIVE_ERROR) errlog("receive failed\n");
+			else if (error == OTA_END_ERROR) errlog("end failed\n");
 			});
 	ArduinoOTA.begin();
 
@@ -176,7 +176,7 @@ void WiFiEvent(WiFiEvent_t event)
 
 void heap_caps_alloc_failed_hook(size_t requested_size, uint32_t caps, const char *function_name)
 {
-	printf("%s was called but failed to allocate %zu bytes with 0x%x capabilities (by %p)\r\n", function_name, requested_size, caps, __builtin_return_address(0));
+	errlog("%s was called but failed to allocate %zu bytes with 0x%x capabilities (by %p)\r\n", function_name, requested_size, caps, __builtin_return_address(0));
 
 	esp_backtrace_print(25);
 }
@@ -266,14 +266,14 @@ void setup() {
 
 	auto reset_reason = esp_reset_reason();
 	if (reset_reason != ESP_RST_POWERON)
-		Serial.printf("Reset reason: %d\r\n", reset_reason);
+		errlog("Reset reason: %d\n", reset_reason);
 
 	esp_wifi_set_ps(WIFI_PS_NONE);
 
 	if (MDNS.begin(name))
 		MDNS.addService("iscsi", "tcp", 3260);
 	else
-		Serial.println(F("Failed starting mdns responder"));
+		errlog("Failed starting mdns responder\n");
 
 	heap_caps_register_failed_alloc_callback(heap_caps_alloc_failed_hook);
 
@@ -300,7 +300,7 @@ void loop()
 
 		com_sockets c(buffer, 3260, &stop);
 		if (c.begin() == false)
-			Serial.println(F("Failed to initialize communication layer!"));
+			errlog("Failed to initialize communication layer!\n");
 
 		server s(scsi_dev, &c);
 		Serial.println(F("Go!"));
@@ -308,7 +308,7 @@ void loop()
 	}
 
 	if (ota_update) {
-		Serial.println(F("Halting for OTA update"));
+		errlog("Halting for OTA update\n");
 
 		for(;;)
 			delay(1000);

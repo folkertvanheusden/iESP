@@ -104,7 +104,7 @@ com_client *com_sockets::accept()
 
 	int fd = ::accept(listen_fd, nullptr, nullptr);
 	if (fd == -1) {
-		DOLOG("com_sockets::accept: accept failed: %s\n", strerror(errno));
+		errlog("com_sockets::accept: accept failed: %s\n", strerror(errno));
 		return nullptr;
 	}
 
@@ -132,7 +132,7 @@ bool com_client_sockets::send(const uint8_t *const from, const size_t n)
 	auto rc = WRITE(fd, from, n);
 	if (rc == -1) {
 #ifdef ESP32
-		printf("com_client_sockets::send: write failed with error %s\r\n", strerror(errno));
+		errlog("com_client_sockets::send: write failed with error %s\n", strerror(errno));
 #else
 		DOLOG("com_client_sockets::send: write failed with error %s\n", strerror(errno));
 #endif
@@ -167,7 +167,7 @@ bool com_client_sockets::recv(uint8_t *const to, const size_t n)
 
 	if (rc == -1) {
 #ifdef ESP32
-		Serial.printf("com_client_sockets::recv: read failed with error %s\r\n", strerror(errno));
+		errlog("com_client_sockets::recv: read failed with error %s\n", strerror(errno));
 #else
 		DOLOG("com_client_sockets::recv: read failed with error %s\n", strerror(errno));
 #endif
@@ -188,7 +188,7 @@ std::string com_client_sockets::get_endpoint_name() const
         socklen_t addr_len = sizeof addr;
 
         if (getpeername(fd, reinterpret_cast<sockaddr *>(&addr), &addr_len) == -1) {
-                DOLOG("get_endpoint_name: failed to find name of fd %d\n", fd);
+                errlog("get_endpoint_name: failed to find name of fd %d\n", fd);
 		return "?:?";
 	}
 

@@ -64,7 +64,7 @@ bool backend_sdcard::reinit(const bool close_first)
 
 retry:
 	if (file.open(FILENAME, O_RDWR) == false) {
-		Serial.println(F("Cannot access test.dat on SD-card"));
+		errlog("Cannot access test.dat on SD-card\n");
 		return false;
 	}
 
@@ -95,7 +95,7 @@ bool backend_sdcard::sync()
 	std::lock_guard<std::mutex> lck(serial_access_lock);
 
 	if (file.sync() == false)
-		Serial.println(F("SD card backend: sync failed"));
+		errlog("SD card backend: sync failed\n");
 
 #ifdef LED_RED
 	digitalWrite(LED_RED, LOW);
@@ -127,7 +127,7 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 	std::lock_guard<std::mutex> lck(serial_access_lock);
 
 	if (file.seekSet(byte_address) == false) {
-		Serial.println(F("Cannot seek to position"));
+		errlog("Cannot seek to position\n");
 #ifdef LED_RED
 		digitalWrite(LED_RED, LOW);
 #endif
@@ -152,7 +152,7 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 	}
 ok:
 	if (!rc)
-		Serial.printf("Cannot write (%d)\r\n", file.getError());
+		errlog("Cannot write (%d)\n", file.getError());
 #ifdef LED_RED
 		digitalWrite(LED_RED, LOW);
 #endif
@@ -165,7 +165,7 @@ bool backend_sdcard::trim(const uint64_t block_nr, const uint32_t n_blocks)
 	uint8_t *data = new uint8_t[get_block_size()];
 	for(uint32_t i=0; i<n_blocks; i++) {
 		if (write(block_nr + i, 1, data) == false) {
-			Serial.printf("Cannot \"trim\"\r\n");
+			errlog("Cannot \"trim\"\n");
 			rc = false;
 			break;
 		}
@@ -187,7 +187,7 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 	std::lock_guard<std::mutex> lck(serial_access_lock);
 
 	if (file.seekSet(byte_address) == false) {
-		Serial.println(F("Cannot seek to position"));
+		errlog("Cannot seek to position\n");
 #ifdef LED_GREEN
 		digitalWrite(LED_GREEN, LOW);
 #endif
@@ -212,7 +212,7 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 	}
 ok:
 	if (!rc)
-		Serial.printf("Cannot read (%d)\r\n", file.getError());
+		errlog("Cannot read (%d)\n", file.getError());
 #ifdef LED_GREEN
 	digitalWrite(LED_GREEN, LOW);
 #endif
