@@ -104,7 +104,7 @@ com_client *com_sockets::accept()
 
 	int fd = ::accept(listen_fd, nullptr, nullptr);
 	if (fd == -1) {
-		errlog("com_sockets::accept: accept failed: %s\n", strerror(errno));
+		errlog("com_sockets::accept: accept failed: %s", strerror(errno));
 		return nullptr;
 	}
 
@@ -130,13 +130,8 @@ com_client_sockets::~com_client_sockets()
 bool com_client_sockets::send(const uint8_t *const from, const size_t n)
 {
 	auto rc = WRITE(fd, from, n);
-	if (rc == -1) {
-#ifdef ESP32
-		errlog("com_client_sockets::send: write failed with error %s\n", strerror(errno));
-#else
-		DOLOG("com_client_sockets::send: write failed with error %s\n", strerror(errno));
-#endif
-	}
+	if (rc == -1)
+		errlog("com_client_sockets::send: write failed with error %s", strerror(errno));
 	return rc == n;
 }
 
@@ -165,13 +160,8 @@ bool com_client_sockets::recv(uint8_t *const to, const size_t n)
 	// ideally the poll-loop should include the read (TODO)
 	auto rc = READ(fd, to, n);
 
-	if (rc == -1) {
-#ifdef ESP32
-		errlog("com_client_sockets::recv: read failed with error %s\n", strerror(errno));
-#else
-		DOLOG("com_client_sockets::recv: read failed with error %s\n", strerror(errno));
-#endif
-	}
+	if (rc == -1)
+		errlog("com_client_sockets::recv: read failed with error %s", strerror(errno));
 
 	return rc == n;
 }
@@ -188,7 +178,7 @@ std::string com_client_sockets::get_endpoint_name() const
         socklen_t addr_len = sizeof addr;
 
         if (getpeername(fd, reinterpret_cast<sockaddr *>(&addr), &addr_len) == -1) {
-                errlog("get_endpoint_name: failed to find name of fd %d\n", fd);
+                errlog("get_endpoint_name: failed to find name of fd %d", fd);
 		return "?:?";
 	}
 

@@ -64,7 +64,7 @@ bool backend_sdcard::reinit(const bool close_first)
 
 retry:
 	if (file.open(FILENAME, O_RDWR) == false) {
-		errlog("Cannot access test.dat on SD-card\n");
+		errlog("Cannot access test.dat on SD-card");
 		return false;
 	}
 
@@ -95,7 +95,7 @@ bool backend_sdcard::sync()
 	std::lock_guard<std::mutex> lck(serial_access_lock);
 
 	if (file.sync() == false)
-		errlog("SD card backend: sync failed\n");
+		errlog("SD card backend: sync failed");
 
 #ifdef LED_RED
 	digitalWrite(LED_RED, LOW);
@@ -127,7 +127,7 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 	std::lock_guard<std::mutex> lck(serial_access_lock);
 
 	if (file.seekSet(byte_address) == false) {
-		errlog("Cannot seek to position\n");
+		errlog("Cannot seek to position");
 #ifdef LED_RED
 		digitalWrite(LED_RED, LOW);
 #endif
@@ -152,7 +152,7 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 	}
 ok:
 	if (!rc)
-		errlog("Cannot write (%d)\n", file.getError());
+		errlog("Cannot write (%d)", file.getError());
 #ifdef LED_RED
 		digitalWrite(LED_RED, LOW);
 #endif
@@ -165,7 +165,7 @@ bool backend_sdcard::trim(const uint64_t block_nr, const uint32_t n_blocks)
 	uint8_t *data = new uint8_t[get_block_size()];
 	for(uint32_t i=0; i<n_blocks; i++) {
 		if (write(block_nr + i, 1, data) == false) {
-			errlog("Cannot \"trim\"\n");
+			errlog("Cannot \"trim\"");
 			rc = false;
 			break;
 		}
@@ -187,7 +187,7 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 	std::lock_guard<std::mutex> lck(serial_access_lock);
 
 	if (file.seekSet(byte_address) == false) {
-		errlog("Cannot seek to position\n");
+		errlog("Cannot seek to position");
 #ifdef LED_GREEN
 		digitalWrite(LED_GREEN, LOW);
 #endif
@@ -212,7 +212,7 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 	}
 ok:
 	if (!rc)
-		errlog("Cannot read (%d)\n", file.getError());
+		errlog("Cannot read (%d)", file.getError());
 #ifdef LED_GREEN
 	digitalWrite(LED_GREEN, LOW);
 #endif

@@ -46,7 +46,7 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 
 	uint8_t pdu[48] { 0 };
 	if (cc->recv(pdu, sizeof pdu) == false) {
-		errlog("server::receive_pdu: PDU receive error\n");
+		errlog("server::receive_pdu: PDU receive error");
 		return { nullptr, false };
 	}
 
@@ -54,7 +54,7 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 
 	iscsi_pdu_bhs bhs;
 	if (bhs.set(*s, pdu, sizeof pdu) == false) {
-		errlog("server::receive_pdu: BHS validation error\n");
+		errlog("server::receive_pdu: BHS validation error");
 		return { nullptr, false };
 	}
 
@@ -96,7 +96,7 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 			pdu_obj = new iscsi_pdu_scsi_data_out();
 			break;
 		default:
-			errlog("server::receive_pdu: opcode %02xh not implemented\n", bhs.get_opcode());
+			errlog("server::receive_pdu: opcode %02xh not implemented", bhs.get_opcode());
 			pdu_obj = new iscsi_pdu_bhs();
 			pdu_error = true;
 			break;
@@ -107,7 +107,7 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 
 		if (pdu_obj->set(*s, pdu, sizeof pdu) == false) {
 			ok = false;
-			errlog("server::receive_pdu: initialize PDU: validation failed\n");
+			errlog("server::receive_pdu: initialize PDU: validation failed");
 		}
 
 #if defined(ESP32) || !defined(NDEBUG)
@@ -131,7 +131,7 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 			uint8_t *ahs_temp = new uint8_t[ahs_len]();
 			if (cc->recv(ahs_temp, ahs_len) == false) {
 				ok = false;
-				errlog("server::receive_pdu: AHS receive error\n");
+				errlog("server::receive_pdu: AHS receive error");
 			}
 			else {
 				pdu_obj->set_ahs_segment({ ahs_temp, ahs_len });
@@ -150,7 +150,7 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 			uint8_t *data_temp = new uint8_t[padded_data_length]();
 			if (cc->recv(data_temp, padded_data_length) == false) {
 				ok = false;
-				errlog("server::receive_pdu: data receive error\n");
+				errlog("server::receive_pdu: data receive error");
 			}
 			else {
 				pdu_obj->set_data({ data_temp, data_length });
@@ -161,7 +161,7 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 		}
 		
 		if (!ok) {
-			errlog("server::receive_pdu: cannot return PDU\n");
+			errlog("server::receive_pdu: cannot return PDU");
 			delete pdu_obj;
 			pdu_obj = nullptr;
 		}
@@ -189,7 +189,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 		}
 
 		if (session == nullptr) {
-			errlog("server::push_response: DATA-OUT PDU references unknown TTT (%08x)\n", TTT);
+			errlog("server::push_response: DATA-OUT PDU references unknown TTT (%08x)", TTT);
 			if (data.has_value())
 				delete [] data.value().first;
 			return false;
@@ -205,7 +205,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 			delete [] data.value().first;
 
 			if (rc != scsi::rw_ok) {
-				errlog("server::push_response: DATA-OUT problem writing to backend (%d)\n", rc);
+				errlog("server::push_response: DATA-OUT problem writing to backend (%d)", rc);
 				return false;
 			}
 
@@ -223,7 +223,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 
 			iscsi_pdu_scsi_cmd response;
 			if (response.set(ses, session->PDU_initiator.data, session->PDU_initiator.n) == false) {
-				errlog("server::push_response: response.set failed\n");
+				errlog("server::push_response: response.set failed");
 				return false;
 			}
 			response_set = response.get_response(ses, parameters, session->bytes_left);
@@ -241,7 +241,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 
 				auto *response = new iscsi_pdu_scsi_r2t() /* 0x31 */;
 				if (response->set(ses, temp, TTT, session->bytes_done, session->bytes_left) == false) {
-					errlog("server::push_response: response->set failed\n");
+					errlog("server::push_response: response->set failed");
 					delete response;
 					return false;
 				}
@@ -255,7 +255,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 	}
 
 	if (response_set.has_value() == false) {
-		errlog("server::push_response: no response from PDU\n");
+		errlog("server::push_response: no response from PDU");
 		return true;
 	}
 
@@ -271,7 +271,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 			if (ok) {
 				ok = cc->send(blobs.data, blobs.n);
 				if (!ok)
-					errlog("server::push_response: sending PDU to peer failed (%s)\n", strerror(errno));
+					errlog("server::push_response: sending PDU to peer failed (%s)", strerror(errno));
 				bytes_send += blobs.n;
 			}
 
@@ -343,7 +343,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 				auto rc = s->read(cur_block_nr, n_left, buffer.data);
 
 				if (rc != scsi::rw_ok) {
-					errlog("server::push_response: reading %u block(s) %zu from backend failed (%d)\n", n_left, size_t(cur_block_nr), rc);
+					errlog("server::push_response: reading %u block(s) %zu from backend failed (%d)", n_left, size_t(cur_block_nr), rc);
 					ok = false;
 					break;
 				}
@@ -356,12 +356,12 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 				delete [] buffer.data;
 				buffer.n = 512;
 				buffer.data = new uint8_t[buffer.n]();
-				errlog("Low on memory: %zu bytes failed\r\n", buffer.n);
+				errlog("Low on memory: %zu bytes failed", buffer.n);
 			}
 			else {
 				if (cc->send(out.data, out.n) == false) {
 					delete [] out.data;
-					errlog("server::push_response: problem sending block %zu to initiator\n", size_t(cur_block_nr));
+					errlog("server::push_response: problem sending block %zu to initiator", size_t(cur_block_nr));
 					ok = false;
 					break;
 				}
@@ -405,7 +405,7 @@ iscsi_response_parameters *server::select_parameters(iscsi_pdu_bhs *const pdu, s
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_data_out:
 			return new iscsi_response_parameters_data_out(ses);
 		default:
-			errlog("server::select_parameters: opcode %02xh not implemented\n", pdu->get_opcode());
+			errlog("server::select_parameters: opcode %02xh not implemented", pdu->get_opcode());
 			break;
 	}
 
@@ -426,7 +426,7 @@ void server::handler()
 	while(!stop) {
 		com_client *cc = c->accept();
 		if (cc == nullptr) {
-			errlog("server::handler: accept() failed: %s\n", strerror(errno));
+			errlog("server::handler: accept() failed: %s", strerror(errno));
 			continue;
 		}
 
@@ -475,18 +475,18 @@ void server::handler()
 #endif
 
 				if (incoming.second) {  // something wrong with the received PDU?
-					errlog("server::handler: invalid PDU received\n");
+					errlog("server::handler: invalid PDU received");
 
 					std::optional<blob_t> reject = generate_reject_pdu(*pdu);
 					if (reject.has_value() == false) {
-						errlog("server::handler: cannot generate reject PDU\n");
+						errlog("server::handler: cannot generate reject PDU");
 						continue;
 					}
 
 					bool rc = cc->send(reject.value().data, reject.value().n);
 					delete [] reject.value().data;
 					if (rc == false) {
-						errlog("server::handler: cannot transmit reject PDU\n");
+						errlog("server::handler: cannot transmit reject PDU");
 						break;
 					}
 

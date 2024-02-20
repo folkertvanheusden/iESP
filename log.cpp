@@ -13,10 +13,10 @@ std::optional<std::string> syslog_host;
 WiFiUDP UDP;
 #endif
 
+thread_local char err_log_buf[128];
+
 void errlog(const char *const fmt, ...)
 {
-	char err_log_buf[128];
-
 	va_list ap;
 	va_start(ap, fmt);
 	(void)vsnprintf(err_log_buf, sizeof err_log_buf, fmt, ap);

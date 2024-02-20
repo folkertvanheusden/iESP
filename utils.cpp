@@ -117,7 +117,7 @@ std::string myformat(const char *const fmt, ...)
         va_start(ap, fmt);
         if (vasprintf(&buffer, fmt, ap) == -1) {
                 va_end(ap);
-                errlog("myformat: failed to convert string with format \"%s\"\n", fmt);
+                errlog("myformat: failed to convert string with format \"%s\"", fmt);
                 return fmt;
         }
         va_end(ap);
@@ -133,7 +133,7 @@ std::string myformat(const char *const fmt, ...)
         va_start(ap, fmt);
         if (vsnprintf(buffer, sizeof buffer, fmt, ap) == -1) {
                 va_end(ap);
-                errlog("myformat: failed to convert string with format \"%s\"\n", fmt);
+                errlog("myformat: failed to convert string with format \"%s\"", fmt);
                 return fmt;
         }
         va_end(ap);
