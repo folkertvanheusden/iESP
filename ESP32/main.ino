@@ -58,6 +58,8 @@ bool load_configuration() {
 	syslog_host = cfg["syslog-host"].as<const char *>();
 	if (syslog_host.value().empty())
 		syslog_host.reset();
+	else
+		Serial.printf("Syslog host: %s\r\n", syslog_host.value().c_str());
 
 	data_file.close();
 
@@ -267,6 +269,8 @@ void setup() {
 	auto reset_reason = esp_reset_reason();
 	if (reset_reason != ESP_RST_POWERON)
 		errlog("Reset reason: %d", reset_reason);
+	else
+		errlog("System (re-)started");
 
 	esp_wifi_set_ps(WIFI_PS_NONE);
 

@@ -29,7 +29,8 @@ void errlog(const char *const fmt, ...)
 	Serial.println(err_log_buf);
 
 	if (syslog_host.has_value()) {
-		IPAddress ip = ip.fromString(syslog_host.value().c_str());
+		IPAddress ip;
+		ip.fromString(syslog_host.value().c_str());
 
 		UDP.beginPacket(ip, 514);
 		UDP.printf(err_log_buf);
