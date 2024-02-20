@@ -379,9 +379,9 @@ void setup() {
 
 	auto reset_reason = esp_reset_reason();
 	if (reset_reason != ESP_RST_POWERON)
-		errlog("Reset reason: %s (%d)", reset_name(reset_reason), reset_reason);
+		errlog("Reset reason: %s (%d), software version %s", reset_name(reset_reason), reset_reason, version_str);
 	else
-		errlog("System (re-)started");
+		errlog("System (re-)started, software version %s", version_str);
 
 	esp_wifi_set_ps(WIFI_PS_NONE);
 
