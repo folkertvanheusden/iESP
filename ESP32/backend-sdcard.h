@@ -10,15 +10,17 @@ class backend_sdcard : public backend
 private:
 	SdFs      sd;
 	FsFile    file;
-	uint64_t  card_size   { 0 };
-	size_t    sector_size { 0 };
+	uint64_t  card_size   { 0  };
+	size_t    sector_size { 0  };
+	const int led_read    { -1 };
+	const int led_write   { -1 };
 
 	std::mutex serial_access_lock;
 
 	bool reinit(const bool close_first);
 
 public:
-	backend_sdcard();
+	backend_sdcard(const int led_read, const int led_write);
 	virtual ~backend_sdcard();
 
 	bool begin() override;

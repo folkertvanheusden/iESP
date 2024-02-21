@@ -13,19 +13,11 @@
 // 19 MISO
 // 23 MOSI
 #define CS_SD 5
-#define LED_GREEN 16
-#define LED_RED   17
 #endif
 #define FILENAME "test.dat"
 
-backend_sdcard::backend_sdcard()
+backend_sdcard::backend_sdcard(const int led_read, const int led_write)
 {
-#ifdef LED_GREEN
-	pinMode(LED_GREEN, OUTPUT);
-#endif
-#ifdef LED_RED
-	pinMode(LED_RED,   OUTPUT);
-#endif
 }
 
 bool backend_sdcard::begin()
@@ -181,9 +173,8 @@ bool backend_sdcard::trim(const uint64_t block_nr, const uint32_t n_blocks)
 
 bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_t *const data)
 {
-#ifdef LED_GREEN
-	digitalWrite(LED_GREEN, HIGH);
-#endif
+	if (led_read != -1)
+		digitalWrite(led_read, HIGH);
 	// Serial.printf("Read from block %zu, %u blocks\r\n", size_t(block_nr), n_blocks);
 
 	uint64_t iscsi_block_size = get_block_size();
@@ -193,9 +184,8 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 
 	if (file.seekSet(byte_address) == false) {
 		errlog("Cannot seek to position");
-#ifdef LED_GREEN
-		digitalWrite(LED_GREEN, LOW);
-#endif
+		if (led_read != -1)
+			digitalWrite(led_read, LOW);
 		return false;
 	}
 
@@ -218,8 +208,7 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 ok:
 	if (!rc)
 		errlog("Cannot read (%d)", file.getError());
-#ifdef LED_GREEN
-	digitalWrite(LED_GREEN, LOW);
-#endif
+	if (led_read != -1)
+		digitalWrite(led_read, LOW);
 	return rc;
 }

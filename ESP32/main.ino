@@ -26,6 +26,10 @@ char name[16] { 0 };
 backend_sdcard  *bs { nullptr };
 scsi *scsi_dev { nullptr };
 
+const int led_green  = 17;
+const int led_yellow = 16;
+const int led_red    = 15;
+
 DynamicJsonDocument cfg(4096);
 #define IESP_CFG_FILE "/cfg-iESP.json"
 
@@ -34,13 +38,20 @@ int trim_level = 0;
 
 TaskHandle_t task2;
 
+void write_led(const int gpio, const int state) {
+	if (gpio != -1)
+		digitalWrite(gpio, state);
+}
+
 void fail_flash() {
 	errlog("System cannot continue");
 
 	for(;;) {
 		digitalWrite(LED_BUILTIN, HIGH);
+		write_led(led_red, HIGH);
 		delay(200);
 		digitalWrite(LED_BUILTIN, LOW);
+		write_led(led_red, LOW);
 		delay(200);
 	}
 }
@@ -87,18 +98,6 @@ bool load_configuration() {
 	return true;
 }
 
-bool save_configuration()
-{
-	File data_file = LittleFS.open(IESP_CFG_FILE, "w");
-	if (!data_file)
-		return false;
-
-	serializeJson(cfg, data_file);
-	data_file.close();
-
-	return true;
-}
-
 void enable_OTA() {
 	ArduinoOTA.setPort(3232);
 	ArduinoOTA.setHostname(name);
@@ -117,6 +116,7 @@ void enable_OTA() {
 			Serial.printf("OTA progress: %u%%\r", progress * 100 / total);
 			});
 	ArduinoOTA.onError([](ota_error_t error) {
+			write_led(led_red, HIGH);
 			errlog("OTA error[%u]: ", error);
 			if (error == OTA_AUTH_ERROR) errlog("auth failed");
 			else if (error == OTA_BEGIN_ERROR) errlog("begin failed");
@@ -131,6 +131,7 @@ void enable_OTA() {
 
 void WiFiEvent(WiFiEvent_t event)
 {
+	write_led(led_red, HIGH);
 	Serial.print(F("WiFi event: "));
 
 	switch(event) {
@@ -193,13 +194,16 @@ void WiFiEvent(WiFiEvent_t event)
 		default:
 			Serial.println(event); break;
 	}
+	write_led(led_red, LOW);
 }
 
 void heap_caps_alloc_failed_hook(size_t requested_size, uint32_t caps, const char *function_name)
 {
+	write_led(led_red, HIGH);
 	errlog("%s was called but failed to allocate %zu bytes with 0x%x capabilities (by %p)", function_name, requested_size, caps, __builtin_return_address(0));
 
 	esp_backtrace_print(25);
+	write_led(led_red, LOW);
 }
 
 bool progress_indicator(const int nr, const int mx, const std::string & which) {
@@ -358,6 +362,12 @@ void setup() {
 	Serial.println(name);
 
 	pinMode(LED_BUILTIN, OUTPUT);
+	if (led_green != -1)
+		pinMode(led_green, OUTPUT);
+	if (led_yellow != -1)
+		pinMode(led_yellow, OUTPUT);
+	if (led_red != -1)
+		pinMode(led_red, OUTPUT);
 
 	if (!LittleFS.begin())
 		Serial.println(F("LittleFS.begin() failed"));
@@ -372,7 +382,7 @@ void setup() {
 	setup_wifi();
 	init_logger(name);
 
-	bs = new backend_sdcard();
+	bs = new backend_sdcard(led_green, led_yellow);
 	if (bs->begin() == false) {
 		errlog("Failed to load initialize storage backend!");
 		fail_flash();
