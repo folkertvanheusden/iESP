@@ -17,6 +17,9 @@ std::string name { "?" };
 
 thread_local char err_log_buf[192];
 
+extern void write_led(const int gpio, const int state);
+extern int led_red;
+
 void errlog(const char *const fmt, ...)
 {
 	int offset = snprintf(err_log_buf, sizeof err_log_buf, "%s] ", name.c_str());
@@ -30,6 +33,7 @@ void errlog(const char *const fmt, ...)
 	syslog(LOG_ERR, "%s", err_log_buf);
 	printf("%s\n", err_log_buf);
 #else
+	write_led(led_red, HIGH);
 	Serial.println(err_log_buf);
 
 	if (syslog_host.has_value()) {
@@ -46,6 +50,7 @@ void errlog(const char *const fmt, ...)
 			UDP.endPacket();
 		}
 	}
+	write_led(led_red, LOW);
 #endif
 }
 

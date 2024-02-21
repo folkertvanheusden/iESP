@@ -26,9 +26,9 @@ char name[16] { 0 };
 backend_sdcard  *bs { nullptr };
 scsi *scsi_dev { nullptr };
 
-const int led_green  = 17;
-const int led_yellow = 16;
-const int led_red    = 15;
+int led_green  = 17;
+int led_yellow = 16;
+int led_red    = 15;
 
 DynamicJsonDocument cfg(4096);
 #define IESP_CFG_FILE "/cfg-iESP.json"
@@ -45,6 +45,9 @@ void write_led(const int gpio, const int state) {
 
 void fail_flash() {
 	errlog("System cannot continue");
+
+	write_led(led_green,  LOW);
+	write_led(led_yellow, LOW);
 
 	for(;;) {
 		digitalWrite(LED_BUILTIN, HIGH);
@@ -215,6 +218,9 @@ bool progress_indicator(const int nr, const int mx, const std::string & which) {
 }
 
 void setup_wifi() {
+	write_led(led_green,  HIGH);
+	write_led(led_yellow, HIGH);
+
 	enable_wifi_debug();
 
 	WiFi.onEvent(WiFiEvent);
@@ -252,6 +258,9 @@ void setup_wifi() {
 		// could not connect
 	}
 	while(cs == CS_FAILURE);
+
+	write_led(led_green,  LOW);
+	write_led(led_yellow, LOW);
 }
 
 void loopw(void *) {
@@ -272,6 +281,7 @@ void ls(fs::FS &fs, const String & name)
 	File dir = fs.open(name);
 	if (!dir) {
 		Serial.println(F("Can't open"));
+		write_led(led_red, LOW);
 		return;
 	}
 
