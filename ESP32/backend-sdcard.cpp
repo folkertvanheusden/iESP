@@ -36,6 +36,8 @@ bool backend_sdcard::begin()
 
 bool backend_sdcard::reinit(const bool close_first)
 {
+	write_led(led_read,  HIGH);
+	write_led(led_write, HIGH);
 	if (close_first) {
 		file.close();
 		sd.end();
@@ -58,6 +60,8 @@ bool backend_sdcard::reinit(const bool close_first)
 	if (ok == false) {
 		Serial.printf("SD-card mount failed (assuming CS is on pin %d)\r\n", CS_SD);
 		sd.initErrorPrint(&Serial);
+		write_led(led_read,  LOW);
+		write_led(led_write, LOW);
 		return false;
 	}
 
@@ -66,6 +70,8 @@ bool backend_sdcard::reinit(const bool close_first)
 retry:
 	if (file.open(FILENAME, O_RDWR) == false) {
 		errlog("Cannot access test.dat on SD-card");
+		write_led(led_read,  LOW);
+		write_led(led_write, LOW);
 		return false;
 	}
 
@@ -76,6 +82,9 @@ retry:
 	Serial.printf("Virtual disk size: %zuMB\r\n", size_t(card_size / 1024 / 1024));
 
 	Serial.println(F("Init LEDs"));
+
+	write_led(led_read,  LOW);
+	write_led(led_write, LOW);
 
 	return true;
 }
