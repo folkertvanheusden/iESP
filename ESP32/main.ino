@@ -13,7 +13,7 @@
 #include <ESPmDNS.h>
 #include <LittleFS.h>
 #include <SNMP_Agent.h>
-
+#include <U8x8lib.h>
 
 #include "backend-sdcard.h"
 #include "com-sockets.h"
@@ -33,6 +33,8 @@ scsi *scsi_dev { nullptr };
 int led_green  = 17;
 int led_yellow = 16;
 int led_red    = 15;
+
+U8X8_SSD1306_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE);
 
 DynamicJsonDocument cfg(4096);
 #define IESP_CFG_FILE "/cfg-iESP.json"
@@ -56,6 +58,14 @@ const uint64_t max_idle_ticks = 1233100;
 #error "Unsupported CPU frequency"
 #endif
 int cpu_usage = 0.;
+
+long int draw_status_ts = 0;
+
+void draw_status(const std::string & str) {
+	u8x8.drawString(0, 22, str.c_str());
+	u8x8.refreshDisplay();
+	draw_status_ts = millis();
+}
 
 bool idle_task_0() {
 	core0_idle++;
@@ -250,17 +260,22 @@ void setup_wifi() {
 	write_led(led_green,  HIGH);
 	write_led(led_yellow, HIGH);
 
+	draw_status("0020");
 	enable_wifi_debug();
 
+	draw_status("0021");
 	WiFi.onEvent(WiFiEvent);
 
 	connect_status_t cs = CS_IDLE;
 	do {
+		draw_status("0022");
 		start_wifi({ });
 
 		Serial.print(F("Scanning for accesspoints"));
+		draw_status("0023");
 		scan_access_points_start();
 
+		draw_status("0024");
 		while(scan_access_points_wait() == false) {
 			digitalWrite(LED_BUILTIN, HIGH);
 			Serial.print(F("."));
@@ -268,12 +283,15 @@ void setup_wifi() {
 			delay(100);
 		}
 
+		draw_status("0025");
 		auto available_access_points = scan_access_points_get();
 		Serial.printf("Found %zu accesspoints\r\n", available_access_points.size());
 
+		draw_status("0026");
 		auto state = try_connect_init(wifi_targets, available_access_points, 300, progress_indicator);
 
 		Serial.println(F("Connecting"));
+		draw_status("0027");
 		for(;;) {
 			cs = try_connect_tick(state);
 
@@ -285,11 +303,16 @@ void setup_wifi() {
 		}
 
 		// could not connect
+		draw_status("0028");
 	}
 	while(cs == CS_FAILURE);
 
+	draw_status("0029");
+
 	write_led(led_green,  LOW);
 	write_led(led_yellow, LOW);
+
+	draw_status("002f");
 }
 
 void loopw(void *) {
@@ -297,8 +320,12 @@ void loopw(void *) {
 
 	int cu_count = 0;
 	for(;;) {
+		auto now = millis();
+		if (now - draw_status_ts > 5000)
+			u8x8.setPowerSave(1);
+
 		ArduinoOTA.handle();
-		hundredsofasecondcounter = millis() / 10;
+		hundredsofasecondcounter = now / 10;
 		snmp.loop();
 		vTaskDelay(100 / portTICK_PERIOD_MS);
 
@@ -395,9 +422,17 @@ void setup() {
 		yield();
 	Serial.setDebugOutput(true);
 
+	u8x8.begin();
+	u8x8.setPowerSave(0);
+	u8x8.setFont(u8x8_font_7x14_1x2_n);
+
+	draw_status("0001");
+
 	uint8_t chipid[6] { };
 	esp_read_mac(chipid, ESP_MAC_WIFI_STA);
 	snprintf(name, sizeof name, "iESP-%02x%02x%02x%02x", chipid[2], chipid[3], chipid[4], chipid[5]);
+
+	draw_status("0002");
 
 	Serial.println(F("iESP, (C) 2023-2024 by Folkert van Heusden <mail@vanheusden.com>"));
 	Serial.println(F("Compiled on " __DATE__ " " __TIME__));
@@ -405,6 +440,8 @@ void setup() {
 	Serial.println(version_str);
 	Serial.print(F("System name: "));
 	Serial.println(name);
+
+	draw_status("0003");
 
 	pinMode(LED_BUILTIN, OUTPUT);
 	if (led_green != -1)
@@ -414,12 +451,19 @@ void setup() {
 	if (led_red != -1)
 		pinMode(led_red, OUTPUT);
 
-	if (!LittleFS.begin())
+	draw_status("0004");
+
+	if (!LittleFS.begin()) {
 		Serial.println(F("LittleFS.begin() failed"));
+		draw_status("0005");
+	}
+
+	draw_status("0006");
 	
 	if (load_configuration() == false) {
 		Serial.println(F("Failed to load configuration, using defaults!"));
 		ls(LittleFS, "/");
+		draw_status("0007");
 		fail_flash();
 	}
 
@@ -427,8 +471,12 @@ void setup() {
 	setup_wifi();
 	init_logger(name);
 
+	draw_status("0008");
+
 	esp_register_freertos_idle_hook_for_cpu(idle_task_0, 0);
 	esp_register_freertos_idle_hook_for_cpu(idle_task_1, 1);
+
+	draw_status("0009");
 
 	snmp.setUDP(&snmp_udp);
 	snmp.addTimestampHandler(".1.3.6.1.2.1.1.3.0",            &hundredsofasecondcounter);
@@ -442,31 +490,42 @@ void setup() {
 	snmp.sortHandlers();
 	snmp.begin();
 
+	draw_status("000a");
+
 	bs = new backend_sdcard(led_green, led_yellow);
+	draw_status("000c");
 	if (bs->begin() == false) {
 		errlog("Failed to load initialize storage backend!");
+		draw_status("000b");
 		fail_flash();
 	}
 
+	draw_status("000d");
 	scsi_dev = new scsi(bs, trim_level, &is);
 
+	draw_status("000e");
 	auto reset_reason = esp_reset_reason();
 	if (reset_reason != ESP_RST_POWERON)
 		errlog("Reset reason: %s (%d), software version %s", reset_name(reset_reason), reset_reason, version_str);
 	else
 		errlog("System (re-)started, software version %s", version_str);
 
+	draw_status("000f");
 	esp_wifi_set_ps(WIFI_PS_NONE);
 
+	draw_status("0010");
 	if (MDNS.begin(name))
 		MDNS.addService("iscsi", "tcp", 3260);
 	else
 		errlog("Failed starting mdns responder");
 
+	draw_status("0012");
 	heap_caps_register_failed_alloc_callback(heap_caps_alloc_failed_hook);
 
+	draw_status("0011");
 	enable_OTA();
 
+	draw_status("0013");
 	xTaskCreate(loopw, /* Function to implement the task */
 			"loop2", /* Name of the task */
 			10000,  /* Stack size in words */
@@ -474,10 +533,13 @@ void setup() {
 			127,  /* Priority of the task */
 			&task2  /* Task handle. */
 		   );
+
+	draw_status("0100");
 }
 
 void loop()
 {
+	draw_status("0201");
 	{
 		auto ip = WiFi.localIP();
 		char buffer[16];
@@ -486,19 +548,25 @@ void loop()
 		Serial.print(F("Will listen on (in a bit): "));
 		Serial.println(buffer);
 
+		draw_status("0202");
 		com_sockets c(buffer, 3260, &stop);
 		if (c.begin() == false) {
 			errlog("Failed to initialize communication layer!");
+			draw_status("0203");
 			fail_flash();
 		}
 
+		draw_status("0204");
 		server s(scsi_dev, &c);
 		Serial.printf("Free heap space: %u\r\n", get_free_heap_space());
 		Serial.println(F("Go!"));
+		draw_status("0205");
 		s.handler();
+		draw_status("0206");
 	}
 
 	if (ota_update) {
+		draw_status("0300");
 		errlog("Halting for OTA update");
 
 		for(;;)
