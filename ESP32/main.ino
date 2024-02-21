@@ -11,12 +11,13 @@
 #include <esp_wifi.h>
 #include <ESPmDNS.h>
 #include <LittleFS.h>
-#include "wifi.h"
+#include <SNMP_Agent.h>
 
 #include "backend-sdcard.h"
 #include "com-sockets.h"
 #include "log.h"
 #include "server.h"
+#include "wifi.h"
 #include "version.h"
 
 
@@ -37,6 +38,9 @@ std::vector<std::pair<std::string, std::string> > wifi_targets;
 int trim_level = 0;
 
 TaskHandle_t task2;
+
+WiFiUDP snmp_udp;
+SNMPAgent snmp("public", "private");
 
 void write_led(const int gpio, const int state) {
 	if (gpio != -1)
@@ -391,6 +395,9 @@ void setup() {
 	set_hostname(name);
 	setup_wifi();
 	init_logger(name);
+
+	snmp.setUDP(&snmp_udp);
+	snmp.(".1.3.6.1.4.1.2021.11.9.0", 
 
 	bs = new backend_sdcard(led_green, led_yellow);
 	if (bs->begin() == false) {
