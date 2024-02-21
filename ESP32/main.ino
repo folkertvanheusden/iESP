@@ -267,7 +267,7 @@ void loopw(void *) {
 void ls(fs::FS &fs, const String & name)
 {
 	Serial.print(F("Directory: "));
-	Serial.print(name);
+	Serial.println(name);
 
 	File dir = fs.open(name);
 	if (!dir) {
