@@ -154,3 +154,13 @@ uint32_t get_free_heap_space()
 	return 0;
 #endif
 }
+
+uint64_t get_uint64_t(const uint8_t *const p)
+{
+	return (uint64_t(p[0]) << 56) | (uint64_t(p[1]) << 48) | (uint64_t(p[2]) << 40) | (uint64_t(p[3]) << 32) | (uint64_t(p[4]) << 24) | (p[5] << 16) | (p[6] << 8) | p[7];
+}
+
+uint32_t get_uint32_t(const uint8_t *const p)
+{
+	return (uint64_t(p[0]) << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
+}

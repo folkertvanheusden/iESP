@@ -254,7 +254,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		if (service_action == 0x10) {  // READ CAPACITY
 			DOLOG("scsi::send: READ_CAPACITY(16)\n");
 
-			uint16_t allocation_length = (CDB[10] << 24) | (CDB[11] << 16) | (CDB[12] << 8) | CDB[13];
+			uint32_t allocation_length = get_uint32_t(&CDB[10]);
 
 			if (allocation_length == 0)
 				response.type = ir_empty_sense;
@@ -284,8 +284,8 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		else if (service_action == 0x12) {  // GET LBA STATUS
 			DOLOG("scsi::send: GET_LBA_STATUS\n");
 
-			uint64_t lba             = (uint64_t(CDB[2]) << 56) | (uint64_t(CDB[3]) << 48) | (uint64_t(CDB[4]) << 40) | (uint64_t(CDB[5]) << 32) | (uint64_t(CDB[6]) << 24) | (CDB[7] << 16) | (CDB[8] << 8) | CDB[9];
-			uint32_t transfer_length = (uint64_t(CDB[10]) << 24) | (CDB[11] << 16) | (CDB[12] << 8) | CDB[13];
+			uint64_t lba             = get_uint64_t(&CDB[2]);
+			uint32_t transfer_length = get_uint32_t(&CDB[10]);
 
 			auto vr = validate_request(lba, transfer_length);
 			if (vr.has_value()) {
@@ -321,12 +321,12 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		}
 		else if (opcode == o_write_10 || opcode == o_write_verify_10) {
 			// NOTE: the verify part is not implemented, o_write_verify_10 is just a dumb write
-			lba             = (uint64_t(CDB[2]) << 24) | (CDB[3] << 16) | (CDB[4] << 8) | CDB[5];
+			lba             = get_uint32_t(&CDB[2]);
 			transfer_length = (CDB[7] << 8) | CDB[8];
 		}
 		else if (opcode == o_write_16) {
-			lba             = (uint64_t(CDB[2]) << 56) | (uint64_t(CDB[3]) << 48) | (uint64_t(CDB[4]) << 40) | (uint64_t(CDB[5]) << 32) | (uint64_t(CDB[6]) << 24) | (CDB[7] << 16) | (CDB[8] << 8) | CDB[9];
-			transfer_length = (uint64_t(CDB[10]) << 24) | (CDB[11] << 16) | (CDB[12] << 8) | CDB[13];
+			lba             = get_uint64_t(&CDB[2]);
+			transfer_length = get_uint32_t(&CDB[10]);
 		}
 		else {
 			errlog("scsi::send: WRITE_1x internal error");
@@ -396,12 +396,12 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		uint32_t transfer_length = 0;
 
 		if (opcode == o_read_16) {
-			lba             = (uint64_t(CDB[2]) << 56) | (uint64_t(CDB[3]) << 48) | (uint64_t(CDB[4]) << 40) | (uint64_t(CDB[5]) << 32) | (uint64_t(CDB[6]) << 24) | (CDB[7] << 16) | (CDB[8] << 8) | CDB[9];
-			transfer_length = (uint64_t(CDB[10]) << 24) | (CDB[11] << 16) | (CDB[12] << 8) | CDB[13];
+			lba             = get_uint64_t(&CDB[2]);
+			transfer_length = get_uint32_t(&CDB[10]);
 			DOLOG("scsi::send: READ_16, LBA %" PRIu64 ", %u sectors\n", lba, transfer_length);
 		}
 		else if (opcode == o_read_10) {
-			lba             = (uint64_t(CDB[2]) << 24) | (uint64_t(CDB[3]) << 16) | (uint64_t(CDB[4]) << 8) | uint64_t(CDB[5]);
+			lba             = get_uint32_t(&CDB[2]);
 			transfer_length =  (CDB[7] << 8) | CDB[8];
 			DOLOG("scsi::send: READ_10, LBA %" PRIu64 ", %u sectors\n", lba, transfer_length);
 		}
@@ -505,7 +505,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			response.sense_data = error_not_implemented();
 	}
 	else if (opcode == o_compare_and_write) {  // 0x89
-		uint64_t lba         = (uint64_t(CDB[2]) << 56) | (uint64_t(CDB[3]) << 48) | (uint64_t(CDB[4]) << 40) | (uint64_t(CDB[5]) << 32) | (uint64_t(CDB[6]) << 24) | (CDB[7] << 16) | (CDB[8] << 8) | CDB[9];
+		uint64_t lba         = get_uint64_t(&CDB[2]);
 		uint32_t block_count = CDB[13];
 		DOLOG("scsi::send: COMPARE AND WRITE: LBA %" PRIu64 ", transfer length: %u\n", lba, block_count);
 
@@ -601,8 +601,8 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		const uint8_t *const pd = data.first;
 		scsi_rw_result rc = rw_ok;
 		for(size_t i=8; i<data.second; i+= 16) {
-			uint64_t lba             = (uint64_t(pd[i + 0]) << 56) | (uint64_t(pd[i + 1]) << 48) | (uint64_t(pd[i + 2]) << 40) | (uint64_t(pd[i + 3]) << 32) | (uint64_t(pd[i + 4]) << 24) | (pd[i + 5] << 16) | (pd[i + 6] << 8) | pd[i + 7];
-			uint32_t transfer_length = (uint64_t(pd[i + 8]) << 24) | (pd[i + 9] << 16) | (pd[i + 10] << 8) | pd[i + 11];
+			uint64_t lba            = get_uint64_t(&pd[i]);
+			uint32_t transfer_length = get_uint32_t(&pd[i + 8]);
 
 			auto vr = validate_request(lba, transfer_length);
 			if (vr.has_value()) {
