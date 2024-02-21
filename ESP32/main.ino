@@ -7,11 +7,13 @@
 #include <csignal>
 #include <cstdio>
 #include <esp_debug_helpers.h>
+#include <esp_freertos_hooks.h>
 #include <esp_heap_caps.h>
 #include <esp_wifi.h>
 #include <ESPmDNS.h>
 #include <LittleFS.h>
 #include <SNMP_Agent.h>
+
 
 #include "backend-sdcard.h"
 #include "com-sockets.h"
@@ -44,6 +46,26 @@ WiFiUDP snmp_udp;
 SNMPAgent snmp("public", "private");
 uint32_t hundredsofasecondcounter = 0;
 io_stats_t is { };
+uint64_t core0_idle = 0;
+uint64_t core1_idle = 0;
+#if defined(CONFIG_ESP32_DEFAULT_CPU_FREQ_240)
+const uint64_t max_idle_ticks = 1855000;
+#elif defined(CONFIG_ESP32_DEFAULT_CPU_FREQ_160)
+const uint64_t max_idle_ticks = 1233100;
+#else
+#error "Unsupported CPU frequency"
+#endif
+int cpu_usage = 0.;
+
+bool idle_task_0() {
+	core0_idle++;
+	return false;
+}
+
+bool idle_task_1() {
+	core1_idle++;
+	return false;
+}
 
 void write_led(const int gpio, const int state) {
 	if (gpio != -1)
@@ -273,11 +295,16 @@ void setup_wifi() {
 void loopw(void *) {
 	Serial.println(F("Thread started"));
 
+	int cu_count = 0;
 	for(;;) {
 		ArduinoOTA.handle();
 		hundredsofasecondcounter = millis() / 10;
 		snmp.loop();
 		vTaskDelay(100 / portTICK_PERIOD_MS);
+
+		cpu_usage = ((100 - core0_idle * 100 / max_idle_ticks) + (100 - core1_idle * 100 / max_idle_ticks)) / 2 * cu_count / 10;
+		if (++cu_count >= 10)
+			cu_count = 0, core0_idle = core1_idle = 0;
 	}
 }
 
@@ -400,6 +427,9 @@ void setup() {
 	setup_wifi();
 	init_logger(name);
 
+	esp_register_freertos_idle_hook_for_cpu(idle_task_0, 0);
+	esp_register_freertos_idle_hook_for_cpu(idle_task_1, 1);
+
 	snmp.setUDP(&snmp_udp);
 	snmp.addTimestampHandler(".1.3.6.1.2.1.1.3.0",            &hundredsofasecondcounter);
 	snmp.addReadOnlyStaticStringHandler(".1.3.6.1.4.1.2021.13.15.1.1.2", "iESP");
@@ -407,6 +437,7 @@ void setup() {
 	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.4", &is.n_writes     );
 	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.5", &is.bytes_read   );
 	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.6", &is.bytes_written);
+	snmp.addIntegerHandler(".1.3.6.1.4.1.2021.11.9.0", &cpu_usage);
 	snmp.addReadOnlyStaticStringHandler(".1.3.6.1.2.1.1.1.0", "iESP");
 	snmp.sortHandlers();
 	snmp.begin();
