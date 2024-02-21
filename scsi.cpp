@@ -194,7 +194,11 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				response.io.what.data.first[5] = max_compare_and_write_block_count;  // compare and write
 				response.io.what.data.first[6] = 0;  // OPTIMAL TRANSFER LENGTH GRANULARITY
 				response.io.what.data.first[7] = 0;
+#ifdef ESP32
+				response.io.what.data.first[22] = 1;  // 'MAXIMUM UNMAP LBA COUNT': 256 blocks
+#else
 				response.io.what.data.first[22] = 32;  // 'MAXIMUM UNMAP LBA COUNT': 8192 blocks
+#endif
 				response.io.what.data.first[23] = 00;  // LSB of 'MAXIMUM UNMAP LBA COUNT'
 				response.io.what.data.first[27] = 8;  // LSB of 'MAXIMUM UNMAP BLOCK DESCRIPTOR COUNT'
 				response.io.what.data.first[31] = 8;  // LSB of 'OPTIMAL UNMAP GRANULARITY'
@@ -699,7 +703,7 @@ scsi::scsi_rw_result scsi::write(const uint64_t block_nr, const uint32_t n_block
 			delete [] zero;
 
 			if (is_zero)
-				return trim(block_nr, n_blocks);
+				return b->trim(block_nr, n_blocks) ? rw_ok : rw_fail_general;
 			else if (b->write(block_nr, n_blocks, data))
 				return rw_ok;
 
