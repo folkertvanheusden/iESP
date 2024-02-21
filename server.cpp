@@ -255,7 +255,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 	}
 
 	if (response_set.has_value() == false) {
-		errlog("server::push_response: no response from PDU");
+		DOLOG("server::push_response: no response from PDU\n");
 		return true;
 	}
 
