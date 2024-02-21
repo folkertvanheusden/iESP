@@ -4,6 +4,7 @@
 #include <string>
 #include <syslog.h>
 #else
+#include <NTP.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
 #endif
@@ -14,6 +15,8 @@ std::optional<std::string> syslog_host;
 WiFiUDP UDP;
 #endif
 std::string name { "?" };
+
+extern NTP ntp;
 
 thread_local char err_log_buf[192];
 
@@ -34,6 +37,8 @@ void errlog(const char *const fmt, ...)
 	printf("%s\n", err_log_buf);
 #else
 	write_led(led_red, HIGH);
+
+	Serial.printf("%04d-%02d-%02d %02d:%02d:%02d ", ntp.year(), ntp.month(), ntp.day(), ntp.hours(), ntp.minutes(), ntp.seconds());
 	Serial.println(err_log_buf);
 
 	if (syslog_host.has_value()) {

@@ -12,6 +12,7 @@
 #include <esp_wifi.h>
 #include <ESPmDNS.h>
 #include <LittleFS.h>
+#include <NTP.h>
 #include <SNMP_Agent.h>
 #include <U8x8lib.h>
 
@@ -58,6 +59,9 @@ const uint64_t max_idle_ticks = 1233100;
 #error "Unsupported CPU frequency"
 #endif
 int cpu_usage = 0.;
+
+WiFiUDP ntp_udp;
+NTP ntp(ntp_udp);
 
 long int draw_status_ts = 0;
 
@@ -174,68 +178,70 @@ void enable_OTA() {
 void WiFiEvent(WiFiEvent_t event)
 {
 	write_led(led_red, HIGH);
-	Serial.print(F("WiFi event: "));
+
+	std::string msg = "WiFi event: ";
 
 	switch(event) {
 		case WIFI_REASON_UNSPECIFIED:
-			Serial.println(F("WIFI_REASON_UNSPECIFIED")); break;
+			msg += "WIFI_REASON_UNSPECIFIED"; break;
 		case WIFI_REASON_AUTH_EXPIRE:
-			Serial.println(F("WIFI_REASON_AUTH_EXPIRE")); break;
+			msg += "WIFI_REASON_AUTH_EXPIRE"; break;
 		case WIFI_REASON_AUTH_LEAVE:
-			Serial.println(F("WIFI_REASON_AUTH_LEAVE")); break;
+			msg += "WIFI_REASON_AUTH_LEAVE"; break;
 		case WIFI_REASON_ASSOC_EXPIRE:
-			Serial.println(F("WIFI_REASON_ASSOC_EXPIRE")); break;
+			msg += "WIFI_REASON_ASSOC_EXPIRE"; break;
 		case WIFI_REASON_ASSOC_TOOMANY:
-			Serial.println(F("WIFI_REASON_ASSOC_TOOMANY")); break;
+			msg += "WIFI_REASON_ASSOC_TOOMANY"; break;
 		case WIFI_REASON_NOT_AUTHED:
-			Serial.println(F("WIFI_REASON_NOT_AUTHED")); break;
+			msg += "WIFI_REASON_NOT_AUTHED"; break;
 		case WIFI_REASON_NOT_ASSOCED:
-			Serial.println(F("WIFI_REASON_NOT_ASSOCED")); break;
+			msg += "WIFI_REASON_NOT_ASSOCED"; break;
 		case WIFI_REASON_ASSOC_LEAVE:
-			Serial.println(F("WIFI_REASON_ASSOC_LEAVE")); break;
+			msg += "WIFI_REASON_ASSOC_LEAVE"; break;
 		case WIFI_REASON_ASSOC_NOT_AUTHED:
-			Serial.println(F("WIFI_REASON_ASSOC_NOT_AUTHED")); break;
+			msg += "WIFI_REASON_ASSOC_NOT_AUTHED"; break;
 		case WIFI_REASON_DISASSOC_PWRCAP_BAD:
-			Serial.println(F("WIFI_REASON_DISASSOC_PWRCAP_BAD")); break;
+			msg += "WIFI_REASON_DISASSOC_PWRCAP_BAD"; break;
 		case WIFI_REASON_DISASSOC_SUPCHAN_BAD:
-			Serial.println(F("WIFI_REASON_DISASSOC_SUPCHAN_BAD")); break;
+			msg += "WIFI_REASON_DISASSOC_SUPCHAN_BAD"; break;
 		case WIFI_REASON_IE_INVALID:
-			Serial.println(F("WIFI_REASON_IE_INVALID")); break;
+			msg += "WIFI_REASON_IE_INVALID"; break;
 		case WIFI_REASON_MIC_FAILURE:
-			Serial.println(F("WIFI_REASON_MIC_FAILURE")); break;
+			msg += "WIFI_REASON_MIC_FAILURE"; break;
 		case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
-			Serial.println(F("WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT")); break;
+			msg += "WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT"; break;
 		case WIFI_REASON_GROUP_KEY_UPDATE_TIMEOUT:
-			Serial.println(F("WIFI_REASON_GROUP_KEY_UPDATE_TIMEOUT")); break;
+			msg += "WIFI_REASON_GROUP_KEY_UPDATE_TIMEOUT"; break;
 		case WIFI_REASON_IE_IN_4WAY_DIFFERS:
-			Serial.println(F("WIFI_REASON_IE_IN_4WAY_DIFFERS")); break;
+			msg += "WIFI_REASON_IE_IN_4WAY_DIFFERS"; break;
 		case WIFI_REASON_GROUP_CIPHER_INVALID:
-			Serial.println(F("WIFI_REASON_GROUP_CIPHER_INVALID")); break;
+			msg += "WIFI_REASON_GROUP_CIPHER_INVALID"; break;
 		case WIFI_REASON_PAIRWISE_CIPHER_INVALID:
-			Serial.println(F("WIFI_REASON_PAIRWISE_CIPHER_INVALID")); break;
+			msg += "WIFI_REASON_PAIRWISE_CIPHER_INVALID"; break;
 		case WIFI_REASON_AKMP_INVALID:
-			Serial.println(F("WIFI_REASON_AKMP_INVALID")); break;
+			msg += "WIFI_REASON_AKMP_INVALID"; break;
 		case WIFI_REASON_UNSUPP_RSN_IE_VERSION:
-			Serial.println(F("WIFI_REASON_UNSUPP_RSN_IE_VERSION")); break;
+			msg += "WIFI_REASON_UNSUPP_RSN_IE_VERSION"; break;
 		case WIFI_REASON_INVALID_RSN_IE_CAP:
-			Serial.println(F("WIFI_REASON_INVALID_RSN_IE_CAP")); break;
+			msg += "WIFI_REASON_INVALID_RSN_IE_CAP"; break;
 		case WIFI_REASON_802_1X_AUTH_FAILED:
-			Serial.println(F("WIFI_REASON_802_1X_AUTH_FAILED")); break;
+			msg += "WIFI_REASON_802_1X_AUTH_FAILED"; break;
 		case WIFI_REASON_CIPHER_SUITE_REJECTED:
-			Serial.println(F("WIFI_REASON_CIPHER_SUITE_REJECTED")); break;
+			msg += "WIFI_REASON_CIPHER_SUITE_REJECTED"; break;
 		case WIFI_REASON_BEACON_TIMEOUT:
-			Serial.println(F("WIFI_REASON_BEACON_TIMEOUT")); break;
+			msg += "WIFI_REASON_BEACON_TIMEOUT"; break;
 		case WIFI_REASON_NO_AP_FOUND:
-			Serial.println(F("WIFI_REASON_NO_AP_FOUND")); break;
+			msg += "WIFI_REASON_NO_AP_FOUND"; break;
 		case WIFI_REASON_AUTH_FAIL:
-			Serial.println(F("WIFI_REASON_AUTH_FAIL")); break;
+			msg += "WIFI_REASON_AUTH_FAIL"; break;
 		case WIFI_REASON_ASSOC_FAIL:
-			Serial.println(F("WIFI_REASON_ASSOC_FAIL")); break;
+			msg += "WIFI_REASON_ASSOC_FAIL"; break;
 		case WIFI_REASON_HANDSHAKE_TIMEOUT:
-			Serial.println(F("WIFI_REASON_HANDSHAKE_TIMEOUT")); break;
+			msg += "WIFI_REASON_HANDSHAKE_TIMEOUT"; break;
 		default:
 			Serial.println(event); break;
 	}
+	errlog(msg.c_str());
 	write_led(led_red, LOW);
 }
 
@@ -324,6 +330,7 @@ void loopw(void *) {
 		if (now - draw_status_ts > 5000)
 			u8x8.setPowerSave(1);
 
+		ntp.update();
 		ArduinoOTA.handle();
 		hundredsofasecondcounter = now / 10;
 		snmp.loop();
@@ -472,6 +479,10 @@ void setup() {
 	init_logger(name);
 
 	draw_status("0008");
+
+	ntp.begin();
+
+	draw_status("0008a");
 
 	esp_register_freertos_idle_hook_for_cpu(idle_task_0, 0);
 	esp_register_freertos_idle_hook_for_cpu(idle_task_1, 1);
