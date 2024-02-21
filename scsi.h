@@ -36,6 +36,7 @@ class scsi
 private:
 	backend *const b      { nullptr };
 	std::string    serial;
+	const int      trim_level { 1   };
 
 	std::mutex locked_by_lock;
 	std::optional<std::thread::id> locked_by;
@@ -50,7 +51,7 @@ private:
 	std::vector<uint8_t> error_miscompare()              const;
 
 public:
-	scsi(backend *const b);
+	scsi(backend *const b, const int trim_level);
 	virtual ~scsi();
 
 	enum scsi_opcode {

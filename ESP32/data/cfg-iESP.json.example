@@ -4,5 +4,6 @@
 		{ "ssid": "another", "psk": "another" },
 		{ "ssid": "and so on", "psk": "and so on" }
 	],
-	"syslog-host" : "94.142.246.161"
+	"syslog-host" : "94.142.246.161",
+	"trim-level": 2
 }

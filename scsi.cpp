@@ -40,7 +40,7 @@ const std::map<scsi::scsi_opcode, scsi_opcode_details> scsi_a3_data {
 
 constexpr const uint8_t max_compare_and_write_block_count = 1;
 
-scsi::scsi(backend *const b) : b(b)
+scsi::scsi(backend *const b, const int trim_level) : b(b), trim_level(trim_level)
 {
 #ifdef ESP32
 	uint64_t temp { 0 };
@@ -683,8 +683,29 @@ void scsi::get_and_reset_stats(uint64_t *const bytes_read, uint64_t *const bytes
 scsi::scsi_rw_result scsi::write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data)
 {
 	if (locking_status() != l_locked_other) {  // locked by myself or not locked?
-		if (b->write(block_nr, n_blocks, data))
-			return rw_ok;
+		if (trim_level == 2) {
+			bool is_zero = true;
+			auto bs = get_block_size();
+			uint8_t *zero = new uint8_t[bs]();
+			for(uint32_t i=0; i<n_blocks; i++) {
+				if (memcmp(&data[i * bs], zero, bs) != 0) {
+					is_zero = false;
+					break;
+				}
+			}
+			delete [] zero;
+
+			if (is_zero)
+				return trim(block_nr, n_blocks);
+			else if (b->write(block_nr, n_blocks, data))
+				return rw_ok;
+
+			return rw_fail_general;
+		}
+		else {
+			if (b->write(block_nr, n_blocks, data))
+				return rw_ok;
+		}
 
 		return rw_fail_general;
 	}
@@ -695,8 +716,22 @@ scsi::scsi_rw_result scsi::write(const uint64_t block_nr, const uint32_t n_block
 scsi::scsi_rw_result scsi::trim(const uint64_t block_nr, const uint32_t n_blocks)
 {
 	if (locking_status() != l_locked_other) {  // locked by myself or not locked?
-		if (b->trim(block_nr, n_blocks))
-			return rw_ok;
+		if (trim_level == 0) {  // 0 = do not trim/unmap
+			scsi::scsi_rw_result rc = rw_ok;
+			uint8_t *zero = new uint8_t[get_block_size()]();
+			for(uint32_t i=0; i<n_blocks; i++) {
+				rc = write(block_nr + i, 1, zero);
+				if (rc != rw_ok)
+					break;
+			}
+			delete [] zero;
+
+			return rc;
+		}
+		else {
+			if (b->trim(block_nr, n_blocks))
+				return rw_ok;
+		}
 
 		return rw_fail_general;
 	}

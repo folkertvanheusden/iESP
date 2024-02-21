@@ -30,6 +30,7 @@ DynamicJsonDocument cfg(4096);
 #define IESP_CFG_FILE "/cfg-iESP.json"
 
 std::vector<std::pair<std::string, std::string> > wifi_targets;
+int trim_level = 0;
 
 TaskHandle_t task2;
 
@@ -71,6 +72,8 @@ bool load_configuration() {
 		syslog_host.reset();
 	else
 		Serial.printf("Syslog host: %s\r\n", syslog_host.value().c_str());
+
+	trim_level = cfg["trim-level"].as<int>();
 
 	data_file.close();
 
@@ -375,7 +378,7 @@ void setup() {
 		fail_flash();
 	}
 
-	scsi_dev = new scsi(bs);
+	scsi_dev = new scsi(bs, trim_level);
 
 	auto reset_reason = esp_reset_reason();
 	if (reset_reason != ESP_RST_POWERON)
