@@ -16,6 +16,8 @@
 #endif
 #define FILENAME "test.dat"
 
+extern void write_led(const int gpio, const int state);
+
 backend_sdcard::backend_sdcard(const int led_read, const int led_write)
 {
 }
@@ -84,9 +86,8 @@ backend_sdcard::~backend_sdcard()
 
 bool backend_sdcard::sync()
 {
-#ifdef LED_RED
-	digitalWrite(LED_RED, HIGH);
-#endif
+	write_led(led_write, HIGH);
+
 	n_syncs++;
 
 	std::lock_guard<std::mutex> lck(serial_access_lock);
@@ -94,9 +95,7 @@ bool backend_sdcard::sync()
 	if (file.sync() == false)
 		errlog("SD card backend: sync failed");
 
-#ifdef LED_RED
-	digitalWrite(LED_RED, LOW);
-#endif
+	write_led(led_write, LOW);
 
 	return true;
 }
@@ -114,9 +113,7 @@ uint64_t backend_sdcard::get_block_size() const
 bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data)
 {
 	// Serial.printf("Write to block %zu, %u blocks\r\n", size_t(block_nr), n_blocks);
-#ifdef LED_RED
-	digitalWrite(LED_RED, HIGH);
-#endif
+	write_led(led_write, HIGH);
 
 	uint64_t iscsi_block_size = get_block_size();
 	uint64_t byte_address     = block_nr * iscsi_block_size;  // iSCSI to bytes
@@ -125,9 +122,7 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 
 	if (file.seekSet(byte_address) == false) {
 		errlog("Cannot seek to position");
-#ifdef LED_RED
-		digitalWrite(LED_RED, LOW);
-#endif
+		write_led(led_write, LOW);
 		return false;
 	}
 
@@ -150,9 +145,9 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 ok:
 	if (!rc)
 		errlog("Cannot write (%d)", file.getError());
-#ifdef LED_RED
-		digitalWrite(LED_RED, LOW);
-#endif
+
+	write_led(led_write, LOW);
+
 	return rc;
 }
 
@@ -173,8 +168,7 @@ bool backend_sdcard::trim(const uint64_t block_nr, const uint32_t n_blocks)
 
 bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_t *const data)
 {
-	if (led_read != -1)
-		digitalWrite(led_read, HIGH);
+	write_led(led_read, HIGH);
 	// Serial.printf("Read from block %zu, %u blocks\r\n", size_t(block_nr), n_blocks);
 
 	uint64_t iscsi_block_size = get_block_size();
@@ -184,8 +178,7 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 
 	if (file.seekSet(byte_address) == false) {
 		errlog("Cannot seek to position");
-		if (led_read != -1)
-			digitalWrite(led_read, LOW);
+		write_led(led_read, LOW);
 		return false;
 	}
 
@@ -208,7 +201,6 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 ok:
 	if (!rc)
 		errlog("Cannot read (%d)", file.getError());
-	if (led_read != -1)
-		digitalWrite(led_read, LOW);
+	write_led(led_read, LOW);
 	return rc;
 }
