@@ -55,12 +55,14 @@ int main(int argc, char *argv[])
 	gethostname(hostname, sizeof hostname);
 	init_logger(hostname);
 
+	io_stats_t is { };
+
 	backend_file bf(dev);
 	if (bf.begin() == false) {
 		fprintf(stderr, "Failed to initialize storage backend\n");
 		return 1;
 	}
-	scsi         sd(&bf, trim_level);
+	scsi sd(&bf, trim_level, &is);
 
 	com_sockets c(ip_address, port, &stop);
 	if (c.begin() == false) {

@@ -40,7 +40,7 @@ const std::map<scsi::scsi_opcode, scsi_opcode_details> scsi_a3_data {
 
 constexpr const uint8_t max_compare_and_write_block_count = 1;
 
-scsi::scsi(backend *const b, const int trim_level) : b(b), trim_level(trim_level)
+scsi::scsi(backend *const b, const int trim_level, io_stats_t *const is) : b(b), trim_level(trim_level), is(is)
 {
 #ifdef ESP32
 	uint64_t temp { 0 };
@@ -682,6 +682,9 @@ void scsi::get_and_reset_stats(uint64_t *const bytes_read, uint64_t *const bytes
 
 scsi::scsi_rw_result scsi::write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data)
 {
+	is->n_writes++;
+	is->bytes_written += n_blocks * b->get_block_size();
+
 	if (locking_status() != l_locked_other) {  // locked by myself or not locked?
 		if (trim_level == 2) {
 			bool is_zero = true;
@@ -741,6 +744,9 @@ scsi::scsi_rw_result scsi::trim(const uint64_t block_nr, const uint32_t n_blocks
 
 scsi::scsi_rw_result scsi::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_t *const data)
 {
+	is->n_reads++;
+	is->bytes_read += n_blocks * b->get_block_size();
+
 	if (locking_status() != l_locked_other) {  // locked by myself or not locked?
 		if (b->read(block_nr, n_blocks, data))
 			return rw_ok;

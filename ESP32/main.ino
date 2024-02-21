@@ -17,6 +17,7 @@
 #include "com-sockets.h"
 #include "log.h"
 #include "server.h"
+#include "utils.h"
 #include "wifi.h"
 #include "version.h"
 
@@ -41,6 +42,8 @@ TaskHandle_t task2;
 
 WiFiUDP snmp_udp;
 SNMPAgent snmp("public", "private");
+uint32_t hundredsofasecondcounter = 0;
+io_stats_t is { };
 
 void write_led(const int gpio, const int state) {
 	if (gpio != -1)
@@ -272,7 +275,8 @@ void loopw(void *) {
 
 	for(;;) {
 		ArduinoOTA.handle();
-
+		hundredsofasecondcounter = millis() / 10;
+		snmp.loop();
 		vTaskDelay(100 / portTICK_PERIOD_MS);
 	}
 }
@@ -397,7 +401,15 @@ void setup() {
 	init_logger(name);
 
 	snmp.setUDP(&snmp_udp);
-	snmp.(".1.3.6.1.4.1.2021.11.9.0", 
+	snmp.addTimestampHandler(".1.3.6.1.2.1.1.3.0",            &hundredsofasecondcounter);
+	snmp.addReadOnlyStaticStringHandler(".1.3.6.1.4.1.2021.13.15.1.1.2", "iESP");
+	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.3", &is.n_reads      );
+	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.4", &is.n_writes     );
+	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.5", &is.bytes_read   );
+	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.6", &is.bytes_written);
+	snmp.addReadOnlyStaticStringHandler(".1.3.6.1.2.1.1.1.0", "iESP");
+	snmp.sortHandlers();
+	snmp.begin();
 
 	bs = new backend_sdcard(led_green, led_yellow);
 	if (bs->begin() == false) {
@@ -405,7 +417,7 @@ void setup() {
 		fail_flash();
 	}
 
-	scsi_dev = new scsi(bs, trim_level);
+	scsi_dev = new scsi(bs, trim_level, &is);
 
 	auto reset_reason = esp_reset_reason();
 	if (reset_reason != ESP_RST_POWERON)
@@ -450,6 +462,7 @@ void loop()
 		}
 
 		server s(scsi_dev, &c);
+		Serial.printf("Free heap space: %u\r\n", get_free_heap_space());
 		Serial.println(F("Go!"));
 		s.handler();
 	}

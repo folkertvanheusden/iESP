@@ -11,6 +11,13 @@
 #include "iscsi-pdu.h"
 
 
+typedef struct {
+	uint64_t n_reads;
+	uint64_t bytes_read;
+	uint64_t n_writes;
+	uint64_t bytes_written;
+} io_stats_t;
+
 struct scsi_response
 {
 	iscsi_reacion_t              type;
@@ -34,9 +41,10 @@ struct scsi_response
 class scsi
 {
 private:
-	backend *const b      { nullptr };
-	std::string    serial;
-	const int      trim_level { 1   };
+	backend    *const b      { nullptr };
+	std::string       serial;
+	const int         trim_level { 1   };
+	io_stats_t *const is     { nullptr };
 
 	std::mutex locked_by_lock;
 	std::optional<std::thread::id> locked_by;
@@ -51,7 +59,7 @@ private:
 	std::vector<uint8_t> error_miscompare()              const;
 
 public:
-	scsi(backend *const b, const int trim_level);
+	scsi(backend *const b, const int trim_level, io_stats_t *const is);
 	virtual ~scsi();
 
 	enum scsi_opcode {
