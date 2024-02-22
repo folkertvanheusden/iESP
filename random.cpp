@@ -34,9 +34,11 @@ void init_my_getrandom()
 
 void my_getrandom(void *const tgt, const size_t n)
 {
-	// TODO improve this: 32b at a time
-	for(size_t i=0; i<n; i++)
-		reinterpret_cast<uint8_t *>(tgt)[i] = get_rand_32();
+	size_t i=0;
+	for(; i<n; i += 4)
+		reinterpret_cast<uint32_t *>(tgt)[i] = get_rand_32();
+	while(i<n)
+		reinterpret_cast<uint8_t *>(tgt)[i++] = get_rand_32();
 }
 #else
 #include <esp_random.h>
