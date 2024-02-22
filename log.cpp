@@ -10,13 +10,15 @@
 #endif
 
 
-#ifndef linux
+#if defined(ESP32) || defined(RP2040)
 std::optional<std::string> syslog_host;
 WiFiUDP UDP;
 #endif
 std::string name { "?" };
 
+#if defined(ESP32) || defined(RP2040)
 extern NTP ntp;
+#endif
 
 thread_local char err_log_buf[192];
 
@@ -63,7 +65,7 @@ void init_logger(const std::string & new_name)
 {
 	name = new_name;
 
-#ifndef linux
+#if defined(ESP32) || defined(RP2040)
 	if (UDP.begin(514) == 0)
 		Serial.println(F("UDP.begin(514) failed"));
 #endif

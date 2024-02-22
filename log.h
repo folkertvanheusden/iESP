@@ -27,7 +27,7 @@
 
 #include <cstdarg>
 void errlog(const char *const fmt, ...);
-#ifndef linux
+#if defined(ESP32) || defined(RP2040)
 #include <optional>
 #include <string>
 extern std::optional<std::string> syslog_host;
