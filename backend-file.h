@@ -6,10 +6,14 @@
 class backend_file : public backend
 {
 private:
-	int fd { -1 };
+	const std::string filename;
+	int               fd       { -1 };
+
 public:
 	backend_file(const std::string & filename);
 	virtual ~backend_file();
+
+	bool begin() override;
 
 	uint64_t get_size_in_blocks() const override;
 	uint64_t get_block_size()     const override;

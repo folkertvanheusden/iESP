@@ -13,33 +13,36 @@
 // 19 MISO
 // 23 MOSI
 #define SD_CS 5
-#define LED_GREEN 16
-#define LED_RED   17
-#endif
 #define FILENAME "test.dat"
 
 #define SD_MISO     2       // SD-Card
 #define SD_MOSI    15       // SD-Card
 #define SD_SCLK    14       // SD-Card
 #define SD_CS      12       // SD-Card
+#endif
 
-backend_sdcard::backend_sdcard()
+extern void write_led(const int gpio, const int state);
+
+backend_sdcard::backend_sdcard(const int led_read, const int led_write) :
+	led_read(led_read),
+	led_write(led_write)
 {
-#ifdef LED_GREEN
-	pinMode(LED_GREEN, OUTPUT);
-#endif
-#ifdef LED_RED
-	pinMode(LED_RED,   OUTPUT);
-#endif
+}
 
-	bool close_first = false;
+bool backend_sdcard::begin()
+{
+	for(int i=0; i<3; i++) {
+		if (reinit(i))
+			return true;
+	}
 
-	while(!reinit(close_first))
-		close_first = true;
+	return false;
 }
 
 bool backend_sdcard::reinit(const bool close_first)
 {
+	write_led(led_read,  HIGH);
+	write_led(led_write, HIGH);
 	if (close_first) {
 		file.close();
 		sd.end();
@@ -64,6 +67,8 @@ bool backend_sdcard::reinit(const bool close_first)
 	if (ok == false) {
 		Serial.printf("SD-card mount failed (assuming CS is on pin %d)\r\n", SD_CS);
 		sd.initErrorPrint(&Serial);
+		write_led(led_read,  LOW);
+		write_led(led_write, LOW);
 		return false;
 	}
 
@@ -71,7 +76,9 @@ bool backend_sdcard::reinit(const bool close_first)
 
 retry:
 	if (file.open(FILENAME, O_RDWR) == false) {
-		Serial.println(F("Cannot access test.dat on SD-card"));
+		errlog("Cannot access test.dat on SD-card");
+		write_led(led_read,  LOW);
+		write_led(led_write, LOW);
 		return false;
 	}
 
@@ -82,6 +89,9 @@ retry:
 	Serial.printf("Virtual disk size: %zuMB\r\n", size_t(card_size / 1024 / 1024));
 
 	Serial.println(F("Init LEDs"));
+
+	write_led(led_read,  LOW);
+	write_led(led_write, LOW);
 
 	return true;
 }
@@ -94,19 +104,16 @@ backend_sdcard::~backend_sdcard()
 
 bool backend_sdcard::sync()
 {
-#ifdef LED_RED
-	digitalWrite(LED_RED, HIGH);
-#endif
+	write_led(led_write, HIGH);
+
 	n_syncs++;
 
 	std::lock_guard<std::mutex> lck(serial_access_lock);
 
 	if (file.sync() == false)
-		Serial.println(F("SD card backend: sync failed"));
+		errlog("SD card backend: sync failed");
 
-#ifdef LED_RED
-	digitalWrite(LED_RED, LOW);
-#endif
+	write_led(led_write, LOW);
 
 	return true;
 }
@@ -124,9 +131,7 @@ uint64_t backend_sdcard::get_block_size() const
 bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data)
 {
 	// Serial.printf("Write to block %zu, %u blocks\r\n", size_t(block_nr), n_blocks);
-#ifdef LED_RED
-	digitalWrite(LED_RED, HIGH);
-#endif
+	write_led(led_write, HIGH);
 
 	uint64_t iscsi_block_size = get_block_size();
 	uint64_t byte_address     = block_nr * iscsi_block_size;  // iSCSI to bytes
@@ -134,10 +139,8 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 	std::lock_guard<std::mutex> lck(serial_access_lock);
 
 	if (file.seekSet(byte_address) == false) {
-		Serial.println(F("Cannot seek to position"));
-#ifdef LED_RED
-		digitalWrite(LED_RED, LOW);
-#endif
+		errlog("Cannot seek to position");
+		write_led(led_write, LOW);
 		return false;
 	}
 
@@ -159,10 +162,10 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 	}
 ok:
 	if (!rc)
-		Serial.printf("Cannot write (%d)\r\n", file.getError());
-#ifdef LED_RED
-		digitalWrite(LED_RED, LOW);
-#endif
+		errlog("Cannot write (%d)", file.getError());
+
+	write_led(led_write, LOW);
+
 	return rc;
 }
 
@@ -172,7 +175,7 @@ bool backend_sdcard::trim(const uint64_t block_nr, const uint32_t n_blocks)
 	uint8_t *data = new uint8_t[get_block_size()];
 	for(uint32_t i=0; i<n_blocks; i++) {
 		if (write(block_nr + i, 1, data) == false) {
-			Serial.printf("Cannot \"trim\"\r\n");
+			errlog("Cannot \"trim\"");
 			rc = false;
 			break;
 		}
@@ -183,9 +186,7 @@ bool backend_sdcard::trim(const uint64_t block_nr, const uint32_t n_blocks)
 
 bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_t *const data)
 {
-#ifdef LED_GREEN
-	digitalWrite(LED_GREEN, HIGH);
-#endif
+	write_led(led_read, HIGH);
 	// Serial.printf("Read from block %zu, %u blocks\r\n", size_t(block_nr), n_blocks);
 
 	uint64_t iscsi_block_size = get_block_size();
@@ -194,10 +195,8 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 	std::lock_guard<std::mutex> lck(serial_access_lock);
 
 	if (file.seekSet(byte_address) == false) {
-		Serial.println(F("Cannot seek to position"));
-#ifdef LED_GREEN
-		digitalWrite(LED_GREEN, LOW);
-#endif
+		errlog("Cannot seek to position");
+		write_led(led_read, LOW);
 		return false;
 	}
 
@@ -219,9 +218,7 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 	}
 ok:
 	if (!rc)
-		Serial.printf("Cannot read (%d)\r\n", file.getError());
-#ifdef LED_GREEN
-	digitalWrite(LED_GREEN, LOW);
-#endif
+		errlog("Cannot read (%d)", file.getError());
+	write_led(led_read, LOW);
 	return rc;
 }

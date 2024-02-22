@@ -7,18 +7,22 @@
 #include <csignal>
 #include <cstdio>
 #include <esp_debug_helpers.h>
+#include <esp_freertos_hooks.h>
 #include <esp_heap_caps.h>
 #include <esp_wifi.h>
 #include <ESPmDNS.h>
 #include <ETH.h>
-// M.A.X.X:
 #include <LittleFS.h>
-#include <configure.h>
-#include <wifi.h>
+#include <NTP.h>
+#include <SNMP_Agent.h>
+#include <U8x8lib.h>
 
 #include "backend-sdcard.h"
 #include "com-sockets.h"
+#include "log.h"
 #include "server.h"
+#include "utils.h"
+#include "wifi.h"
 #include "version.h"
 
 
@@ -28,11 +32,76 @@ char name[16] { 0 };
 backend_sdcard  *bs { nullptr };
 scsi *scsi_dev { nullptr };
 
+int led_green  = 17;
+int led_yellow = 16;
+int led_red    = 15;
+
+U8X8_SSD1306_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE);
+
 DynamicJsonDocument cfg(4096);
 #define IESP_CFG_FILE "/cfg-iESP.json"
-AsyncWebServer web_server(80);
+
+std::vector<std::pair<std::string, std::string> > wifi_targets;
+int trim_level = 0;
 
 TaskHandle_t task2;
+
+WiFiUDP snmp_udp;
+SNMPAgent snmp("public", "private");
+uint32_t hundredsofasecondcounter = 0;
+io_stats_t is { };
+uint64_t core0_idle = 0;
+uint64_t core1_idle = 0;
+#if defined(CONFIG_ESP32_DEFAULT_CPU_FREQ_240)
+const uint64_t max_idle_ticks = 1855000;
+#elif defined(CONFIG_ESP32_DEFAULT_CPU_FREQ_160)
+const uint64_t max_idle_ticks = 1233100;
+#else
+#error "Unsupported CPU frequency"
+#endif
+int cpu_usage = 0.;
+
+WiFiUDP ntp_udp;
+NTP ntp(ntp_udp);
+
+long int draw_status_ts = 0;
+
+void draw_status(const std::string & str) {
+	u8x8.drawString(0, 22, str.c_str());
+	u8x8.refreshDisplay();
+	draw_status_ts = millis();
+}
+
+bool idle_task_0() {
+	core0_idle++;
+	return false;
+}
+
+bool idle_task_1() {
+	core1_idle++;
+	return false;
+}
+
+void write_led(const int gpio, const int state) {
+	if (gpio != -1)
+		digitalWrite(gpio, state);
+}
+
+void fail_flash() {
+	errlog("System cannot continue");
+
+	write_led(led_green,  LOW);
+	write_led(led_yellow, LOW);
+
+	for(;;) {
+//		digitalWrite(LED_BUILTIN, HIGH);
+		write_led(led_red, HIGH);
+		delay(200);
+//		digitalWrite(LED_BUILTIN, LOW);
+		write_led(led_red, LOW);
+		delay(200);
+	}
+}
 
 bool load_configuration() {
 	File data_file = LittleFS.open(IESP_CFG_FILE, "r");
@@ -40,47 +109,40 @@ bool load_configuration() {
 		return false;
 
 	auto error = deserializeJson(cfg, data_file);
-	data_file.close();
-	if (error)  // this should not happen
+	if (error) {  // this should not happen
+		data_file.close();
 		return false;
+	}
+
+	JsonArray w_aps_ar = cfg["wifi"].as<JsonArray>();
+	for(JsonObject p: w_aps_ar) {
+		auto ssid = p["ssid"];
+		auto psk  = p["psk"];
+
+		Serial.print(F("Will search for: "));
+		Serial.println(ssid.as<String>());
+
+		wifi_targets.push_back({ ssid, psk });
+	}
+
+	syslog_host = cfg["syslog-host"].as<const char *>();
+	if (syslog_host.value().empty())
+		syslog_host.reset();
+	else
+		Serial.printf("Syslog host: %s\r\n", syslog_host.value().c_str());
+
+	trim_level = cfg["trim-level"].as<int>();
+
+	data_file.close();
+
+	auto n = wifi_targets.size();
+	Serial.printf("Loaded configuration parameters for %zu WiFi access points\r\n", n);
+	if (n == 0) {
+		Serial.println(F("Cannot continue without WiFi access"));
+		fail_flash();
+	}
 
 	return true;
-}
-
-bool save_configuration()
-{
-	File data_file = LittleFS.open(IESP_CFG_FILE, "w");
-	if (!data_file)
-		return false;
-
-	serializeJson(cfg, data_file);
-	data_file.close();
-
-	return true;
-}
-
-void setup_web_server() {
-	web_server.on("/", HTTP_GET, [] (AsyncWebServerRequest *request) {
-		Serial.println(request->url().c_str());
-
-		request->redirect("/index.html");
-	});
-
-	web_server.on("/index.html", HTTP_GET, [] (AsyncWebServerRequest *request) {
-		Serial.println(request->url().c_str());
-
-		AsyncResponseStream *response = request->beginResponseStream("text/html");
-
-		response->printf("<!DOCTYPE html><html><head><link rel=\"stylesheet\" href=\"/stylesheet.css\"><title>iESP (%s)</title><body><h1>iESP (%s)</h1>"
-			"<h2>website</h2>"
-			"<p><a href=\"https://vanheusden.com/electronics/iESP/\">https://vanheusden.com/electronics/iESP/</a></p>"
-			"<h2>copyrights</h2>"
-			"<p>(c) 2023-2024 by Folkert van Heusden <mail@vanheusden.com></p></body></html>", name, name);
-
-		request->send(response);
-	});
-
-	web_server.begin();
 }
 
 void enable_OTA() {
@@ -89,24 +151,25 @@ void enable_OTA() {
 	ArduinoOTA.setPassword("iojasdsjiasd");
 
 	ArduinoOTA.onStart([]() {
-			Serial.println(F("OTA start"));
+			errlog("OTA start\n");
 			ota_update = true;
 			stop = true;
 			LittleFS.end();
 			});
 	ArduinoOTA.onEnd([]() {
-			Serial.println(F("OTA end"));
+			errlog("OTA end");
 			});
 	ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
 			Serial.printf("OTA progress: %u%%\r", progress * 100 / total);
 			});
 	ArduinoOTA.onError([](ota_error_t error) {
-			Serial.printf("Error[%u]: ", error);
-			if (error == OTA_AUTH_ERROR) Serial.println(F("auth failed"));
-			else if (error == OTA_BEGIN_ERROR) Serial.println(F("begin failed"));
-			else if (error == OTA_CONNECT_ERROR) Serial.println(F("connect failed"));
-			else if (error == OTA_RECEIVE_ERROR) Serial.println(F("receive failed"));
-			else if (error == OTA_END_ERROR) Serial.println(F("end failed"));
+			write_led(led_red, HIGH);
+			errlog("OTA error[%u]: ", error);
+			if (error == OTA_AUTH_ERROR) errlog("auth failed");
+			else if (error == OTA_BEGIN_ERROR) errlog("begin failed");
+			else if (error == OTA_CONNECT_ERROR) errlog("connect failed");
+			else if (error == OTA_RECEIVE_ERROR) errlog("receive failed");
+			else if (error == OTA_END_ERROR) errlog("end failed");
 			});
 	ArduinoOTA.begin();
 
@@ -117,174 +180,281 @@ volatile bool eth_connected = false;
 
 void WiFiEvent(WiFiEvent_t event)
 {
-	Serial.print(F("WiFi event: "));
+	write_led(led_red, HIGH);
+
+	std::string msg = "WiFi event: ";
 
 	switch(event) {
 		case WIFI_REASON_UNSPECIFIED:
-			Serial.println(F("WIFI_REASON_UNSPECIFIED")); break;
+			msg += "WIFI_REASON_UNSPECIFIED"; break;
 		case WIFI_REASON_AUTH_EXPIRE:
-			Serial.println(F("WIFI_REASON_AUTH_EXPIRE")); break;
+			msg += "WIFI_REASON_AUTH_EXPIRE"; break;
 		case WIFI_REASON_AUTH_LEAVE:
-			Serial.println(F("WIFI_REASON_AUTH_LEAVE")); break;
+			msg += "WIFI_REASON_AUTH_LEAVE"; break;
 		case WIFI_REASON_ASSOC_EXPIRE:
-			Serial.println(F("WIFI_REASON_ASSOC_EXPIRE")); break;
+			msg += "WIFI_REASON_ASSOC_EXPIRE"; break;
 		case WIFI_REASON_ASSOC_TOOMANY:
-			Serial.println(F("WIFI_REASON_ASSOC_TOOMANY")); break;
+			msg += "WIFI_REASON_ASSOC_TOOMANY"; break;
 		case WIFI_REASON_NOT_AUTHED:
-			Serial.println(F("WIFI_REASON_NOT_AUTHED")); break;
+			msg += "WIFI_REASON_NOT_AUTHED"; break;
 		case WIFI_REASON_NOT_ASSOCED:
-			Serial.println(F("WIFI_REASON_NOT_ASSOCED")); break;
+			msg += "WIFI_REASON_NOT_ASSOCED"; break;
 		case WIFI_REASON_ASSOC_LEAVE:
-			Serial.println(F("WIFI_REASON_ASSOC_LEAVE")); break;
+			msg += "WIFI_REASON_ASSOC_LEAVE"; break;
 		case WIFI_REASON_ASSOC_NOT_AUTHED:
-			Serial.println(F("WIFI_REASON_ASSOC_NOT_AUTHED")); break;
+			msg += "WIFI_REASON_ASSOC_NOT_AUTHED"; break;
 		case WIFI_REASON_DISASSOC_PWRCAP_BAD:
-			Serial.println(F("WIFI_REASON_DISASSOC_PWRCAP_BAD")); break;
+			msg += "WIFI_REASON_DISASSOC_PWRCAP_BAD"; break;
 		case WIFI_REASON_DISASSOC_SUPCHAN_BAD:
-			Serial.println(F("WIFI_REASON_DISASSOC_SUPCHAN_BAD")); break;
+			msg += "WIFI_REASON_DISASSOC_SUPCHAN_BAD"; break;
 		case WIFI_REASON_IE_INVALID:
-			Serial.println(F("WIFI_REASON_IE_INVALID")); break;
+			msg += "WIFI_REASON_IE_INVALID"; break;
 		case WIFI_REASON_MIC_FAILURE:
-			Serial.println(F("WIFI_REASON_MIC_FAILURE")); break;
+			msg += "WIFI_REASON_MIC_FAILURE"; break;
 		case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
-			Serial.println(F("WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT")); break;
+			msg += "WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT"; break;
 		case WIFI_REASON_GROUP_KEY_UPDATE_TIMEOUT:
-			Serial.println(F("WIFI_REASON_GROUP_KEY_UPDATE_TIMEOUT")); break;
+			msg += "WIFI_REASON_GROUP_KEY_UPDATE_TIMEOUT"; break;
 		case WIFI_REASON_IE_IN_4WAY_DIFFERS:
-			Serial.println(F("WIFI_REASON_IE_IN_4WAY_DIFFERS")); break;
+			msg += "WIFI_REASON_IE_IN_4WAY_DIFFERS"; break;
 //		case WIFI_REASON_GROUP_CIPHER_INVALID:
-//			Serial.println(F("WIFI_REASON_GROUP_CIPHER_INVALID")); break;
+//			msg += "WIFI_REASON_GROUP_CIPHER_INVALID"; break;
 //		case WIFI_REASON_PAIRWISE_CIPHER_INVALID:
-//			Serial.println(F("WIFI_REASON_PAIRWISE_CIPHER_INVALID")); break;
+//			msg += "WIFI_REASON_PAIRWISE_CIPHER_INVALID"; break;
 //		case WIFI_REASON_AKMP_INVALID:
-//			Serial.println(F("WIFI_REASON_AKMP_INVALID")); break;
+//			msg += "WIFI_REASON_AKMP_INVALID"; break;
 //		case WIFI_REASON_UNSUPP_RSN_IE_VERSION:
-//			Serial.println(F("WIFI_REASON_UNSUPP_RSN_IE_VERSION")); break;
+//			msg += "WIFI_REASON_UNSUPP_RSN_IE_VERSION"; break;
 //		case WIFI_REASON_INVALID_RSN_IE_CAP:
-//			Serial.println(F("WIFI_REASON_INVALID_RSN_IE_CAP")); break;
+//			msg += "WIFI_REASON_INVALID_RSN_IE_CAP"; break;
 		case WIFI_REASON_802_1X_AUTH_FAILED:
-			Serial.println(F("WIFI_REASON_802_1X_AUTH_FAILED")); break;
+			msg += "WIFI_REASON_802_1X_AUTH_FAILED"; break;
 		case WIFI_REASON_CIPHER_SUITE_REJECTED:
-			Serial.println(F("WIFI_REASON_CIPHER_SUITE_REJECTED")); break;
+			msg += "WIFI_REASON_CIPHER_SUITE_REJECTED"; break;
 		case WIFI_REASON_BEACON_TIMEOUT:
-			Serial.println(F("WIFI_REASON_BEACON_TIMEOUT")); break;
+			msg += "WIFI_REASON_BEACON_TIMEOUT"; break;
 		case WIFI_REASON_NO_AP_FOUND:
-			Serial.println(F("WIFI_REASON_NO_AP_FOUND")); break;
+			msg += "WIFI_REASON_NO_AP_FOUND"; break;
 		case WIFI_REASON_AUTH_FAIL:
-			Serial.println(F("WIFI_REASON_AUTH_FAIL")); break;
+			msg += "WIFI_REASON_AUTH_FAIL"; break;
 		case WIFI_REASON_ASSOC_FAIL:
-			Serial.println(F("WIFI_REASON_ASSOC_FAIL")); break;
+			msg += "WIFI_REASON_ASSOC_FAIL"; break;
 		case WIFI_REASON_HANDSHAKE_TIMEOUT:
-			Serial.println(F("WIFI_REASON_HANDSHAKE_TIMEOUT")); break;
+			msg += "WIFI_REASON_HANDSHAKE_TIMEOUT"; break;
 		case ARDUINO_EVENT_ETH_START:
-			Serial.println("ETH Started");
+			msg += "ETH Started";
 			//set eth hostname here
 			ETH.setHostname(name);
 			break;
 		case ARDUINO_EVENT_ETH_CONNECTED:
-			Serial.println("ETH Connected");
+			msg += "ETH Connected";
 			break;
 		case ARDUINO_EVENT_ETH_GOT_IP:
-			Serial.print("ETH MAC: ");
-			Serial.print(ETH.macAddress());
-			Serial.print(", IPv4: ");
-			Serial.print(ETH.localIP());
+#if 0
+			msg += "ETH MAC: ";
+			msg += ETH.macAddress();
+			msg += ", IPv4: ";
+			msg += ETH.localIP();
 			if (ETH.fullDuplex())
-				Serial.print(", FULL_DUPLEX");
-			Serial.print(", ");
-			Serial.print(ETH.linkSpeed());
-			Serial.println("Mbps");
+				msg += ", FULL_DUPLEX";
+			msg += ", ";
+			msg += ETH.linkSpeed();
+			msg += "Mbps";
+#endif
 			eth_connected = true;
 			break;
 		case ARDUINO_EVENT_ETH_DISCONNECTED:
-			Serial.println("ETH Disconnected");
+			msg += "ETH Disconnected";
 			eth_connected = false;
 			break;
 		case ARDUINO_EVENT_ETH_STOP:
-			Serial.println("ETH Stopped");
+			msg += "ETH Stopped";
 			eth_connected = false;
 			break;
 		default:
 			Serial.printf("Unknown/unexpected ETH event %d\r\n", event);
 			break;
 	}
+	errlog(msg.c_str());
+	write_led(led_red, LOW);
 }
 
 void heap_caps_alloc_failed_hook(size_t requested_size, uint32_t caps, const char *function_name)
 {
-	printf("%s was called but failed to allocate %zu bytes with 0x%x capabilities (by %p)\r\n", function_name, requested_size, caps, __builtin_return_address(0));
+	write_led(led_red, HIGH);
+	errlog("%s was called but failed to allocate %zu bytes with 0x%x capabilities (by %p)", function_name, requested_size, caps, __builtin_return_address(0));
 
 	esp_backtrace_print(25);
+	write_led(led_red, LOW);
 }
 
 bool progress_indicator(const int nr, const int mx, const std::string & which) {
+//	digitalWrite(LED_BUILTIN, HIGH);
 	printf("%3.2f%%: %s\r\n", nr * 100. / mx, which.c_str());
+//	digitalWrite(LED_BUILTIN, LOW);
 
 	return true;
 }
 
 void setup_wifi() {
+	write_led(led_green,  HIGH);
+	write_led(led_yellow, HIGH);
+
+	draw_status("0020");
 	enable_wifi_debug();
 
+	draw_status("0021");
 	WiFi.onEvent(WiFiEvent);
 
-	scan_access_points_start();
-
-	if (!LittleFS.begin())
-		printf("LittleFS.begin() failed\r\n");
-
-	configure_wifi cw;
-
-	if (cw.is_configured() == false) {
-retry:
-		Serial.println(F("Cannot connect to WiFi: accesspoint for configuration started"));
-		start_wifi(name);  // enable wifi with AP (empty string for no AP)
-
-		cw.configure_aps();
-	}
-	else {
-		Serial.println(F("Connecting to WiFi..."));
-		start_wifi("");
-	}
-
-	Serial.println(F("Scanning for accesspoints"));
-	scan_access_points_start();
-
-	while(scan_access_points_wait() == false)
-		delay(100);
-
-	auto available_access_points = scan_access_points_get();
-
-	auto state = try_connect_init(cw.get_targets(), available_access_points, 300, progress_indicator);
 	connect_status_t cs = CS_IDLE;
+	do {
+		draw_status("0022");
+		start_wifi({ });
 
-	Serial.println(F("Connecting..."));
-	for(;;) {
-		cs = try_connect_tick(state);
+		Serial.print(F("Scanning for accesspoints"));
+		draw_status("0023");
+		scan_access_points_start();
 
-		if (cs != CS_IDLE)
-			break;
+		draw_status("0024");
+		while(scan_access_points_wait() == false) {
+//			digitalWrite(LED_BUILTIN, HIGH);
+			Serial.print(F("."));
+//			digitalWrite(LED_BUILTIN, LOW);
+			delay(100);
+		}
 
-		delay(100);
+		draw_status("0025");
+		auto available_access_points = scan_access_points_get();
+		Serial.printf("Found %zu accesspoints\r\n", available_access_points.size());
+
+		draw_status("0026");
+		auto state = try_connect_init(wifi_targets, available_access_points, 300, progress_indicator);
+
+		Serial.println(F("Connecting"));
+		draw_status("0027");
+		for(;;) {
+			cs = try_connect_tick(state);
+
+			if (cs != CS_IDLE)
+				break;
+
+			Serial.print(F("."));
+			delay(100);
+		}
+
+		// could not connect
+		draw_status("0028");
 	}
+	while(cs == CS_FAILURE);
 
-	// could not connect, restart esp
-	// you could also re-run the portal
-	if (cs == CS_FAILURE) {
-		Serial.println(F("Failed to connect"));
+	draw_status("0029");
 
-		goto retry;
-	}
+	write_led(led_green,  LOW);
+	write_led(led_yellow, LOW);
+
+	draw_status("002f");
 }
 
 void loopw(void *) {
 	Serial.println(F("Thread started"));
 
+	int cu_count = 0;
 	for(;;) {
-		ArduinoOTA.handle();
+		auto now = millis();
+		if (now - draw_status_ts > 5000)
+			u8x8.setPowerSave(1);
 
+		ntp.update();
+		ArduinoOTA.handle();
+		hundredsofasecondcounter = now / 10;
+		snmp.loop();
 		vTaskDelay(100 / portTICK_PERIOD_MS);
+
+		cpu_usage = ((100 - core0_idle * 100 / max_idle_ticks) + (100 - core1_idle * 100 / max_idle_ticks)) / 2 * cu_count / 10;
+		if (++cu_count >= 10)
+			cu_count = 0, core0_idle = core1_idle = 0;
 	}
+}
+
+void ls(fs::FS &fs, const String & name)
+{
+	Serial.print(F("Directory: "));
+	Serial.println(name);
+
+	File dir = fs.open(name);
+	if (!dir) {
+		Serial.println(F("Can't open"));
+		write_led(led_red, LOW);
+		return;
+	}
+
+	File file = dir.openNextFile();
+	while(file) {
+		if (file.isDirectory()) {
+			Serial.print("Dir: ");
+			Serial.println(file.name());
+			ls(fs, name + "/" + file.name());
+		}
+		else {
+			Serial.print("File: ");
+			Serial.print(file.name());
+			Serial.print(", size: ");
+			Serial.println(file.size());
+		}
+
+		file = dir.openNextFile();
+	}
+
+	dir.close();
+}
+
+const char *reset_name(const esp_reset_reason_t rr)
+{
+	switch(rr) {
+		case ESP_RST_UNKNOWN:
+			return "Reset reason can not be determined";
+
+		case ESP_RST_POWERON:
+			return "Reset due to power-on event";
+
+		case ESP_RST_EXT:
+			return "Reset by external pin (not applicable for ESP32)";
+
+		case ESP_RST_SW:
+			return "Software reset via esp_restart";
+
+		case ESP_RST_PANIC:
+			return "Software reset due to exception/panic";
+
+		case ESP_RST_INT_WDT:
+			return "Reset (software or hardware) due to interrupt watchdog";
+
+		case ESP_RST_TASK_WDT:
+			return "Reset due to task watchdog";
+
+		case ESP_RST_WDT:
+			return "Reset due to other watchdogs";
+
+		case ESP_RST_DEEPSLEEP:
+			return "Reset after exiting deep sleep mode";
+
+		case ESP_RST_BROWNOUT:
+			return "Brownout reset (software or hardware)";
+
+		case ESP_RST_SDIO:
+			return "Reset over SDIO";
+
+//		case ESP_RST_USB:
+//			return "Reset by USB peripheral";
+
+//		case ESP_RST_JTAG:
+//			return "Reset by JTAG";
+
+		default:
+			return "?";
+	}
+
+	return nullptr;
 }
 
 void setup() {
@@ -293,9 +463,17 @@ void setup() {
 		yield();
 	Serial.setDebugOutput(true);
 
+	u8x8.begin();
+	u8x8.setPowerSave(0);
+	u8x8.setFont(u8x8_font_7x14_1x2_n);
+
+	draw_status("0001");
+
 	uint8_t chipid[6] { };
 	esp_read_mac(chipid, ESP_MAC_WIFI_STA);
 	snprintf(name, sizeof name, "iESP-%02x%02x%02x%02x", chipid[2], chipid[3], chipid[4], chipid[5]);
+
+	draw_status("0002");
 
 	Serial.println(F("iESP, (C) 2023-2024 by Folkert van Heusden <mail@vanheusden.com>"));
 	Serial.println(F("Compiled on " __DATE__ " " __TIME__));
@@ -304,28 +482,96 @@ void setup() {
 	Serial.print(F("System name: "));
 	Serial.println(name);
 
-	auto reset_reason = esp_reset_reason();
-	if (reset_reason != ESP_RST_POWERON)
-		Serial.printf("Reset reason: %d\r\n", reset_reason);
+	draw_status("0003");
 
-	if (load_configuration() == false)
+//	pinMode(LED_BUILTIN, OUTPUT);
+	if (led_green != -1)
+		pinMode(led_green, OUTPUT);
+	if (led_yellow != -1)
+		pinMode(led_yellow, OUTPUT);
+	if (led_red != -1)
+		pinMode(led_red, OUTPUT);
+
+	draw_status("0004");
+
+	if (!LittleFS.begin()) {
+		Serial.println(F("LittleFS.begin() failed"));
+		draw_status("0005");
+	}
+
+	draw_status("0006");
+	
+	if (load_configuration() == false) {
 		Serial.println(F("Failed to load configuration, using defaults!"));
-
-	bs = new backend_sdcard();
-	scsi_dev = new scsi(bs);
+		ls(LittleFS, "/");
+		draw_status("0007");
+		fail_flash();
+	}
 
 	set_hostname(name);
 
 	WiFi.onEvent(WiFiEvent);
 	ETH.begin(1, 16, 23, 18, ETH_PHY_LAN8720);
 
+//	setup_wifi();
+	init_logger(name);
+
+	draw_status("0008");
+
+	ntp.begin();
+
+	draw_status("0008a");
+
+	esp_register_freertos_idle_hook_for_cpu(idle_task_0, 0);
+	esp_register_freertos_idle_hook_for_cpu(idle_task_1, 1);
+
+	draw_status("0009");
+
+	snmp.setUDP(&snmp_udp);
+	snmp.addTimestampHandler(".1.3.6.1.2.1.1.3.0",            &hundredsofasecondcounter);
+	snmp.addReadOnlyStaticStringHandler(".1.3.6.1.4.1.2021.13.15.1.1.2", "iESP");
+	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.3", &is.n_reads      );
+	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.4", &is.n_writes     );
+	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.5", &is.bytes_read   );
+	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.6", &is.bytes_written);
+	snmp.addIntegerHandler(".1.3.6.1.4.1.2021.11.9.0", &cpu_usage);
+	snmp.addReadOnlyStaticStringHandler(".1.3.6.1.2.1.1.1.0", "iESP");
+	snmp.sortHandlers();
+	snmp.begin();
+
+	draw_status("000a");
+
+	bs = new backend_sdcard(led_green, led_yellow);
+	draw_status("000c");
+	if (bs->begin() == false) {
+		errlog("Failed to load initialize storage backend!");
+		draw_status("000b");
+		fail_flash();
+	}
+
+	draw_status("000d");
+	scsi_dev = new scsi(bs, trim_level, &is);
+
+	draw_status("000e");
+	auto reset_reason = esp_reset_reason();
+	if (reset_reason != ESP_RST_POWERON)
+		errlog("Reset reason: %s (%d), software version %s", reset_name(reset_reason), reset_reason, version_str);
+	else
+		errlog("System (re-)started, software version %s", version_str);
+
+	draw_status("000f");
+	esp_wifi_set_ps(WIFI_PS_NONE);
+
+	draw_status("0010");
 	if (MDNS.begin(name))
 		MDNS.addService("iscsi", "tcp", 3260);
 	else
-		Serial.println(F("Failed starting mdns responder"));
+		errlog("Failed starting mdns responder");
 
+	draw_status("0012");
 	heap_caps_register_failed_alloc_callback(heap_caps_alloc_failed_hook);
 
+	draw_status("0011");
 	Serial.print("Waiting for Ethernet: ");
 	while(eth_connected == false) {
 		delay(200);
@@ -337,8 +583,7 @@ void setup() {
 
 	enable_OTA();
 
-	setup_web_server();
-
+	draw_status("0013");
 	xTaskCreate(loopw, /* Function to implement the task */
 			"loop2", /* Name of the task */
 			10000,  /* Stack size in words */
@@ -346,10 +591,13 @@ void setup() {
 			127,  /* Priority of the task */
 			&task2  /* Task handle. */
 		   );
+
+	draw_status("0100");
 }
 
 void loop()
 {
+	draw_status("0201");
 	{
 		auto ip = ETH.localIP();
 		char buffer[16];
@@ -358,17 +606,26 @@ void loop()
 		Serial.print(F("Will listen on (in a bit): "));
 		Serial.println(buffer);
 
+		draw_status("0202");
 		com_sockets c(buffer, 3260, &stop);
-		if (c.begin() == false)
-			Serial.println(F("Failed to initialize communication layer!"));
+		if (c.begin() == false) {
+			errlog("Failed to initialize communication layer!");
+			draw_status("0203");
+			fail_flash();
+		}
 
+		draw_status("0204");
 		server s(scsi_dev, &c);
+		Serial.printf("Free heap space: %u\r\n", get_free_heap_space());
 		Serial.println(F("Go!"));
+		draw_status("0205");
 		s.handler();
+		draw_status("0206");
 	}
 
 	if (ota_update) {
-		Serial.println(F("Halting for OTA update"));
+		draw_status("0300");
+		errlog("Halting for OTA update");
 
 		for(;;)
 			delay(1000);

@@ -16,6 +16,7 @@ add_executable(
 	com-sockets.cpp
 	iscsi.cpp
 	iscsi-pdu.cpp
+	log.cpp
 	main.cpp
 	random.cpp
 	server.cpp

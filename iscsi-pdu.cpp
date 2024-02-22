@@ -1122,6 +1122,7 @@ std::optional<blob_t> generate_reject_pdu(const iscsi_pdu_bhs & about)
 	__reject__ *reject = new __reject__();
 	auto raw = about.get();
 	if (raw.empty()) {
+		delete reject;
 		DOLOG("generate_reject_pdu: can't get data from original PDU\n");
 		return { };
 	}

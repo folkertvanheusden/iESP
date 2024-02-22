@@ -80,7 +80,7 @@ std::vector<std::string> split(std::string in, const std::string & splitter)
 	return out;
 }
 
-#ifdef linux
+#if !defined(ARDUINO)
 std::string to_hex(const uint8_t *const in, const size_t n)
 {
 	std::string out;
@@ -111,13 +111,13 @@ std::string to_hex(const uint8_t *const in, const size_t n)
 
 std::string myformat(const char *const fmt, ...)
 {
-#ifdef linux
+#if !defined(ARDUINO)
         char *buffer = nullptr;
         va_list ap;
         va_start(ap, fmt);
         if (vasprintf(&buffer, fmt, ap) == -1) {
                 va_end(ap);
-                DOLOG("myformat: failed to convert string with format \"%s\"\n", fmt);
+                errlog("myformat: failed to convert string with format \"%s\"", fmt);
                 return fmt;
         }
         va_end(ap);
@@ -133,7 +133,7 @@ std::string myformat(const char *const fmt, ...)
         va_start(ap, fmt);
         if (vsnprintf(buffer, sizeof buffer, fmt, ap) == -1) {
                 va_end(ap);
-                DOLOG("myformat: failed to convert string with format \"%s\"\n", fmt);
+                errlog("myformat: failed to convert string with format \"%s\"", fmt);
                 return fmt;
         }
         va_end(ap);
@@ -153,4 +153,14 @@ uint32_t get_free_heap_space()
 #else
 	return 0;
 #endif
+}
+
+uint64_t get_uint64_t(const uint8_t *const p)
+{
+	return (uint64_t(p[0]) << 56) | (uint64_t(p[1]) << 48) | (uint64_t(p[2]) << 40) | (uint64_t(p[3]) << 32) | (uint64_t(p[4]) << 24) | (p[5] << 16) | (p[6] << 8) | p[7];
+}
+
+uint32_t get_uint32_t(const uint8_t *const p)
+{
+	return (uint64_t(p[0]) << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
 }
