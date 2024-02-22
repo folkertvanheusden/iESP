@@ -41,9 +41,13 @@ bool com_sockets::begin()
 		return false;
 	}
 
-#ifdef linux
+#if !defined(ARDUINO)
 	int q_size = SOMAXCONN;
+#ifdef linux 
 	if (setsockopt(listen_fd, SOL_TCP, TCP_FASTOPEN, &q_size, sizeof q_size)) {
+#else
+	if (setsockopt(listen_fd, IPPROTO_TCP, TCP_FASTOPEN, &q_size, sizeof q_size)) {
+#endif
 		DOLOG("com_sockets::begin: failed to set \"TCP fast open\": %s\n", strerror(errno));
 		return false;
 	}

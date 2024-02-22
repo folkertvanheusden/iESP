@@ -2,6 +2,7 @@
 #include <csignal>
 #include <cstdio>
 #include <getopt.h>
+#include <unistd.h>
 
 #include "backend-file.h"
 #include "com-sockets.h"
