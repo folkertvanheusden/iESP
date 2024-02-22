@@ -1,22 +1,22 @@
 #include <cstdarg>
 #include <cstdio>
-#ifdef linux
-#include <string>
-#include <syslog.h>
-#else
+#if defined(ARDUINO)
 #include <NTP.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
+#else
+#include <string>
+#include <syslog.h>
 #endif
 
 
-#if defined(ESP32) || defined(RP2040)
+#if defined(ARDUINO)
 std::optional<std::string> syslog_host;
 WiFiUDP UDP;
 #endif
 std::string name { "?" };
 
-#if defined(ESP32) || defined(RP2040)
+#if defined(ARDUINO)
 extern NTP ntp;
 #endif
 
@@ -34,7 +34,7 @@ void errlog(const char *const fmt, ...)
 	(void)vsnprintf(&err_log_buf[offset], sizeof(err_log_buf) - offset, fmt, ap);
 	va_end(ap);
 
-#ifdef linux
+#if !defined(ARDUINO)
 	syslog(LOG_ERR, "%s", err_log_buf);
 	printf("%s\n", err_log_buf);
 #else

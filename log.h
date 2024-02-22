@@ -1,4 +1,4 @@
-#ifdef linux
+#if !defined(ARDUINO)
 #ifndef NDEBUG
 #include <cstdio>
 #include <ctime>
@@ -27,7 +27,7 @@
 
 #include <cstdarg>
 void errlog(const char *const fmt, ...);
-#if defined(ESP32) || defined(RP2040)
+#if defined(ARDUINO)
 #include <optional>
 #include <string>
 extern std::optional<std::string> syslog_host;

@@ -73,9 +73,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 
 	scsi_opcode opcode = scsi_opcode(CDB[0]);
 	DOLOG("SCSI opcode: %02xh, CDB size: %zu\n", opcode, size);
-#ifdef linux
 	DOLOG("CDB contents: %s\n", to_hex(CDB, size).c_str());
-#endif
 
 	scsi_response response { };
 	response.type         = ir_as_is;

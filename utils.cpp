@@ -80,7 +80,7 @@ std::vector<std::string> split(std::string in, const std::string & splitter)
 	return out;
 }
 
-#ifdef linux
+#if !defined(ARDUINO)
 std::string to_hex(const uint8_t *const in, const size_t n)
 {
 	std::string out;
@@ -111,7 +111,7 @@ std::string to_hex(const uint8_t *const in, const size_t n)
 
 std::string myformat(const char *const fmt, ...)
 {
-#ifdef linux
+#if !defined(ARDUINO)
         char *buffer = nullptr;
         va_list ap;
         va_start(ap, fmt);
