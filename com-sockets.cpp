@@ -41,9 +41,13 @@ bool com_sockets::begin()
 		return false;
 	}
 
-#ifdef linux
+#if !defined(ARDUINO)
 	int q_size = SOMAXCONN;
+#ifdef linux 
 	if (setsockopt(listen_fd, SOL_TCP, TCP_FASTOPEN, &q_size, sizeof q_size)) {
+#else
+	if (setsockopt(listen_fd, IPPROTO_TCP, TCP_FASTOPEN, &q_size, sizeof q_size)) {
+#endif
 		DOLOG("com_sockets::begin: failed to set \"TCP fast open\": %s\n", strerror(errno));
 		return false;
 	}
@@ -104,7 +108,7 @@ com_client *com_sockets::accept()
 
 	int fd = ::accept(listen_fd, nullptr, nullptr);
 	if (fd == -1) {
-		DOLOG("com_sockets::accept: accept failed: %s\n", strerror(errno));
+		errlog("com_sockets::accept: accept failed: %s", strerror(errno));
 		return nullptr;
 	}
 
@@ -130,13 +134,8 @@ com_client_sockets::~com_client_sockets()
 bool com_client_sockets::send(const uint8_t *const from, const size_t n)
 {
 	auto rc = WRITE(fd, from, n);
-	if (rc == -1) {
-#ifdef ESP32
-		printf("com_client_sockets::send: write failed with error %s\r\n", strerror(errno));
-#else
-		DOLOG("com_client_sockets::send: write failed with error %s\n", strerror(errno));
-#endif
-	}
+	if (rc == -1)
+		errlog("com_client_sockets::send: write failed with error %s", strerror(errno));
 	return rc == n;
 }
 
@@ -165,13 +164,8 @@ bool com_client_sockets::recv(uint8_t *const to, const size_t n)
 	// ideally the poll-loop should include the read (TODO)
 	auto rc = READ(fd, to, n);
 
-	if (rc == -1) {
-#ifdef ESP32
-		Serial.printf("com_client_sockets::recv: read failed with error %s\r\n", strerror(errno));
-#else
-		DOLOG("com_client_sockets::recv: read failed with error %s\n", strerror(errno));
-#endif
-	}
+	if (rc == -1)
+		errlog("com_client_sockets::recv: read failed with error %s", strerror(errno));
 
 	return rc == n;
 }
@@ -188,7 +182,7 @@ std::string com_client_sockets::get_endpoint_name() const
         socklen_t addr_len = sizeof addr;
 
         if (getpeername(fd, reinterpret_cast<sockaddr *>(&addr), &addr_len) == -1) {
-                DOLOG("get_endpoint_name: failed to find name of fd %d\n", fd);
+                errlog("get_endpoint_name: failed to find name of fd %d", fd);
 		return "?:?";
 	}
 

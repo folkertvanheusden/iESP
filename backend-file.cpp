@@ -8,16 +8,24 @@
 #include "log.h"
 
 
-backend_file::backend_file(const std::string & filename)
+backend_file::backend_file(const std::string & filename): filename(filename), fd(-1)
 {
-	fd = open(filename.c_str(), O_RDWR);
-	if (fd == -1)
-		DOLOG("backend_file:: cannot access file %s: %s\n", filename.c_str(), strerror(errno));
 }
 
 backend_file::~backend_file()
 {
 	close(fd);
+}
+
+bool backend_file::begin()
+{
+	fd = open(filename.c_str(), O_RDWR);
+	if (fd == -1) {
+		DOLOG("backend_file:: cannot access file %s: %s\n", filename.c_str(), strerror(errno));
+		return false;
+	}
+
+	return true;
 }
 
 uint64_t backend_file::get_size_in_blocks() const
@@ -62,7 +70,18 @@ bool backend_file::trim(const uint64_t block_nr, const uint32_t n_blocks)
 	off_t  offset     = block_nr * block_size;
 	size_t n_bytes    = n_blocks * block_size;
 	DOLOG("backend_file::trim: block %" PRIu64 " (%lu), %d blocks, block size: %" PRIu64 "\n", block_nr, offset, n_blocks, block_size);
+#ifdef linux
 	int rc = fallocate(fd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, offset, n_bytes);
+#else
+	int rc = 0;
+	uint8_t *zero = new uint8_t[512]();
+	for(uint32_t i=0; i<n_blocks; i++) {
+		if (write(block_nr + i, 1, zero) == false) {
+			rc = -1;
+			break;
+		}
+	}
+#endif
 	if (rc == -1)
 		DOLOG("backend_file::trim: ERROR unmaping; %s\n", strerror(errno));
 	return rc == 0;

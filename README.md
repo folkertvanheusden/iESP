@@ -26,7 +26,7 @@ For Linux/FreeBSD:
 
 using
 -----
-On the ESP32 it uses the connected SD-card. Make sure it is formatted in 'exfat' format (because of the file size). Create a test.dat file on the SD-card of the size you want your iSCSI target to be. The ESP32 version uses a WiFi-manager: after the first powerup you need to configure it to use your WiFi via the temporary accesspoint (look for 'iESP-xxxxxx' in the list of access points).
+On the ESP32 it uses the connected SD-card. Make sure it is formatted in 'exfat' format (because of the file size). Create a test.dat file on the SD-card of the size you want your iSCSI target to be. The ESP32 version needs to be configured first: under ESP32/data there's a file called cfg-iESP.json.example. Rename this to cfg-iESP.json and enter appropriate WiFi settings. Leave "syslog-host" empty to not send error logging to a syslog server.
 
 On Linux/FreeBSD, it assumes you have a test.dat file of appropriate size in the current directory. Run iESP with '-h' to see a list of switches. You probably need to change the listen-address for example.
 

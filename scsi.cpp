@@ -40,7 +40,7 @@ const std::map<scsi::scsi_opcode, scsi_opcode_details> scsi_a3_data {
 
 constexpr const uint8_t max_compare_and_write_block_count = 1;
 
-scsi::scsi(backend *const b) : b(b)
+scsi::scsi(backend *const b, const int trim_level, io_stats_t *const is) : b(b), trim_level(trim_level), is(is)
 {
 #ifdef ESP32
 	uint64_t temp { 0 };
@@ -73,9 +73,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 
 	scsi_opcode opcode = scsi_opcode(CDB[0]);
 	DOLOG("SCSI opcode: %02xh, CDB size: %zu\n", opcode, size);
-#ifdef linux
 	DOLOG("CDB contents: %s\n", to_hex(CDB, size).c_str());
-#endif
 
 	scsi_response response { };
 	response.type         = ir_as_is;
@@ -194,7 +192,12 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				response.io.what.data.first[5] = max_compare_and_write_block_count;  // compare and write
 				response.io.what.data.first[6] = 0;  // OPTIMAL TRANSFER LENGTH GRANULARITY
 				response.io.what.data.first[7] = 0;
-				response.io.what.data.first[23] = 128;  // LSB of 'MAXIMUM UNMAP LBA COUNT'
+#ifdef ESP32
+				response.io.what.data.first[22] = 1;  // 'MAXIMUM UNMAP LBA COUNT': 256 blocks
+#else
+				response.io.what.data.first[22] = 32;  // 'MAXIMUM UNMAP LBA COUNT': 8192 blocks
+#endif
+				response.io.what.data.first[23] = 00;  // LSB of 'MAXIMUM UNMAP LBA COUNT'
 				response.io.what.data.first[27] = 8;  // LSB of 'MAXIMUM UNMAP BLOCK DESCRIPTOR COUNT'
 				response.io.what.data.first[31] = 8;  // LSB of 'OPTIMAL UNMAP GRANULARITY'
 				// ... set rest to 'not set'
@@ -212,7 +215,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				// ... set all to 'not set'
 			}
 			else {
-				DOLOG("scsi::send: INQUIRY page code %02xh not implemented\n", CDB[2]);
+				errlog("scsi::send: INQUIRY page code %02xh not implemented", CDB[2]);
 				ok = false;
 			}
 		}
@@ -253,7 +256,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		if (service_action == 0x10) {  // READ CAPACITY
 			DOLOG("scsi::send: READ_CAPACITY(16)\n");
 
-			uint16_t allocation_length = (CDB[10] << 24) | (CDB[11] << 16) | (CDB[12] << 8) | CDB[13];
+			uint32_t allocation_length = get_uint32_t(&CDB[10]);
 
 			if (allocation_length == 0)
 				response.type = ir_empty_sense;
@@ -283,12 +286,12 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		else if (service_action == 0x12) {  // GET LBA STATUS
 			DOLOG("scsi::send: GET_LBA_STATUS\n");
 
-			uint64_t lba             = (uint64_t(CDB[2]) << 56) | (uint64_t(CDB[3]) << 48) | (uint64_t(CDB[4]) << 40) | (uint64_t(CDB[5]) << 32) | (uint64_t(CDB[6]) << 24) | (CDB[7] << 16) | (CDB[8] << 8) | CDB[9];
-			uint32_t transfer_length = (uint64_t(CDB[10]) << 24) | (CDB[11] << 16) | (CDB[12] << 8) | CDB[13];
+			uint64_t lba             = get_uint64_t(&CDB[2]);
+			uint32_t transfer_length = get_uint32_t(&CDB[10]);
 
 			auto vr = validate_request(lba, transfer_length);
 			if (vr.has_value()) {
-				DOLOG("scsi::send: GET LBA STATUS parameters invalid\n");
+				errlog("scsi::send: GET LBA STATUS parameters invalid");
 				response.sense_data = vr.value();
 			}
 			else {
@@ -304,7 +307,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			}
 		}
 		else {
-			DOLOG("scsi::send: GET LBA STATUS service action %02xh not implemented\n", service_action);
+			errlog("scsi::send: GET LBA STATUS service action %02xh not implemented", service_action);
 			response.sense_data = error_not_implemented();
 		}
 	}
@@ -320,22 +323,22 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		}
 		else if (opcode == o_write_10 || opcode == o_write_verify_10) {
 			// NOTE: the verify part is not implemented, o_write_verify_10 is just a dumb write
-			lba             = (uint64_t(CDB[2]) << 24) | (CDB[3] << 16) | (CDB[4] << 8) | CDB[5];
+			lba             = get_uint32_t(&CDB[2]);
 			transfer_length = (CDB[7] << 8) | CDB[8];
 		}
 		else if (opcode == o_write_16) {
-			lba             = (uint64_t(CDB[2]) << 56) | (uint64_t(CDB[3]) << 48) | (uint64_t(CDB[4]) << 40) | (uint64_t(CDB[5]) << 32) | (uint64_t(CDB[6]) << 24) | (CDB[7] << 16) | (CDB[8] << 8) | CDB[9];
-			transfer_length = (uint64_t(CDB[10]) << 24) | (CDB[11] << 16) | (CDB[12] << 8) | CDB[13];
+			lba             = get_uint64_t(&CDB[2]);
+			transfer_length = get_uint32_t(&CDB[10]);
 		}
 		else {
-			DOLOG("scsi::send: WRITE_1x internal error\n");
+			errlog("scsi::send: WRITE_1x internal error");
 		}
 
 		DOLOG("scsi::send: WRITE_1%c, offset %" PRIu64 ", %u sectors\n", opcode == o_write_10 ? '0' : '6', lba, transfer_length);
 
 		auto vr = validate_request(lba, transfer_length);
 		if (vr.has_value()) {
-			DOLOG("scsi::send: WRITE_1x parameters invalid\n");
+			errlog("scsi::send: WRITE_1x parameters invalid");
 			response.sense_data = vr.value();
 		}
 		else if (data.first) {
@@ -353,12 +356,12 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				auto rc = write(lba, received_blocks, data.first);
 
 				if (rc == scsi_rw_result::rw_fail_general) {
-					DOLOG("scsi::send: WRITE_xx, general write error\n");
+					errlog("scsi::send: WRITE_xx, general write error");
 					response.sense_data = error_write_error();
 					ok = false;
 				}
 				else if (rc == rw_fail_locked) {
-					DOLOG("scsi::send: WRITE_xx, failed writing due to reservations\n");
+					errlog("scsi::send: WRITE_xx, failed writing due to reservations");
 					response.sense_data = error_reserve_6();
 					ok = false;
 				}
@@ -395,12 +398,12 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		uint32_t transfer_length = 0;
 
 		if (opcode == o_read_16) {
-			lba             = (uint64_t(CDB[2]) << 56) | (uint64_t(CDB[3]) << 48) | (uint64_t(CDB[4]) << 40) | (uint64_t(CDB[5]) << 32) | (uint64_t(CDB[6]) << 24) | (CDB[7] << 16) | (CDB[8] << 8) | CDB[9];
-			transfer_length = (uint64_t(CDB[10]) << 24) | (CDB[11] << 16) | (CDB[12] << 8) | CDB[13];
+			lba             = get_uint64_t(&CDB[2]);
+			transfer_length = get_uint32_t(&CDB[10]);
 			DOLOG("scsi::send: READ_16, LBA %" PRIu64 ", %u sectors\n", lba, transfer_length);
 		}
 		else if (opcode == o_read_10) {
-			lba             = (uint64_t(CDB[2]) << 24) | (uint64_t(CDB[3]) << 16) | (uint64_t(CDB[4]) << 8) | uint64_t(CDB[5]);
+			lba             = get_uint32_t(&CDB[2]);
 			transfer_length =  (CDB[7] << 8) | CDB[8];
 			DOLOG("scsi::send: READ_10, LBA %" PRIu64 ", %u sectors\n", lba, transfer_length);
 		}
@@ -414,7 +417,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 
 		auto vr = validate_request(lba, transfer_length);
 		if (vr.has_value()) {
-			DOLOG("scsi::send: READ_1x parameters invalid\n");
+			errlog("scsi::send: READ_1x parameters invalid");
 			response.sense_data = vr.value();
 		}
 		else if (transfer_length == 0) {
@@ -489,22 +492,22 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 					ok = true;
 				}
 				else {
-					DOLOG("scsi::send: 0xa3 for opcode %02x not implemented\n", req_operation_code);
+					errlog("scsi::send: 0xa3 for opcode %02x not implemented", req_operation_code);
 				}
 			}
 			else {
-				DOLOG("scsi::send: 0xa3 reporting option %d not implemented\n", reporting_options);
+				errlog("scsi::send: 0xa3 reporting option %d not implemented", reporting_options);
 			}
 		}
 		else {
-			DOLOG("scsi::send: 0xa3 service action %02x not implemented\n", service_action);
+			errlog("scsi::send: 0xa3 service action %02x not implemented", service_action);
 		}
 
 		if (!ok)
 			response.sense_data = error_not_implemented();
 	}
 	else if (opcode == o_compare_and_write) {  // 0x89
-		uint64_t lba         = (uint64_t(CDB[2]) << 56) | (uint64_t(CDB[3]) << 48) | (uint64_t(CDB[4]) << 40) | (uint64_t(CDB[5]) << 32) | (uint64_t(CDB[6]) << 24) | (CDB[7] << 16) | (CDB[8] << 8) | CDB[9];
+		uint64_t lba         = get_uint64_t(&CDB[2]);
 		uint32_t block_count = CDB[13];
 		DOLOG("scsi::send: COMPARE AND WRITE: LBA %" PRIu64 ", transfer length: %u\n", lba, block_count);
 
@@ -529,13 +532,13 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				match = read(lba + i, 1, buffer);
 
 				if (match != rw_ok) {
-					DOLOG("scsi::send: read from backend error\n");
+					errlog("scsi::send: read from backend error");
 					break;
 				}
 
 				if (memcmp(buffer, &data.first[i * block_size], block_size) != 0) {
 					match = rw_fail_general;
-					DOLOG("scsi::send: block %u (LBA: %" PRIu64 ") mismatch\n", i, lba + i);
+					errlog("scsi::send: block %u (LBA: %" PRIu64 ") mismatch", i, lba + i);
 					break;
 				}
 			}
@@ -548,7 +551,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 					write_result = write(lba + i, 1, &data.first[i * block_size + block_count * block_size]);
 
 					if (write_result != rw_ok) {
-						DOLOG("scsi::send: write to backend error\n");
+						errlog("scsi::send: write to backend error");
 						break;
 					}
 				}
@@ -600,12 +603,12 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		const uint8_t *const pd = data.first;
 		scsi_rw_result rc = rw_ok;
 		for(size_t i=8; i<data.second; i+= 16) {
-			uint64_t lba             = (uint64_t(pd[i + 0]) << 56) | (uint64_t(pd[i + 1]) << 48) | (uint64_t(pd[i + 2]) << 40) | (uint64_t(pd[i + 3]) << 32) | (uint64_t(pd[i + 4]) << 24) | (pd[i + 5] << 16) | (pd[i + 6] << 8) | pd[i + 7];
-			uint32_t transfer_length = (uint64_t(pd[i + 8]) << 24) | (pd[i + 9] << 16) | (pd[i + 10] << 8) | pd[i + 11];
+			uint64_t lba            = get_uint64_t(&pd[i]);
+			uint32_t transfer_length = get_uint32_t(&pd[i + 8]);
 
 			auto vr = validate_request(lba, transfer_length);
 			if (vr.has_value()) {
-				DOLOG("scsi::send: UNMAP parameters invalid\n");
+				errlog("scsi::send: UNMAP parameters invalid");
 				response.sense_data = vr.value();
 				rc = rw_fail_general;
 			}
@@ -614,7 +617,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 
 				rc = trim(lba, transfer_length);
 				if (rc != rw_ok) {
-					DOLOG("scsi::send: UNMAP trim failed\n");
+					errlog("scsi::send: UNMAP trim failed");
 					break;
 				}
 			}
@@ -632,7 +635,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		}
 	}
 	else {
-		DOLOG("scsi::send: opcode %02xh not implemented\n", opcode);
+		errlog("scsi::send: opcode %02xh not implemented", opcode);
 		response.sense_data = error_not_implemented();
 	}
 
@@ -681,9 +684,33 @@ void scsi::get_and_reset_stats(uint64_t *const bytes_read, uint64_t *const bytes
 
 scsi::scsi_rw_result scsi::write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data)
 {
+	is->n_writes++;
+	is->bytes_written += n_blocks * b->get_block_size();
+
 	if (locking_status() != l_locked_other) {  // locked by myself or not locked?
-		if (b->write(block_nr, n_blocks, data))
-			return rw_ok;
+		if (trim_level == 2) {
+			bool is_zero = true;
+			auto bs = get_block_size();
+			uint8_t *zero = new uint8_t[bs]();
+			for(uint32_t i=0; i<n_blocks; i++) {
+				if (memcmp(&data[i * bs], zero, bs) != 0) {
+					is_zero = false;
+					break;
+				}
+			}
+			delete [] zero;
+
+			if (is_zero)
+				return b->trim(block_nr, n_blocks) ? rw_ok : rw_fail_general;
+			else if (b->write(block_nr, n_blocks, data))
+				return rw_ok;
+
+			return rw_fail_general;
+		}
+		else {
+			if (b->write(block_nr, n_blocks, data))
+				return rw_ok;
+		}
 
 		return rw_fail_general;
 	}
@@ -694,8 +721,22 @@ scsi::scsi_rw_result scsi::write(const uint64_t block_nr, const uint32_t n_block
 scsi::scsi_rw_result scsi::trim(const uint64_t block_nr, const uint32_t n_blocks)
 {
 	if (locking_status() != l_locked_other) {  // locked by myself or not locked?
-		if (b->trim(block_nr, n_blocks))
-			return rw_ok;
+		if (trim_level == 0) {  // 0 = do not trim/unmap
+			scsi::scsi_rw_result rc = rw_ok;
+			uint8_t *zero = new uint8_t[get_block_size()]();
+			for(uint32_t i=0; i<n_blocks; i++) {
+				rc = write(block_nr + i, 1, zero);
+				if (rc != rw_ok)
+					break;
+			}
+			delete [] zero;
+
+			return rc;
+		}
+		else {
+			if (b->trim(block_nr, n_blocks))
+				return rw_ok;
+		}
 
 		return rw_fail_general;
 	}
@@ -705,6 +746,9 @@ scsi::scsi_rw_result scsi::trim(const uint64_t block_nr, const uint32_t n_blocks
 
 scsi::scsi_rw_result scsi::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_t *const data)
 {
+	is->n_reads++;
+	is->bytes_read += n_blocks * b->get_block_size();
+
 	if (locking_status() != l_locked_other) {  // locked by myself or not locked?
 		if (b->read(block_nr, n_blocks, data))
 			return rw_ok;
@@ -738,7 +782,7 @@ bool scsi::unlock_device()
 	std::unique_lock lck(locked_by_lock);
 
 	if (locked_by.has_value() == false) {
-		DOLOG("scsi::unlock_device: device was NOT locked!\n");
+		errlog("scsi::unlock_device: device was NOT locked!");
 		return false;
 	}
 
@@ -747,7 +791,7 @@ bool scsi::unlock_device()
 		return true;
 	}
 
-	DOLOG("scsi::unlock_device: device is locked by someone else!\n");
+	errlog("scsi::unlock_device: device is locked by someone else!");
 
 	return false;
 }

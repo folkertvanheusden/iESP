@@ -1,4 +1,4 @@
-#ifdef linux
+#if !defined(ARDUINO)
 #ifndef NDEBUG
 #include <cstdio>
 #include <ctime>
@@ -24,3 +24,12 @@
 #else
 #define DOLOG(fmt, ...) do { } while(0)
 #endif
+
+#include <cstdarg>
+void errlog(const char *const fmt, ...);
+#if defined(ARDUINO)
+#include <optional>
+#include <string>
+extern std::optional<std::string> syslog_host;
+#endif
+void init_logger(const std::string & name);
