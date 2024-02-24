@@ -220,17 +220,17 @@ void WiFiEvent(WiFiEvent_t event)
 		case WIFI_REASON_GROUP_KEY_UPDATE_TIMEOUT:
 			msg += "WIFI_REASON_GROUP_KEY_UPDATE_TIMEOUT"; break;
 		case WIFI_REASON_IE_IN_4WAY_DIFFERS:
-			Serial.println(F("WIFI_REASON_IE_IN_4WAY_DIFFERS")); break;
+			msg += "WIFI_REASON_IE_IN_4WAY_DIFFERS"; break;
 //		case WIFI_REASON_GROUP_CIPHER_INVALID:
-//			Serial.println(F("WIFI_REASON_GROUP_CIPHER_INVALID")); break;
+//			msg += "WIFI_REASON_GROUP_CIPHER_INVALID"; break;
 //		case WIFI_REASON_PAIRWISE_CIPHER_INVALID:
-//			Serial.println(F("WIFI_REASON_PAIRWISE_CIPHER_INVALID")); break;
+//			msg += "WIFI_REASON_PAIRWISE_CIPHER_INVALID"; break;
 //		case WIFI_REASON_AKMP_INVALID:
-//			Serial.println(F("WIFI_REASON_AKMP_INVALID")); break;
+//			msg += "WIFI_REASON_AKMP_INVALID"; break;
 //		case WIFI_REASON_UNSUPP_RSN_IE_VERSION:
-//			Serial.println(F("WIFI_REASON_UNSUPP_RSN_IE_VERSION")); break;
+//			msg += "WIFI_REASON_UNSUPP_RSN_IE_VERSION"; break;
 //		case WIFI_REASON_INVALID_RSN_IE_CAP:
-//			Serial.println(F("WIFI_REASON_INVALID_RSN_IE_CAP")); break;
+//			msg += "WIFI_REASON_INVALID_RSN_IE_CAP"; break;
 		case WIFI_REASON_802_1X_AUTH_FAILED:
 			msg += "WIFI_REASON_802_1X_AUTH_FAILED"; break;
 		case WIFI_REASON_CIPHER_SUITE_REJECTED:
@@ -244,33 +244,35 @@ void WiFiEvent(WiFiEvent_t event)
 		case WIFI_REASON_ASSOC_FAIL:
 			msg += "WIFI_REASON_ASSOC_FAIL"; break;
 		case WIFI_REASON_HANDSHAKE_TIMEOUT:
-			Serial.println(F("WIFI_REASON_HANDSHAKE_TIMEOUT")); break;
+			msg += "WIFI_REASON_HANDSHAKE_TIMEOUT"; break;
 		case ARDUINO_EVENT_ETH_START:
-			Serial.println("ETH Started");
+			msg += "ETH Started";
 			//set eth hostname here
 			ETH.setHostname(name);
 			break;
 		case ARDUINO_EVENT_ETH_CONNECTED:
-			Serial.println("ETH Connected");
+			msg += "ETH Connected";
 			break;
 		case ARDUINO_EVENT_ETH_GOT_IP:
-			Serial.print("ETH MAC: ");
-			Serial.print(ETH.macAddress());
-			Serial.print(", IPv4: ");
-			Serial.print(ETH.localIP());
+#if 0
+			msg += "ETH MAC: ";
+			msg += ETH.macAddress();
+			msg += ", IPv4: ";
+			msg += ETH.localIP();
 			if (ETH.fullDuplex())
-				Serial.print(", FULL_DUPLEX");
-			Serial.print(", ");
-			Serial.print(ETH.linkSpeed());
-			Serial.println("Mbps");
+				msg += ", FULL_DUPLEX";
+			msg += ", ";
+			msg += ETH.linkSpeed();
+			msg += "Mbps";
+#endif
 			eth_connected = true;
 			break;
 		case ARDUINO_EVENT_ETH_DISCONNECTED:
-			Serial.println("ETH Disconnected");
+			msg += "ETH Disconnected";
 			eth_connected = false;
 			break;
 		case ARDUINO_EVENT_ETH_STOP:
-			Serial.println("ETH Stopped");
+			msg += "ETH Stopped";
 			eth_connected = false;
 			break;
 		default:
@@ -581,6 +583,7 @@ void setup() {
 	draw_status("0012");
 	heap_caps_register_failed_alloc_callback(heap_caps_alloc_failed_hook);
 
+	draw_status("0011");
 	Serial.print("Waiting for Ethernet: ");
 	while(eth_connected == false) {
 		delay(200);
