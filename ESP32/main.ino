@@ -182,6 +182,11 @@ void enable_OTA() {
 
 volatile bool eth_connected = false;
 
+bool is_network_up()
+{
+	return eth_connected;
+}
+
 void WiFiEvent(WiFiEvent_t event)
 {
 	write_led(led_red, HIGH);
