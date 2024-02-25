@@ -1,5 +1,6 @@
 #include <cstdarg>
 #include <cstdio>
+#include <optional>
 #if defined(ARDUINO)
 #include <NTP.h>
 #include <WiFi.h>
@@ -22,8 +23,10 @@ extern NTP ntp;
 
 thread_local char err_log_buf[192];
 
+// TODO: into headerfile
 extern void write_led(const int gpio, const int state);
 extern int led_red;
+extern bool is_network_up();
 
 void errlog(const char *const fmt, ...)
 {
@@ -43,7 +46,7 @@ void errlog(const char *const fmt, ...)
 	Serial.printf("%04d-%02d-%02d %02d:%02d:%02d ", ntp.year(), ntp.month(), ntp.day(), ntp.hours(), ntp.minutes(), ntp.seconds());
 	Serial.println(err_log_buf);
 
-	if (syslog_host.has_value()) {
+	if (syslog_host.has_value() && is_network_up()) {
 		IPAddress ip;
 		static bool failed = false;
 		if (!ip.fromString(syslog_host.value().c_str()) && failed == false) {

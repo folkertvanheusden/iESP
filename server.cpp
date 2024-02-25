@@ -193,7 +193,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 		}
 
 		if (session == nullptr) {
-			errlog("server::push_response: DATA-OUT PDU references unknown TTT (%08x)", TTT);
+			DOLOG("server::push_response: DATA-OUT PDU references unknown TTT (%08x)", TTT);
 			if (data.has_value())
 				delete [] data.value().first;
 			return false;

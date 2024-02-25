@@ -6,15 +6,22 @@
 #include "log.h"
 
 #ifdef RP2040W
-#define CS_SD 17
+#define SD_CS 17
 #define SDCARD_SPI SPI1
 #else
+// Ethernet:
 // 18 SCK
 // 19 MISO
 // 23 MOSI
-#define CS_SD 5
+// 5  CS
 #endif
+
 #define FILENAME "test.dat"
+
+#define SD_MISO     2       // SD-Card, IO2
+#define SD_MOSI    15       // SD-Card, TD0
+#define SD_SCLK    14       // SD-Card, TMS
+#define SD_CS      12       // SD-Card, TDI
 
 extern void write_led(const int gpio, const int state);
 
@@ -47,10 +54,12 @@ bool backend_sdcard::reinit(const bool close_first)
 		Serial.println(F("Init SD-card backend..."));
 	}
 
+	SPI.begin(SD_SCLK, SD_MISO, SD_MOSI, SD_CS);
+
 	bool ok = false;
 	for(int sp=50; sp>=14; sp -= 4) {
 		Serial.printf("Trying %d MHz...\r\n", sp);
-		if (sd.begin(CS_SD, SD_SCK_MHZ(sp))) {
+		if (sd.begin(SdSpiConfig(SD_CS, DEDICATED_SPI, SD_SCK_MHZ(sp)))) {
 			ok = true;
 			Serial.printf("Accessing SD card at %d MHz\r\n", sp);
 			break;
@@ -58,7 +67,7 @@ bool backend_sdcard::reinit(const bool close_first)
 	}
 
 	if (ok == false) {
-		Serial.printf("SD-card mount failed (assuming CS is on pin %d)\r\n", CS_SD);
+		Serial.printf("SD-card mount failed (assuming CS is on pin %d)\r\n", SD_CS);
 		sd.initErrorPrint(&Serial);
 		write_led(led_read,  LOW);
 		write_led(led_write, LOW);

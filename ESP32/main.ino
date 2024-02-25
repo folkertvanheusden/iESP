@@ -11,10 +11,14 @@
 #include <esp_heap_caps.h>
 #include <esp_wifi.h>
 #include <ESPmDNS.h>
+#if defined(WEMOS32_ETH)
+#include <ESP32-ENC28J60.h>
+#else
+#include <ETH.h>
+#endif
 #include <LittleFS.h>
 #include <NTP.h>
 #include <SNMP_Agent.h>
-#include <U8x8lib.h>
 
 #include "backend-sdcard.h"
 #include "com-sockets.h"
@@ -31,11 +35,15 @@ char name[16] { 0 };
 backend_sdcard  *bs { nullptr };
 scsi *scsi_dev { nullptr };
 
+#ifdef CONFIG_ETH_ENABLED
+int led_green  = 4;
+int led_yellow = 5;
+int led_red    = 35;
+#else
 int led_green  = 17;
 int led_yellow = 16;
-int led_red    = 15;
-
-U8X8_SSD1306_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE);
+int led_red    = 32;
+#endif
 
 DynamicJsonDocument cfg(4096);
 #define IESP_CFG_FILE "/cfg-iESP.json"
@@ -55,6 +63,7 @@ uint64_t core1_idle = 0;
 uint64_t max_idle_ticks = 1855000;
 int cpu_usage = 0;
 int ram_free_kb = 0;
+int eth_wait_seconds = 0;
 
 WiFiUDP ntp_udp;
 NTP ntp(ntp_udp);
@@ -62,8 +71,7 @@ NTP ntp(ntp_udp);
 long int draw_status_ts = 0;
 
 void draw_status(const std::string & str) {
-	u8x8.drawString(0, 22, str.c_str());
-	u8x8.refreshDisplay();
+// TODO update display
 	draw_status_ts = millis();
 }
 
@@ -89,10 +97,14 @@ void fail_flash() {
 	write_led(led_yellow, LOW);
 
 	for(;;) {
+#ifdef LED_BUILTIN
 		digitalWrite(LED_BUILTIN, HIGH);
+#endif
 		write_led(led_red, HIGH);
 		delay(200);
+#ifdef LED_BUILTIN
 		digitalWrite(LED_BUILTIN, LOW);
+#endif
 		write_led(led_red, LOW);
 		delay(200);
 	}
@@ -127,6 +139,8 @@ bool load_configuration() {
 		Serial.printf("Syslog host: %s\r\n", syslog_host.value().c_str());
 
 	trim_level = cfg["trim-level"].as<int>();
+
+	eth_wait_seconds = cfg["eth-wait-time"].as<int>();
 
 	data_file.close();
 
@@ -171,6 +185,13 @@ void enable_OTA() {
 	Serial.println(F("OTA ready"));
 }
 
+volatile bool eth_connected = false;
+
+bool is_network_up()
+{
+	return eth_connected;
+}
+
 void WiFiEvent(WiFiEvent_t event)
 {
 	write_led(led_red, HIGH);
@@ -210,16 +231,16 @@ void WiFiEvent(WiFiEvent_t event)
 			msg += "WIFI_REASON_GROUP_KEY_UPDATE_TIMEOUT"; break;
 		case WIFI_REASON_IE_IN_4WAY_DIFFERS:
 			msg += "WIFI_REASON_IE_IN_4WAY_DIFFERS"; break;
-		case WIFI_REASON_GROUP_CIPHER_INVALID:
-			msg += "WIFI_REASON_GROUP_CIPHER_INVALID"; break;
-		case WIFI_REASON_PAIRWISE_CIPHER_INVALID:
-			msg += "WIFI_REASON_PAIRWISE_CIPHER_INVALID"; break;
-		case WIFI_REASON_AKMP_INVALID:
-			msg += "WIFI_REASON_AKMP_INVALID"; break;
-		case WIFI_REASON_UNSUPP_RSN_IE_VERSION:
-			msg += "WIFI_REASON_UNSUPP_RSN_IE_VERSION"; break;
-		case WIFI_REASON_INVALID_RSN_IE_CAP:
-			msg += "WIFI_REASON_INVALID_RSN_IE_CAP"; break;
+//		case WIFI_REASON_GROUP_CIPHER_INVALID:
+//			msg += "WIFI_REASON_GROUP_CIPHER_INVALID"; break;
+//		case WIFI_REASON_PAIRWISE_CIPHER_INVALID:
+//			msg += "WIFI_REASON_PAIRWISE_CIPHER_INVALID"; break;
+//		case WIFI_REASON_AKMP_INVALID:
+//			msg += "WIFI_REASON_AKMP_INVALID"; break;
+//		case WIFI_REASON_UNSUPP_RSN_IE_VERSION:
+//			msg += "WIFI_REASON_UNSUPP_RSN_IE_VERSION"; break;
+//		case WIFI_REASON_INVALID_RSN_IE_CAP:
+//			msg += "WIFI_REASON_INVALID_RSN_IE_CAP"; break;
 		case WIFI_REASON_802_1X_AUTH_FAILED:
 			msg += "WIFI_REASON_802_1X_AUTH_FAILED"; break;
 		case WIFI_REASON_CIPHER_SUITE_REJECTED:
@@ -234,8 +255,37 @@ void WiFiEvent(WiFiEvent_t event)
 			msg += "WIFI_REASON_ASSOC_FAIL"; break;
 		case WIFI_REASON_HANDSHAKE_TIMEOUT:
 			msg += "WIFI_REASON_HANDSHAKE_TIMEOUT"; break;
+		case ARDUINO_EVENT_ETH_START:
+			msg += "ETH Started";
+			//set eth hostname here
+			ETH.setHostname(name);
+			break;
+		case ARDUINO_EVENT_ETH_CONNECTED:
+			msg += "ETH Connected";
+			break;
+		case ARDUINO_EVENT_ETH_GOT_IP: {
+			auto ip = ETH.localIP();
+			msg += "ETH IPv4: ";
+			msg += myformat("%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+			if (ETH.fullDuplex())
+				msg += ", FULL_DUPLEX";
+			msg += ", ";
+			msg += myformat("%d", ETH.linkSpeed());
+			msg += "Mb";
+			eth_connected = true;
+			break;
+		}
+		case ARDUINO_EVENT_ETH_DISCONNECTED:
+			msg += "ETH Disconnected";
+			eth_connected = false;
+			break;
+		case ARDUINO_EVENT_ETH_STOP:
+			msg += "ETH Stopped";
+			eth_connected = false;
+			break;
 		default:
-			Serial.println(event); break;
+			Serial.printf("Unknown/unexpected ETH event %d\r\n", event);
+			break;
 	}
 	errlog(msg.c_str());
 	write_led(led_red, LOW);
@@ -251,9 +301,13 @@ void heap_caps_alloc_failed_hook(size_t requested_size, uint32_t caps, const cha
 }
 
 bool progress_indicator(const int nr, const int mx, const std::string & which) {
+#ifdef LED_BUILTIN
 	digitalWrite(LED_BUILTIN, HIGH);
+#endif
 	printf("%3.2f%%: %s\r\n", nr * 100. / mx, which.c_str());
+#ifdef LED_BUILTIN
 	digitalWrite(LED_BUILTIN, LOW);
+#endif
 
 	return true;
 }
@@ -269,52 +323,52 @@ void setup_wifi() {
 	WiFi.onEvent(WiFiEvent);
 
 	connect_status_t cs = CS_IDLE;
-	do {
-		draw_status("0022");
-		start_wifi({ });
+	draw_status("0022");
+	start_wifi({ });
 
-		Serial.print(F("Scanning for accesspoints"));
-		draw_status("0023");
-		scan_access_points_start();
+	Serial.print(F("Scanning for accesspoints"));
+	draw_status("0023");
+	scan_access_points_start();
 
-		draw_status("0024");
-		while(scan_access_points_wait() == false) {
-			digitalWrite(LED_BUILTIN, HIGH);
-			Serial.print(F("."));
-			digitalWrite(LED_BUILTIN, LOW);
-			delay(100);
-		}
-
-		draw_status("0025");
-		auto available_access_points = scan_access_points_get();
-		Serial.printf("Found %zu accesspoints\r\n", available_access_points.size());
-
-		draw_status("0026");
-		auto state = try_connect_init(wifi_targets, available_access_points, 300, progress_indicator);
-
-		Serial.println(F("Connecting"));
-		draw_status("0027");
-		for(;;) {
-			cs = try_connect_tick(state);
-
-			if (cs != CS_IDLE)
-				break;
-
-			Serial.print(F("."));
-			delay(100);
-		}
-
-		// could not connect
-		draw_status("0028");
+	draw_status("0024");
+	while(scan_access_points_wait() == false) {
+#ifdef LED_BUILTIN
+		digitalWrite(LED_BUILTIN, HIGH);
+#endif
+		Serial.print(F("."));
+#ifdef LED_BUILTIN
+		digitalWrite(LED_BUILTIN, LOW);
+#endif
+		delay(100);
 	}
-	while(cs == CS_FAILURE);
 
-	draw_status("0029");
+	draw_status("0025");
+	auto available_access_points = scan_access_points_get();
+	Serial.printf("Found %zu accesspoints\r\n", available_access_points.size());
+
+	draw_status("0026");
+	auto state = try_connect_init(wifi_targets, available_access_points, 300, progress_indicator);
+
+	Serial.println(F("Connecting"));
+	draw_status("0027");
+	for(;;) {
+		cs = try_connect_tick(state);
+
+		if (cs != CS_IDLE)
+			break;
+
+		Serial.print(F("."));
+		delay(100);
+	}
 
 	write_led(led_green,  LOW);
 	write_led(led_yellow, LOW);
 
-	draw_status("002f");
+	// could not connect
+	if (cs == CS_CONNECTED)
+		draw_status("0029");
+	else
+		draw_status("0028");
 }
 
 void loopw(void *) {
@@ -323,8 +377,9 @@ void loopw(void *) {
 	int cu_count = 0;
 	for(;;) {
 		auto now = millis();
-		if (now - draw_status_ts > 5000)
-			u8x8.setPowerSave(1);
+		if (now - draw_status_ts > 5000) {
+// TODO powerdown display
+		}
 
 		ntp.update();
 		ArduinoOTA.handle();
@@ -440,14 +495,12 @@ void setup() {
 		yield();
 	Serial.setDebugOutput(true);
 
-	u8x8.begin();
-	u8x8.setPowerSave(0);
-	u8x8.setFont(u8x8_font_7x14_1x2_n);
+	// TODO init display
 
 	draw_status("0001");
 
-	uint8_t chipid[6] { };
-	esp_read_mac(chipid, ESP_MAC_WIFI_STA);
+	uint64_t mac = ESP.getEfuseMac();
+	uint8_t *chipid = reinterpret_cast<uint8_t *>(&mac);
 	snprintf(name, sizeof name, "iESP-%02x%02x%02x%02x", chipid[2], chipid[3], chipid[4], chipid[5]);
 
 	draw_status("0002");
@@ -461,7 +514,9 @@ void setup() {
 
 	draw_status("0003");
 
+#ifdef LED_BUILTIN
 	pinMode(LED_BUILTIN, OUTPUT);
+#endif
 	if (led_green != -1)
 		pinMode(led_green, OUTPUT);
 	if (led_yellow != -1)
@@ -486,6 +541,22 @@ void setup() {
 	}
 
 	set_hostname(name);
+	WiFi.onEvent(WiFiEvent);
+#if defined(WEMOS32_ETH)
+	//begin(int MISO_GPIO, int MOSI_GPIO, int SCLK_GPIO, int CS_GPIO, int INT_GPIO, int SPI_CLOCK_MHZ, int SPI_HOST, bool use_mac_from_efuse=false)
+	bool eth_ok = false;
+	if (ETH.begin(19, 23, 18, 5, 4, 9, 1, false) == true) {  // ENC28J60
+		eth_ok = true;
+		Serial.println(F("ENC28J60 ok!"));
+	}
+
+	if (!eth_ok) {
+		Serial.println(F("ENC28J60 failed"));
+		fail_flash();
+	}
+#else
+	ETH.begin();  // ESP32-WT-ETH01, w32-eth01
+#endif
 	setup_wifi();
 	init_logger(name);
 
@@ -493,12 +564,12 @@ void setup() {
 
 	ntp.begin();
 
-	draw_status("0008a");
+	draw_status("0010");
 
 	esp_register_freertos_idle_hook_for_cpu(idle_task_0, 0);
 	esp_register_freertos_idle_hook_for_cpu(idle_task_1, 1);
 
-	draw_status("0009");
+	draw_status("0011");
 
 	snmp.setUDP(&snmp_udp);
 	snmp.addTimestampHandler(".1.3.6.1.2.1.1.3.0",            &hundredsofasecondcounter);
@@ -521,7 +592,7 @@ void setup() {
 	snmp.sortHandlers();
 	snmp.begin();
 
-	draw_status("000a");
+	draw_status("0012");
 
 	bs = new backend_sdcard(led_green, led_yellow);
 	draw_status("000c");
@@ -531,39 +602,55 @@ void setup() {
 		fail_flash();
 	}
 
-	draw_status("000d");
+	draw_status("0015");
 	scsi_dev = new scsi(bs, trim_level, &ios);
 
-	draw_status("000e");
+	draw_status("0020");
 	auto reset_reason = esp_reset_reason();
 	if (reset_reason != ESP_RST_POWERON)
 		errlog("Reset reason: %s (%d), software version %s", reset_name(reset_reason), reset_reason, version_str);
 	else
 		errlog("System (re-)started, software version %s", version_str);
 
-	draw_status("000f");
+	draw_status("0025");
 	esp_wifi_set_ps(WIFI_PS_NONE);
 
-	draw_status("0010");
+	draw_status("0028");
 	if (MDNS.begin(name))
 		MDNS.addService("iscsi", "tcp", 3260);
 	else
 		errlog("Failed starting mdns responder");
 
-	draw_status("0012");
+	draw_status("0030");
 	heap_caps_register_failed_alloc_callback(heap_caps_alloc_failed_hook);
 
-	draw_status("0011");
+	draw_status("0032");
+	write_led(led_green,  HIGH);
+	write_led(led_yellow, HIGH);
+	Serial.printf("Waiting %d seconds for Ethernet: ", eth_wait_seconds);
+	auto start = millis();
+	while(eth_connected == false && (millis() - start) / 1000 < eth_wait_seconds) {
+		delay(200);
+		Serial.print(".");
+	}
+
+	if (!eth_connected)
+		Serial.println(F("Not listening on Ethernet"));
+	write_led(led_green,  HIGH);
+	write_led(led_yellow, HIGH);
+
+	draw_status("0033");
+
 	enable_OTA();
 
-	draw_status("0013");
+	draw_status("0035");
 
 	if (setCpuFrequencyMhz(240))
 		Serial.println(F("Clock frequency set"));
 	else
 		Serial.println(F("Clock frequency NOT set"));
 
-	draw_status("0014");
+	draw_status("0050");
 
 	xTaskCreate(loopw, /* Function to implement the task */
 			"loop2", /* Name of the task */
@@ -580,32 +667,36 @@ void loop()
 {
 	draw_status("0201");
 	{
-		auto ip = WiFi.localIP();
+		auto ipe = ETH.localIP();
+		auto ipw = WiFi.localIP();
 		char buffer[16];
-		snprintf(buffer, sizeof buffer, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+		if (ipe == IPAddress(uint32_t(0)))  // not connected to Ethernet? then use WiFi IP-address
+			snprintf(buffer, sizeof buffer, "%d.%d.%d.%d", ipw[0], ipw[1], ipw[2], ipw[3]);
+		else
+			snprintf(buffer, sizeof buffer, "%d.%d.%d.%d", ipe[0], ipe[1], ipe[2], ipe[3]);
 
 		Serial.print(F("Will listen on (in a bit): "));
 		Serial.println(buffer);
 
-		draw_status("0202");
+		draw_status("0205");
 		com_sockets c(buffer, 3260, &stop);
 		if (c.begin() == false) {
 			errlog("Failed to initialize communication layer!");
-			draw_status("0203");
+			draw_status("0210");
 			fail_flash();
 		}
 
-		draw_status("0204");
+		draw_status("0220");
 		server s(scsi_dev, &c, &is);
 		Serial.printf("Free heap space: %u\r\n", get_free_heap_space());
 		Serial.println(F("Go!"));
-		draw_status("0205");
+		draw_status("0230");
 		s.handler();
-		draw_status("0206");
+		draw_status("0250");
 	}
 
 	if (ota_update) {
-		draw_status("0300");
+		draw_status("0500");
 		errlog("Halting for OTA update");
 
 		for(;;)
