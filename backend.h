@@ -8,6 +8,7 @@ protected:
 	uint64_t bytes_read    { 0 };
 	uint64_t bytes_written { 0 };
 	uint64_t n_syncs       { 0 };
+	uint64_t n_trims       { 0 };
 
 public:
 	backend();
@@ -20,7 +21,7 @@ public:
 
 	virtual bool sync() = 0;
 
-	void get_and_reset_stats(uint64_t *const bytes_read, uint64_t *const bytes_written, uint64_t *const n_syncs);
+	void get_and_reset_stats(uint64_t *const bytes_read, uint64_t *const bytes_written, uint64_t *const n_syncs, uint64_t *const n_trims);
 
 	virtual bool write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data) = 0;
 	virtual bool trim (const uint64_t block_nr, const uint32_t n_blocks                           ) = 0;

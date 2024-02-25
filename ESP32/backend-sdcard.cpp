@@ -183,6 +183,7 @@ bool backend_sdcard::trim(const uint64_t block_nr, const uint32_t n_blocks)
 		}
 	}
 	delete [] data;
+	n_trims++;
 	return rc;
 }
 

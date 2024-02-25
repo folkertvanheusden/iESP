@@ -56,14 +56,15 @@ int main(int argc, char *argv[])
 	gethostname(hostname, sizeof hostname);
 	init_logger(hostname);
 
-	io_stats_t is { };
+	io_stats_t    ios { };
+	iscsi_stats_t is  { };
 
 	backend_file bf(dev);
 	if (bf.begin() == false) {
 		fprintf(stderr, "Failed to initialize storage backend\n");
 		return 1;
 	}
-	scsi sd(&bf, trim_level, &is);
+	scsi sd(&bf, trim_level, &ios);
 
 	com_sockets c(ip_address, port, &stop);
 	if (c.begin() == false) {
@@ -71,7 +72,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	server s(&sd, &c);
+	server s(&sd, &c, &is);
 	s.handler();
 
 	return 0;

@@ -679,9 +679,9 @@ scsi::scsi_rw_result scsi::sync()
 	return rw_fail_locked;
 }
 
-void scsi::get_and_reset_stats(uint64_t *const bytes_read, uint64_t *const bytes_written, uint64_t *const n_syncs)
+void scsi::get_and_reset_stats(uint64_t *const bytes_read, uint64_t *const bytes_written, uint64_t *const n_syncs, uint64_t *const n_trims)
 {
-	return b->get_and_reset_stats(bytes_read, bytes_written, n_syncs);
+	return b->get_and_reset_stats(bytes_read, bytes_written, n_syncs, n_trims);
 }
 
 scsi::scsi_rw_result scsi::write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data)

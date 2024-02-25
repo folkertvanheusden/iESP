@@ -451,7 +451,7 @@ void server::handler()
 
 		std::atomic_bool *flag = new std::atomic_bool(false);
 
-		std::thread *th = new std::thread([=]() {
+		std::thread *th = new std::thread([=, this]() {
 			std::string endpoint = cc->get_endpoint_name();
 
 #if defined(ESP32) || defined(RP2040W)
@@ -528,8 +528,9 @@ void server::handler()
 					uint64_t bytes_read    = 0;
 					uint64_t bytes_written = 0;
 					uint64_t n_syncs       = 0;
-					s->get_and_reset_stats(&bytes_read, &bytes_written, &n_syncs);
-					Serial.printf("%ld] PDU/s: %.2f (%zu), send: %" PRIu64 " kB (%.2f kB/s), recv: %" PRIu64 " kB (%.2f kB/s), written: %.2f kB/s, read: %.2f kB/s, syncs: %.2f/s, load: %.2f%%, mem: %u\r\n", now, pdu_count / dtook, pdu_count, bytes_send / 1024, bytes_send / dkb, bytes_recv / 1024, bytes_recv / dkb, bytes_written / dkb, bytes_read / dkb, n_syncs / dtook, busy * 0.1 / took, get_free_heap_space());
+					uint64_t n_trims       = 0;
+					s->get_and_reset_stats(&bytes_read, &bytes_written, &n_syncs, &n_trims);
+					Serial.printf("%ld] PDU/s: %.2f, send: %.2f kB/s, recv: %.2f kB/s, written: %.2f kB/s, read: %.2f kB/s, syncs: %.2f/s, unmaps: %.2f/s, load: %.2f%%, mem: %" PRIu32 "\r\n", now, pdu_count / dtook, bytes_send / dkb, bytes_recv / dkb, bytes_written / dkb, bytes_read / dkb, n_syncs / dtook, n_trims / dtook, busy * 0.1 / took, get_free_heap_space());
 					pdu_count  = 0;
 					bytes_send = 0;
 					bytes_recv = 0;

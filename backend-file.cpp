@@ -84,6 +84,7 @@ bool backend_file::trim(const uint64_t block_nr, const uint32_t n_blocks)
 #endif
 	if (rc == -1)
 		DOLOG("backend_file::trim: ERROR unmaping; %s\n", strerror(errno));
+	n_trims++;
 	return rc == 0;
 }
 
