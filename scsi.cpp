@@ -3,6 +3,9 @@
 #include <cstdio>
 #include <cstring>
 #include <thread>
+#ifdef ESP32
+#include <Esp.h>
+#endif
 
 #include "log.h"
 #include "scsi.h"
@@ -43,9 +46,8 @@ constexpr const uint8_t max_compare_and_write_block_count = 1;
 scsi::scsi(backend *const b, const int trim_level, io_stats_t *const is) : b(b), trim_level(trim_level), is(is)
 {
 #ifdef ESP32
-	uint64_t temp { 0 };
-//	esp_efuse_mac_get_default(reinterpret_cast<uint8_t *>(&temp));
-	serial = myformat("%" PRIx64, 123);  // TODO
+	uint64_t temp = ESP.getEfuseMac();
+	serial = myformat("%" PRIx64, 123);
 #else
 	FILE *fh = fopen("/var/lib/dbus/machine-id", "r");
 	if (fh) {

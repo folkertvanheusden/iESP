@@ -63,6 +63,7 @@ uint64_t core1_idle = 0;
 uint64_t max_idle_ticks = 1855000;
 int cpu_usage = 0;
 int ram_free_kb = 0;
+int eth_wait_seconds = 0;
 
 WiFiUDP ntp_udp;
 NTP ntp(ntp_udp);
@@ -138,6 +139,8 @@ bool load_configuration() {
 		Serial.printf("Syslog host: %s\r\n", syslog_host.value().c_str());
 
 	trim_level = cfg["trim-level"].as<int>();
+
+	eth_wait_seconds = cfg["eth-wait-time"].as<int>();
 
 	data_file.close();
 
@@ -260,20 +263,18 @@ void WiFiEvent(WiFiEvent_t event)
 		case ARDUINO_EVENT_ETH_CONNECTED:
 			msg += "ETH Connected";
 			break;
-		case ARDUINO_EVENT_ETH_GOT_IP:
-#if 0
-			msg += "ETH MAC: ";
-			msg += ETH.macAddress();
-			msg += ", IPv4: ";
-			msg += ETH.localIP();
+		case ARDUINO_EVENT_ETH_GOT_IP: {
+			auto ip = ETH.localIP();
+			msg += "ETH IPv4: ";
+			msg += myformat("%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
 			if (ETH.fullDuplex())
 				msg += ", FULL_DUPLEX";
 			msg += ", ";
-			msg += ETH.linkSpeed();
-			msg += "Mbps";
-#endif
+			msg += myformat("%d", ETH.linkSpeed());
+			msg += "Mb";
 			eth_connected = true;
 			break;
+		}
 		case ARDUINO_EVENT_ETH_DISCONNECTED:
 			msg += "ETH Disconnected";
 			eth_connected = false;
@@ -322,56 +323,52 @@ void setup_wifi() {
 	WiFi.onEvent(WiFiEvent);
 
 	connect_status_t cs = CS_IDLE;
-	do {
-		draw_status("0022");
-		start_wifi({ });
+	draw_status("0022");
+	start_wifi({ });
 
-		Serial.print(F("Scanning for accesspoints"));
-		draw_status("0023");
-		scan_access_points_start();
+	Serial.print(F("Scanning for accesspoints"));
+	draw_status("0023");
+	scan_access_points_start();
 
-		draw_status("0024");
-		while(scan_access_points_wait() == false) {
+	draw_status("0024");
+	while(scan_access_points_wait() == false) {
 #ifdef LED_BUILTIN
-			digitalWrite(LED_BUILTIN, HIGH);
+		digitalWrite(LED_BUILTIN, HIGH);
 #endif
-			Serial.print(F("."));
+		Serial.print(F("."));
 #ifdef LED_BUILTIN
-			digitalWrite(LED_BUILTIN, LOW);
+		digitalWrite(LED_BUILTIN, LOW);
 #endif
-			delay(100);
-		}
-
-		draw_status("0025");
-		auto available_access_points = scan_access_points_get();
-		Serial.printf("Found %zu accesspoints\r\n", available_access_points.size());
-
-		draw_status("0026");
-		auto state = try_connect_init(wifi_targets, available_access_points, 300, progress_indicator);
-
-		Serial.println(F("Connecting"));
-		draw_status("0027");
-		for(;;) {
-			cs = try_connect_tick(state);
-
-			if (cs != CS_IDLE)
-				break;
-
-			Serial.print(F("."));
-			delay(100);
-		}
-
-		// could not connect
-		draw_status("0028");
+		delay(100);
 	}
-	while(cs == CS_FAILURE);
 
-	draw_status("0029");
+	draw_status("0025");
+	auto available_access_points = scan_access_points_get();
+	Serial.printf("Found %zu accesspoints\r\n", available_access_points.size());
+
+	draw_status("0026");
+	auto state = try_connect_init(wifi_targets, available_access_points, 300, progress_indicator);
+
+	Serial.println(F("Connecting"));
+	draw_status("0027");
+	for(;;) {
+		cs = try_connect_tick(state);
+
+		if (cs != CS_IDLE)
+			break;
+
+		Serial.print(F("."));
+		delay(100);
+	}
 
 	write_led(led_green,  LOW);
 	write_led(led_yellow, LOW);
 
-	draw_status("002f");
+	// could not connect
+	if (cs == CS_CONNECTED)
+		draw_status("0029");
+	else
+		draw_status("0028");
 }
 
 void loopw(void *) {
@@ -502,8 +499,8 @@ void setup() {
 
 	draw_status("0001");
 
-	uint8_t chipid[6] { 0x12 };  // TODO
-	//esp_read_mac(chipid, ESP_IF_WIFI_STA);  // TODO
+	uint64_t mac = ESP.getEfuseMac();
+	uint8_t *chipid = reinterpret_cast<uint8_t *>(&mac);
 	snprintf(name, sizeof name, "iESP-%02x%02x%02x%02x", chipid[2], chipid[3], chipid[4], chipid[5]);
 
 	draw_status("0002");
@@ -560,19 +557,19 @@ void setup() {
 #else
 	ETH.begin();  // ESP32-WT-ETH01, w32-eth01
 #endif
-	// setup_wifi();
+	setup_wifi();
 	init_logger(name);
 
 	draw_status("0008");
 
 	ntp.begin();
 
-	draw_status("0008a");
+	draw_status("0010");
 
 	esp_register_freertos_idle_hook_for_cpu(idle_task_0, 0);
 	esp_register_freertos_idle_hook_for_cpu(idle_task_1, 1);
 
-	draw_status("0009");
+	draw_status("0011");
 
 	snmp.setUDP(&snmp_udp);
 	snmp.addTimestampHandler(".1.3.6.1.2.1.1.3.0",            &hundredsofasecondcounter);
@@ -595,7 +592,7 @@ void setup() {
 	snmp.sortHandlers();
 	snmp.begin();
 
-	draw_status("000a");
+	draw_status("0012");
 
 	bs = new backend_sdcard(led_green, led_yellow);
 	draw_status("000c");
@@ -605,50 +602,55 @@ void setup() {
 		fail_flash();
 	}
 
-	draw_status("000d");
+	draw_status("0015");
 	scsi_dev = new scsi(bs, trim_level, &ios);
 
-	draw_status("000e");
+	draw_status("0020");
 	auto reset_reason = esp_reset_reason();
 	if (reset_reason != ESP_RST_POWERON)
 		errlog("Reset reason: %s (%d), software version %s", reset_name(reset_reason), reset_reason, version_str);
 	else
 		errlog("System (re-)started, software version %s", version_str);
 
-	draw_status("000f");
+	draw_status("0025");
 	esp_wifi_set_ps(WIFI_PS_NONE);
 
-	draw_status("0010");
+	draw_status("0028");
 	if (MDNS.begin(name))
 		MDNS.addService("iscsi", "tcp", 3260);
 	else
 		errlog("Failed starting mdns responder");
 
-	draw_status("0012");
+	draw_status("0030");
 	heap_caps_register_failed_alloc_callback(heap_caps_alloc_failed_hook);
 
-	draw_status("0011");
-	Serial.print("Waiting for Ethernet: ");
-	while(eth_connected == false) {
+	draw_status("0032");
+	write_led(led_green,  HIGH);
+	write_led(led_yellow, HIGH);
+	Serial.printf("Waiting %d seconds for Ethernet: ", eth_wait_seconds);
+	auto start = millis();
+	while(eth_connected == false && (millis() - start) / 1000 < eth_wait_seconds) {
 		delay(200);
 		Serial.print(".");
 	}
 
-//	setup_wifi();
-//	esp_wifi_set_ps(WIFI_PS_NONE);
+	if (!eth_connected)
+		Serial.println(F("Not listening on Ethernet"));
+	write_led(led_green,  HIGH);
+	write_led(led_yellow, HIGH);
 
-	draw_status("0011");
+	draw_status("0033");
 
 	enable_OTA();
 
-	draw_status("0013");
+	draw_status("0035");
 
 	if (setCpuFrequencyMhz(240))
 		Serial.println(F("Clock frequency set"));
 	else
 		Serial.println(F("Clock frequency NOT set"));
 
-	draw_status("0014");
+	draw_status("0050");
 
 	xTaskCreate(loopw, /* Function to implement the task */
 			"loop2", /* Name of the task */
@@ -665,32 +667,36 @@ void loop()
 {
 	draw_status("0201");
 	{
-		auto ip = ETH.localIP();
+		auto ipe = ETH.localIP();
+		auto ipw = WiFi.localIP();
 		char buffer[16];
-		snprintf(buffer, sizeof buffer, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+		if (ipe == IPAddress(uint32_t(0)))  // not connected to Ethernet? then use WiFi IP-address
+			snprintf(buffer, sizeof buffer, "%d.%d.%d.%d", ipw[0], ipw[1], ipw[2], ipw[3]);
+		else
+			snprintf(buffer, sizeof buffer, "%d.%d.%d.%d", ipe[0], ipe[1], ipe[2], ipe[3]);
 
 		Serial.print(F("Will listen on (in a bit): "));
 		Serial.println(buffer);
 
-		draw_status("0202");
+		draw_status("0205");
 		com_sockets c(buffer, 3260, &stop);
 		if (c.begin() == false) {
 			errlog("Failed to initialize communication layer!");
-			draw_status("0203");
+			draw_status("0210");
 			fail_flash();
 		}
 
-		draw_status("0204");
+		draw_status("0220");
 		server s(scsi_dev, &c, &is);
 		Serial.printf("Free heap space: %u\r\n", get_free_heap_space());
 		Serial.println(F("Go!"));
-		draw_status("0205");
+		draw_status("0230");
 		s.handler();
-		draw_status("0206");
+		draw_status("0250");
 	}
 
 	if (ota_update) {
-		draw_status("0300");
+		draw_status("0500");
 		errlog("Halting for OTA update");
 
 		for(;;)
