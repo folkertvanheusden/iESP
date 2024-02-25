@@ -11,11 +11,14 @@
 #include <esp_heap_caps.h>
 #include <esp_wifi.h>
 #include <ESPmDNS.h>
+#if defined(WEMOS32_ETH)
+#include <ESP32-ENC28J60.h>
+#else
 #include <ETH.h>
+#endif
 #include <LittleFS.h>
 #include <NTP.h>
 #include <SNMP_Agent.h>
-#include <U8x8lib.h>
 
 #include "backend-sdcard.h"
 #include "com-sockets.h"
@@ -34,9 +37,7 @@ scsi *scsi_dev { nullptr };
 
 int led_green  = 17;
 int led_yellow = 16;
-int led_red    = 15;
-
-U8X8_SSD1306_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE);
+int led_red    = 32;
 
 DynamicJsonDocument cfg(4096);
 #define IESP_CFG_FILE "/cfg-iESP.json"
@@ -67,8 +68,7 @@ NTP ntp(ntp_udp);
 long int draw_status_ts = 0;
 
 void draw_status(const std::string & str) {
-	u8x8.drawString(0, 22, str.c_str());
-	u8x8.refreshDisplay();
+// TODO update display
 	draw_status_ts = millis();
 }
 
@@ -378,8 +378,9 @@ void loopw(void *) {
 	int cu_count = 0;
 	for(;;) {
 		auto now = millis();
-		if (now - draw_status_ts > 5000)
-			u8x8.setPowerSave(1);
+		if (now - draw_status_ts > 5000) {
+// TODO powerdown display
+		}
 
 		ntp.update();
 		ArduinoOTA.handle();
@@ -480,9 +481,7 @@ void setup() {
 		yield();
 	Serial.setDebugOutput(true);
 
-	u8x8.begin();
-	u8x8.setPowerSave(0);
-	u8x8.setFont(u8x8_font_7x14_1x2_n);
+	// TODO init display
 
 	draw_status("0001");
 
@@ -529,7 +528,14 @@ void setup() {
 
 	set_hostname(name);
 	WiFi.onEvent(WiFiEvent);
-	ETH.begin(1, 16, 23, 18, ETH_PHY_LAN8720);
+	// ETH.begin(1, 16, 23, 18, ETH_PHY_LAN8720);  // ESP32-WT-ETH01, w32-eth01
+#if defined(WEMOS32_ETH)
+	//begin(int MISO_GPIO, int MOSI_GPIO, int SCLK_GPIO, int CS_GPIO, int INT_GPIO, int SPI_CLOCK_MHZ, int SPI_HOST, bool use_mac_from_efuse=false)
+	if (ETH.begin(19, 23, 18, 5, 4, 8, 1, true) == false) {  // ENC28J60
+		Serial.println(F("ENC28J60 failed"));
+		fail_flash();
+	}
+#endif
 	// setup_wifi();
 	init_logger(name);
 
