@@ -636,8 +636,8 @@ void setup() {
 
 	if (!eth_connected)
 		Serial.println(F("Not listening on Ethernet"));
-	write_led(led_green,  HIGH);
-	write_led(led_yellow, HIGH);
+	write_led(led_green,  LOW);
+	write_led(led_yellow, LOW);
 
 	draw_status("0033");
 
