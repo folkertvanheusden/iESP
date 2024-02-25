@@ -1,5 +1,6 @@
 #include <cstdarg>
 #include <cstdio>
+#include <optional>
 #if defined(ARDUINO)
 #include <NTP.h>
 #include <WiFi.h>

@@ -44,8 +44,8 @@ scsi::scsi(backend *const b, const int trim_level, io_stats_t *const is) : b(b),
 {
 #ifdef ESP32
 	uint64_t temp { 0 };
-	esp_efuse_mac_get_default(reinterpret_cast<uint8_t *>(&temp));
-	serial = myformat("%" PRIx64, temp);
+//	esp_efuse_mac_get_default(reinterpret_cast<uint8_t *>(&temp));
+	serial = myformat("%" PRIx64, 123);  // TODO
 #else
 	FILE *fh = fopen("/var/lib/dbus/machine-id", "r");
 	if (fh) {

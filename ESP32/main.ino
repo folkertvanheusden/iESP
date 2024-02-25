@@ -35,9 +35,15 @@ char name[16] { 0 };
 backend_sdcard  *bs { nullptr };
 scsi *scsi_dev { nullptr };
 
+#ifdef CONFIG_ETH_ENABLED
+int led_green  = 4;
+int led_yellow = 39;
+int led_red    = 35;
+#else
 int led_green  = 17;
 int led_yellow = 16;
 int led_red    = 32;
+#endif
 
 DynamicJsonDocument cfg(4096);
 #define IESP_CFG_FILE "/cfg-iESP.json"
@@ -485,8 +491,8 @@ void setup() {
 
 	draw_status("0001");
 
-	uint8_t chipid[6] { };
-	esp_read_mac(chipid, ESP_MAC_WIFI_STA);
+	uint8_t chipid[6] { 0x12 };  // TODO
+	//esp_read_mac(chipid, ESP_IF_WIFI_STA);  // TODO
 	snprintf(name, sizeof name, "iESP-%02x%02x%02x%02x", chipid[2], chipid[3], chipid[4], chipid[5]);
 
 	draw_status("0002");
@@ -528,11 +534,10 @@ void setup() {
 
 	set_hostname(name);
 	WiFi.onEvent(WiFiEvent);
-	// ETH.begin(1, 16, 23, 18, ETH_PHY_LAN8720);  // ESP32-WT-ETH01, w32-eth01
 #if defined(WEMOS32_ETH)
 	//begin(int MISO_GPIO, int MOSI_GPIO, int SCLK_GPIO, int CS_GPIO, int INT_GPIO, int SPI_CLOCK_MHZ, int SPI_HOST, bool use_mac_from_efuse=false)
 	bool eth_ok = false;
-	if (ETH.begin(19, 23, 18, 5, 4, 20, 1, true) == true) {  // ENC28J60
+	if (ETH.begin(19, 23, 18, 5, 4, 9, 1, false) == true) {  // ENC28J60
 		eth_ok = true;
 		Serial.println(F("ENC28J60 ok!"));
 	}
@@ -541,6 +546,8 @@ void setup() {
 		Serial.println(F("ENC28J60 failed"));
 		fail_flash();
 	}
+#else
+	ETH.begin();  // ESP32-WT-ETH01, w32-eth01
 #endif
 	// setup_wifi();
 	init_logger(name);
