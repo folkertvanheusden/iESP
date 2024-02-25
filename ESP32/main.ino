@@ -48,11 +48,13 @@ TaskHandle_t task2;
 WiFiUDP snmp_udp;
 SNMPAgent snmp("public", "private");
 uint32_t hundredsofasecondcounter = 0;
-io_stats_t is { };
+io_stats_t ios { };
+iscsi_stats_t is { };
 uint64_t core0_idle = 0;
 uint64_t core1_idle = 0;
 uint64_t max_idle_ticks = 1855000;
-int cpu_usage = 0.;
+int cpu_usage = 0;
+int ram_free_kb = 0;
 
 WiFiUDP ntp_udp;
 NTP ntp(ntp_udp);
@@ -341,8 +343,10 @@ void loopw(void *) {
 
 			cpu_usage = ((100 - core0_tick_temp * 100 / max_idle_ticks) + (100 - core1_tick_temp * 100 / max_idle_ticks)) / 2;
 
-			is.io_wait = is.io_wait_cur / 10000;  // uS to 1/100th
-			is.io_wait_cur = 0;
+			ram_free_kb = get_free_heap_space() / 1024;  // in kB
+
+			ios.io_wait = ios.io_wait_cur / 10000;  // uS to 1/100th
+			ios.io_wait_cur = 0;
 
 			cu_count = 0;
 		}
@@ -499,13 +503,21 @@ void setup() {
 	snmp.setUDP(&snmp_udp);
 	snmp.addTimestampHandler(".1.3.6.1.2.1.1.3.0",            &hundredsofasecondcounter);
 	snmp.addReadOnlyStaticStringHandler(".1.3.6.1.4.1.2021.13.15.1.1.2", "iESP");
-	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.3", &is.n_reads      );
-	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.4", &is.n_writes     );
-	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.5", &is.bytes_read   );
-	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.6", &is.bytes_written);
-	snmp.addCounter32Handler(".1.3.6.1.4.1.2021.11.54",       &is.io_wait      );
+	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.3", &ios.n_reads      );
+	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.4", &ios.n_writes     );
+	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.5", &ios.bytes_read   );
+	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.6", &ios.bytes_written);
+	snmp.addCounter32Handler(".1.3.6.1.4.1.2021.11.54",       &ios.io_wait      );
 	snmp.addIntegerHandler(".1.3.6.1.4.1.2021.11.9.0", &cpu_usage);
+	snmp.addIntegerHandler(".1.3.6.1.4.1.2021.4.11.0", &ram_free_kb);
 	snmp.addReadOnlyStaticStringHandler(".1.3.6.1.2.1.1.1.0", "iESP");
+	snmp.addReadOnlyIntegerHandler(".1.3.6.1.4.1.2021.100.1", 1);
+	snmp.addReadOnlyStaticStringHandler(".1.3.6.1.4.1.2021.100.2", version_str);
+	snmp.addReadOnlyStaticStringHandler(".1.3.6.1.4.1.2021.100.3", __DATE__);
+	snmp.addCounter32Handler("1.3.6.1.2.1.142.1.10.2.1.1", &is.iscsiSsnCmdPDUs);
+	snmp.addCounter64Handler("1.3.6.1.2.1.142.1.10.2.1.3", &is.iscsiSsnTxDataOctets);
+	snmp.addCounter64Handler("1.3.6.1.2.1.142.1.10.2.1.4", &is.iscsiSsnRxDataOctets);
+
 	snmp.sortHandlers();
 	snmp.begin();
 
@@ -520,7 +532,7 @@ void setup() {
 	}
 
 	draw_status("000d");
-	scsi_dev = new scsi(bs, trim_level, &is);
+	scsi_dev = new scsi(bs, trim_level, &ios);
 
 	draw_status("000e");
 	auto reset_reason = esp_reset_reason();
@@ -584,7 +596,7 @@ void loop()
 		}
 
 		draw_status("0204");
-		server s(scsi_dev, &c);
+		server s(scsi_dev, &c, &is);
 		Serial.printf("Free heap space: %u\r\n", get_free_heap_space());
 		Serial.println(F("Go!"));
 		draw_status("0205");

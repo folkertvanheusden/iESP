@@ -29,9 +29,10 @@
 
 extern std::atomic_bool stop;
 
-server::server(scsi *const s, com *const c):
+server::server(scsi *const s, com *const c, iscsi_stats_t *is):
 	s(s),
-	c(c)
+	c(c),
+	is(is)
 {
 }
 
@@ -51,6 +52,7 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 	}
 
 	bytes_recv += sizeof pdu;
+	is->iscsiSsnRxDataOctets += sizeof pdu;
 
 	iscsi_pdu_bhs bhs;
 	if (bhs.set(*s, pdu, sizeof pdu) == false) {
@@ -139,6 +141,7 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 			delete [] ahs_temp;
 
 			bytes_recv += ahs_len;
+			is->iscsiSsnRxDataOctets += ahs_len;
 		}
 
 		size_t data_length = pdu_obj->get_data_length();
@@ -158,6 +161,7 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 			delete [] data_temp;
 
 			bytes_recv += padded_data_length;
+			is->iscsiSsnRxDataOctets += padded_data_length;
 		}
 		
 		if (!ok) {
@@ -273,6 +277,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 				if (!ok)
 					errlog("server::push_response: sending PDU to peer failed (%s)", strerror(errno));
 				bytes_send += blobs.n;
+				is->iscsiSsnTxDataOctets += blobs.n;
 			}
 
 			delete [] blobs.data;
@@ -371,6 +376,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 				bytes_send += out.n;
 				offset += buffer.n;
 				block_nr += n_left;
+				is->iscsiSsnTxDataOctets += out.n;
 			}
 
 			if (buffer.n == 0)
@@ -470,6 +476,8 @@ void server::handler()
 					break;
 				}
 
+				is->iscsiSsnCmdPDUs++;
+
 #if defined(ESP32) || defined(RP2040W)
 				auto tx_start = micros();
 #endif
@@ -489,6 +497,7 @@ void server::handler()
 						errlog("server::handler: cannot transmit reject PDU");
 						break;
 					}
+					is->iscsiSsnTxDataOctets += reject.value().n;
 
 					DOLOG("server::handler: transmitted reject PDU\n");
 				}
