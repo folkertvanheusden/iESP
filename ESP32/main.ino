@@ -59,13 +59,7 @@ uint32_t hundredsofasecondcounter = 0;
 io_stats_t is { };
 uint64_t core0_idle = 0;
 uint64_t core1_idle = 0;
-#if defined(CONFIG_ESP32_DEFAULT_CPU_FREQ_240)
-const uint64_t max_idle_ticks = 1855000;
-#elif defined(CONFIG_ESP32_DEFAULT_CPU_FREQ_160)
-const uint64_t max_idle_ticks = 1233100;
-#else
-#error "Unsupported CPU frequency"
-#endif
+uint64_t max_idle_ticks = 1855000;
 int cpu_usage = 0.;
 
 WiFiUDP ntp_udp;
@@ -392,11 +386,24 @@ void loopw(void *) {
 		ArduinoOTA.handle();
 		hundredsofasecondcounter = now / 10;
 		snmp.loop();
+
 		vTaskDelay(100 / portTICK_PERIOD_MS);
 
-		cpu_usage = ((100 - core0_idle * 100 / max_idle_ticks) + (100 - core1_idle * 100 / max_idle_ticks)) / 2 * cu_count / 10;
-		if (++cu_count >= 10)
-			cu_count = 0, core0_idle = core1_idle = 0;
+		if (++cu_count >= 10) {
+			uint64_t core0_tick_temp = core0_idle;
+			uint64_t core1_tick_temp = core1_idle;
+			core0_idle = core1_idle = 0;
+
+			max_idle_ticks = std::max(core0_tick_temp, max_idle_ticks);
+			max_idle_ticks = std::max(core1_tick_temp, max_idle_ticks);
+
+			cpu_usage = ((100 - core0_tick_temp * 100 / max_idle_ticks) + (100 - core1_tick_temp * 100 / max_idle_ticks)) / 2;
+
+			is.io_wait = is.io_wait_cur / 10000;  // uS to 1/100th
+			is.io_wait_cur = 0;
+
+			cu_count = 0;
+		}
 	}
 }
 
@@ -570,6 +577,7 @@ void setup() {
 	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.4", &is.n_writes     );
 	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.5", &is.bytes_read   );
 	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.6", &is.bytes_written);
+	snmp.addCounter32Handler(".1.3.6.1.4.1.2021.11.54",       &is.io_wait      );
 	snmp.addIntegerHandler(".1.3.6.1.4.1.2021.11.9.0", &cpu_usage);
 	snmp.addReadOnlyStaticStringHandler(".1.3.6.1.2.1.1.1.0", "iESP");
 	snmp.sortHandlers();
@@ -622,6 +630,14 @@ void setup() {
 	enable_OTA();
 
 	draw_status("0013");
+
+	if (setCpuFrequencyMhz(240))
+		Serial.println(F("Clock frequency set"));
+	else
+		Serial.println(F("Clock frequency NOT set"));
+
+	draw_status("0014");
+
 	xTaskCreate(loopw, /* Function to implement the task */
 			"loop2", /* Name of the task */
 			10000,  /* Stack size in words */

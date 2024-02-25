@@ -36,6 +36,7 @@ The ESP32 version listens to SNMP (using the Arduino\_SNMP library).
 * .1.3.6.1.4.1.2021.13.15.1.1.5 - number of reads
 * .1.3.6.1.4.1.2021.13.15.1.1.6 - number of writes
 * .1.3.6.1.4.1.2021.11.9.0 - CPU usage
+* .1.3.6.1.4.1.2021.11.54 - I/O wait in 100ths of a second
 
 
 disclaimer

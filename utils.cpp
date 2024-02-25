@@ -3,10 +3,11 @@
 #include <string>
 #include <unistd.h>
 #include <vector>
-#if defined(RP2040W)
+#if defined(RP2040W) || defined(ARDUINO)
 #include <Arduino.h>
 #else
 #include <netdb.h>
+#include <time.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #endif
@@ -163,4 +164,16 @@ uint64_t get_uint64_t(const uint8_t *const p)
 uint32_t get_uint32_t(const uint8_t *const p)
 {
 	return (uint64_t(p[0]) << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
+}
+
+uint64_t get_micros()
+{
+#if defined(ARDUINO)
+	return micros();
+#else
+        struct timespec tv;
+        clock_gettime(CLOCK_REALTIME, &tv);
+
+        return uint64_t(tv.tv_sec) * uint64_t(1000 * 1000) + uint64_t(tv.tv_nsec / 1000);
+#endif
 }
