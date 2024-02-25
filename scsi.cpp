@@ -668,10 +668,10 @@ uint64_t scsi::get_block_size() const
 scsi::scsi_rw_result scsi::sync()
 {
 	if (locking_status() != l_locked_other) {  // locked by myself or not locked?
-		if (b->sync())
-			return rw_ok;
-
-		return rw_fail_general;
+		auto start = get_micros();
+		bool result = b->sync();
+		is->io_wait_cur += get_micros() - start;
+		return result ? rw_ok : rw_fail_general;
 	}
 
 	return rw_fail_locked;
@@ -688,6 +688,8 @@ scsi::scsi_rw_result scsi::write(const uint64_t block_nr, const uint32_t n_block
 	is->bytes_written += n_blocks * b->get_block_size();
 
 	if (locking_status() != l_locked_other) {  // locked by myself or not locked?
+		bool result = false;
+		auto start = get_micros();
 		if (trim_level == 2) {
 			bool is_zero = true;
 			auto bs = get_block_size();
@@ -701,18 +703,16 @@ scsi::scsi_rw_result scsi::write(const uint64_t block_nr, const uint32_t n_block
 			delete [] zero;
 
 			if (is_zero)
-				return b->trim(block_nr, n_blocks) ? rw_ok : rw_fail_general;
-			else if (b->write(block_nr, n_blocks, data))
-				return rw_ok;
-
-			return rw_fail_general;
+				result = b->trim(block_nr, n_blocks);
+			else
+				result = b->write(block_nr, n_blocks, data);
 		}
 		else {
-			if (b->write(block_nr, n_blocks, data))
-				return rw_ok;
+			result = b->write(block_nr, n_blocks, data);
 		}
 
-		return rw_fail_general;
+		is->io_wait_cur += get_micros() - start;
+		return result ? rw_ok : rw_fail_general;
 	}
 
 	return rw_fail_locked;
@@ -721,6 +721,7 @@ scsi::scsi_rw_result scsi::write(const uint64_t block_nr, const uint32_t n_block
 scsi::scsi_rw_result scsi::trim(const uint64_t block_nr, const uint32_t n_blocks)
 {
 	if (locking_status() != l_locked_other) {  // locked by myself or not locked?
+		auto start = get_micros();
 		if (trim_level == 0) {  // 0 = do not trim/unmap
 			scsi::scsi_rw_result rc = rw_ok;
 			uint8_t *zero = new uint8_t[get_block_size()]();
@@ -731,10 +732,14 @@ scsi::scsi_rw_result scsi::trim(const uint64_t block_nr, const uint32_t n_blocks
 			}
 			delete [] zero;
 
+			is->io_wait_cur += get_micros() - start;
+
 			return rc;
 		}
 		else {
-			if (b->trim(block_nr, n_blocks))
+			bool result = b->trim(block_nr, n_blocks);
+			is->io_wait_cur += get_micros() - start;
+			if (result)
 				return rw_ok;
 		}
 
@@ -750,10 +755,10 @@ scsi::scsi_rw_result scsi::read(const uint64_t block_nr, const uint32_t n_blocks
 	is->bytes_read += n_blocks * b->get_block_size();
 
 	if (locking_status() != l_locked_other) {  // locked by myself or not locked?
-		if (b->read(block_nr, n_blocks, data))
-			return rw_ok;
-
-		return rw_fail_general;
+		auto start = get_micros();
+		bool result = b->read(block_nr, n_blocks, data);
+		is->io_wait_cur += get_micros() - start;
+		return result ? rw_ok : rw_fail_general;
 	}
 	
 	return rw_fail_locked;

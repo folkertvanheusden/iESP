@@ -9,6 +9,7 @@ std::string myformat(const char *const fmt, ...);
 uint32_t get_free_heap_space();
 uint64_t get_uint64_t(const uint8_t *const p);
 uint32_t get_uint32_t(const uint8_t *const p);
+uint64_t get_micros();
 
 #if !defined(ARDUINO)
 std::string to_hex(const uint8_t *const in, const size_t n);
