@@ -9,17 +9,19 @@
 #define SD_CS 17
 #define SDCARD_SPI SPI1
 #else
+// Ethernet:
 // 18 SCK
 // 19 MISO
 // 23 MOSI
-#define SD_CS 5
+// 5  CS
+#endif
+
 #define FILENAME "test.dat"
 
-#define SD_MISO     2       // SD-Card
-#define SD_MOSI    15       // SD-Card
-#define SD_SCLK    14       // SD-Card
-#define SD_CS      12       // SD-Card
-#endif
+#define SD_MISO     2       // SD-Card, IO2
+#define SD_MOSI    15       // SD-Card, TD0
+#define SD_SCLK    14       // SD-Card, TMS
+#define SD_CS      12       // SD-Card, TDI
 
 extern void write_led(const int gpio, const int state);
 

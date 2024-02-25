@@ -11,11 +11,14 @@
 #include <esp_heap_caps.h>
 #include <esp_wifi.h>
 #include <ESPmDNS.h>
+#if defined(WEMOS32_ETH)
+#include <ESP32-ENC28J60.h>
+#else
 #include <ETH.h>
+#endif
 #include <LittleFS.h>
 #include <NTP.h>
 #include <SNMP_Agent.h>
-#include <U8x8lib.h>
 
 #include "backend-sdcard.h"
 #include "com-sockets.h"
@@ -32,11 +35,15 @@ char name[16] { 0 };
 backend_sdcard  *bs { nullptr };
 scsi *scsi_dev { nullptr };
 
+#ifdef CONFIG_ETH_ENABLED
+int led_green  = 4;
+int led_yellow = 39;
+int led_red    = 35;
+#else
 int led_green  = 17;
 int led_yellow = 16;
-int led_red    = 15;
-
-U8X8_SSD1306_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE);
+int led_red    = 32;
+#endif
 
 DynamicJsonDocument cfg(4096);
 #define IESP_CFG_FILE "/cfg-iESP.json"
@@ -67,8 +74,7 @@ NTP ntp(ntp_udp);
 long int draw_status_ts = 0;
 
 void draw_status(const std::string & str) {
-	u8x8.drawString(0, 22, str.c_str());
-	u8x8.refreshDisplay();
+// TODO update display
 	draw_status_ts = millis();
 }
 
@@ -94,10 +100,14 @@ void fail_flash() {
 	write_led(led_yellow, LOW);
 
 	for(;;) {
-//		digitalWrite(LED_BUILTIN, HIGH);
+#ifdef LED_BUILTIN
+		digitalWrite(LED_BUILTIN, HIGH);
+#endif
 		write_led(led_red, HIGH);
 		delay(200);
-//		digitalWrite(LED_BUILTIN, LOW);
+#ifdef LED_BUILTIN
+		digitalWrite(LED_BUILTIN, LOW);
+#endif
 		write_led(led_red, LOW);
 		delay(200);
 	}
@@ -177,6 +187,11 @@ void enable_OTA() {
 }
 
 volatile bool eth_connected = false;
+
+bool is_network_up()
+{
+	return eth_connected;
+}
 
 void WiFiEvent(WiFiEvent_t event)
 {
@@ -289,9 +304,13 @@ void heap_caps_alloc_failed_hook(size_t requested_size, uint32_t caps, const cha
 }
 
 bool progress_indicator(const int nr, const int mx, const std::string & which) {
-//	digitalWrite(LED_BUILTIN, HIGH);
+#ifdef LED_BUILTIN
+	digitalWrite(LED_BUILTIN, HIGH);
+#endif
 	printf("%3.2f%%: %s\r\n", nr * 100. / mx, which.c_str());
-//	digitalWrite(LED_BUILTIN, LOW);
+#ifdef LED_BUILTIN
+	digitalWrite(LED_BUILTIN, LOW);
+#endif
 
 	return true;
 }
@@ -317,9 +336,13 @@ void setup_wifi() {
 
 		draw_status("0024");
 		while(scan_access_points_wait() == false) {
-//			digitalWrite(LED_BUILTIN, HIGH);
+#ifdef LED_BUILTIN
+			digitalWrite(LED_BUILTIN, HIGH);
+#endif
 			Serial.print(F("."));
-//			digitalWrite(LED_BUILTIN, LOW);
+#ifdef LED_BUILTIN
+			digitalWrite(LED_BUILTIN, LOW);
+#endif
 			delay(100);
 		}
 
@@ -361,8 +384,9 @@ void loopw(void *) {
 	int cu_count = 0;
 	for(;;) {
 		auto now = millis();
-		if (now - draw_status_ts > 5000)
-			u8x8.setPowerSave(1);
+		if (now - draw_status_ts > 5000) {
+// TODO powerdown display
+		}
 
 		ntp.update();
 		ArduinoOTA.handle();
@@ -463,14 +487,12 @@ void setup() {
 		yield();
 	Serial.setDebugOutput(true);
 
-	u8x8.begin();
-	u8x8.setPowerSave(0);
-	u8x8.setFont(u8x8_font_7x14_1x2_n);
+	// TODO init display
 
 	draw_status("0001");
 
-	uint8_t chipid[6] { };
-	esp_read_mac(chipid, ESP_MAC_WIFI_STA);
+	uint8_t chipid[6] { 0x12 };  // TODO
+	//esp_read_mac(chipid, ESP_IF_WIFI_STA);  // TODO
 	snprintf(name, sizeof name, "iESP-%02x%02x%02x%02x", chipid[2], chipid[3], chipid[4], chipid[5]);
 
 	draw_status("0002");
@@ -484,7 +506,9 @@ void setup() {
 
 	draw_status("0003");
 
-//	pinMode(LED_BUILTIN, OUTPUT);
+#ifdef LED_BUILTIN
+	pinMode(LED_BUILTIN, OUTPUT);
+#endif
 	if (led_green != -1)
 		pinMode(led_green, OUTPUT);
 	if (led_yellow != -1)
@@ -509,11 +533,23 @@ void setup() {
 	}
 
 	set_hostname(name);
-
 	WiFi.onEvent(WiFiEvent);
-	ETH.begin(1, 16, 23, 18, ETH_PHY_LAN8720);
+#if defined(WEMOS32_ETH)
+	//begin(int MISO_GPIO, int MOSI_GPIO, int SCLK_GPIO, int CS_GPIO, int INT_GPIO, int SPI_CLOCK_MHZ, int SPI_HOST, bool use_mac_from_efuse=false)
+	bool eth_ok = false;
+	if (ETH.begin(19, 23, 18, 5, 4, 9, 1, false) == true) {  // ENC28J60
+		eth_ok = true;
+		Serial.println(F("ENC28J60 ok!"));
+	}
 
-//	setup_wifi();
+	if (!eth_ok) {
+		Serial.println(F("ENC28J60 failed"));
+		fail_flash();
+	}
+#else
+	ETH.begin();  // ESP32-WT-ETH01, w32-eth01
+#endif
+	// setup_wifi();
 	init_logger(name);
 
 	draw_status("0008");
@@ -580,6 +616,8 @@ void setup() {
 
 //	setup_wifi();
 //	esp_wifi_set_ps(WIFI_PS_NONE);
+
+	draw_status("0011");
 
 	enable_OTA();
 
