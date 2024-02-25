@@ -37,7 +37,7 @@ scsi *scsi_dev { nullptr };
 
 #ifdef CONFIG_ETH_ENABLED
 int led_green  = 4;
-int led_yellow = 39;
+int led_yellow = 5;
 int led_red    = 35;
 #else
 int led_green  = 17;
