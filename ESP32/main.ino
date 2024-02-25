@@ -531,7 +531,13 @@ void setup() {
 	// ETH.begin(1, 16, 23, 18, ETH_PHY_LAN8720);  // ESP32-WT-ETH01, w32-eth01
 #if defined(WEMOS32_ETH)
 	//begin(int MISO_GPIO, int MOSI_GPIO, int SCLK_GPIO, int CS_GPIO, int INT_GPIO, int SPI_CLOCK_MHZ, int SPI_HOST, bool use_mac_from_efuse=false)
-	if (ETH.begin(19, 23, 18, 5, 4, 8, 1, true) == false) {  // ENC28J60
+	bool eth_ok = false;
+	if (ETH.begin(19, 23, 18, 5, 4, 20, 1, true) == true) {  // ENC28J60
+		eth_ok = true;
+		Serial.println(F("ENC28J60 ok!"));
+	}
+
+	if (!eth_ok) {
 		Serial.println(F("ENC28J60 failed"));
 		fail_flash();
 	}
