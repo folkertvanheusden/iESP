@@ -2,5 +2,4 @@
 - configurable:
   - async writes
   - name of disk-image on SD card
-- ntp upstream for logging timestamps?
-- grouperen van writes? dus met tcp_cork
+- does not send syslog when connected to wifi only
