@@ -1,3 +1,6 @@
+#ifdef TEENSY4_1
+#include <Arduino.h>
+#endif
 #include <cassert>
 #include <cinttypes>
 #include <cstdio>
@@ -47,7 +50,11 @@ scsi::scsi(backend *const b, const int trim_level, io_stats_t *const is) : b(b),
 {
 #ifdef ESP32
 	uint64_t temp = ESP.getEfuseMac();
-	serial = myformat("%" PRIx64, 123);
+	serial = myformat("%" PRIx64, temp);
+#elif defined(TEENSY4_1)
+        uint32_t m1 = HW_OCOTP_MAC1;
+        uint32_t m2 = HW_OCOTP_MAC0;
+	serial = myformat("%08x%08x", m1, m2);
 #else
 	FILE *fh = fopen("/var/lib/dbus/machine-id", "r");
 	if (fh) {
