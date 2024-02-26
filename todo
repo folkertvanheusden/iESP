@@ -3,8 +3,3 @@
   - async writes
   - name of disk-image on SD card
 - does not send syslog when connected to wifi only
- // Add Settable Handlers
-    snmp.addReadWriteStringHandler(oidSysContact, &sysContact, 25, true);
-    snmp.addReadWriteStringHandler(oidSysName, &sysName, 25, true);
-    snmp.addReadWriteStringHandler(oidSysLocation, &sysLocation, 25, true);
- store in LittleFS configurationfile
