@@ -573,7 +573,9 @@ void setup() {
 	
 	if (load_configuration() == false) {
 		Serial.println(F("Failed to load configuration, using defaults!"));
-		ls(LittleFS, "/");
+#if defined(TEENSY4_1)
+		ls(LittleFS_Program, "/");
+#endif
 		draw_status("0007");
 		fail_flash();
 	}
@@ -672,8 +674,8 @@ void setup() {
 
 	draw_status("0028");
 #if defined(TEENSY4_1)
-	MDNS.begin(name);
-	MDNS.addService("iscsi", "tcp", 3260);
+	MDNS.begin(name, 1);
+	MDNS.addService("_iscsi._tcp", 3260);
 #else
 	if (MDNS.begin(name))
 		MDNS.addService("iscsi", "tcp", 3260);
