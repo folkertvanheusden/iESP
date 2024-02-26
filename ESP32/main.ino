@@ -3,17 +3,21 @@
 
 #include <atomic>
 #include <ArduinoJson.h>
+#if !defined(TEENSY4_1)
 #include <ArduinoOTA.h>
+#endif
 #include <csignal>
 #include <cstdio>
+#if !defined(TEENSY4_1)
 #include <esp_debug_helpers.h>
 #include <esp_freertos_hooks.h>
 #include <esp_heap_caps.h>
 #include <esp_wifi.h>
 #include <ESPmDNS.h>
+#endif
 #if defined(WEMOS32_ETH)
 #include <ESP32-ENC28J60.h>
-#else
+#elif !defined(TEENSY4_1)
 #include <ETH.h>
 #endif
 #include <LittleFS.h>
@@ -25,7 +29,12 @@
 #include "log.h"
 #include "server.h"
 #include "utils.h"
+#if defined(TEENSY4_1)
+#include <NativeEthernet.h>
+#include <NativeEthernetUdp.h>
+#else
 #include "wifi.h"
+#endif
 #include "version.h"
 
 
@@ -51,22 +60,31 @@ DynamicJsonDocument cfg(4096);
 std::vector<std::pair<std::string, std::string> > wifi_targets;
 int trim_level = 0;
 
+#if !defined(TEENSY4_1)
 TaskHandle_t task2;
+#endif
 
+#if defined(TEENSY4_1)
+EthernetUDP snmp_udp;
+EthernetUDP ntp_udp;
+#else
 WiFiUDP snmp_udp;
+WiFiUDP ntp_udp;
+#endif
 SNMPAgent snmp("public", "private");
+NTP ntp(ntp_udp);
+
 uint32_t hundredsofasecondcounter = 0;
 io_stats_t ios { };
 iscsi_stats_t is { };
+#if !defined(TEENSY4_1)
 uint64_t core0_idle = 0;
 uint64_t core1_idle = 0;
 uint64_t max_idle_ticks = 1855000;
+#endif
 int cpu_usage = 0;
 int ram_free_kb = 0;
 int eth_wait_seconds = 0;
-
-WiFiUDP ntp_udp;
-NTP ntp(ntp_udp);
 
 long int draw_status_ts = 0;
 
@@ -75,6 +93,7 @@ void draw_status(const std::string & str) {
 	draw_status_ts = millis();
 }
 
+#if !defined(TEENSY4_1)
 bool idle_task_0() {
 	core0_idle++;
 	return false;
@@ -84,6 +103,7 @@ bool idle_task_1() {
 	core1_idle++;
 	return false;
 }
+#endif
 
 void write_led(const int gpio, const int state) {
 	if (gpio != -1)
@@ -121,6 +141,7 @@ bool load_configuration() {
 		return false;
 	}
 
+#if !defined(TEENSY4_1)
 	JsonArray w_aps_ar = cfg["wifi"].as<JsonArray>();
 	for(JsonObject p: w_aps_ar) {
 		auto ssid = p["ssid"];
@@ -131,6 +152,7 @@ bool load_configuration() {
 
 		wifi_targets.push_back({ ssid, psk });
 	}
+#endif
 
 	syslog_host = cfg["syslog-host"].as<const char *>();
 	if (syslog_host.value().empty())
@@ -144,16 +166,19 @@ bool load_configuration() {
 
 	data_file.close();
 
+#if !defined(TEENSY4_1)
 	auto n = wifi_targets.size();
 	Serial.printf("Loaded configuration parameters for %zu WiFi access points\r\n", n);
 	if (n == 0) {
 		Serial.println(F("Cannot continue without WiFi access"));
 		fail_flash();
 	}
+#endif
 
 	return true;
 }
 
+#if !defined(TEENSY4_1)
 void enable_OTA() {
 	ArduinoOTA.setPort(3232);
 	ArduinoOTA.setHostname(name);
@@ -184,6 +209,7 @@ void enable_OTA() {
 
 	Serial.println(F("OTA ready"));
 }
+#endif
 
 volatile bool eth_connected = false;
 
@@ -192,6 +218,7 @@ bool is_network_up()
 	return eth_connected;
 }
 
+#if !defined(TEENSY4_1)
 void WiFiEvent(WiFiEvent_t event)
 {
 	write_led(led_red, HIGH);
@@ -407,8 +434,9 @@ void loopw(void *) {
 		}
 	}
 }
+#endif
 
-void ls(fs::FS &fs, const String & name)
+void ls(LittleFS::FS &fs, const String & name)
 {
 	Serial.print(F("Directory: "));
 	Serial.println(name);
@@ -440,6 +468,7 @@ void ls(fs::FS &fs, const String & name)
 	dir.close();
 }
 
+#if !defined(TEENSY4_1)
 const char *reset_name(const esp_reset_reason_t rr)
 {
 	switch(rr) {
@@ -488,20 +517,29 @@ const char *reset_name(const esp_reset_reason_t rr)
 
 	return nullptr;
 }
+#endif
 
 void setup() {
 	Serial.begin(115200);
+#if !defined(TEENSY4_1)
 	while(!Serial)
 		yield();
 	Serial.setDebugOutput(true);
+#endif
 
 	// TODO init display
 
 	draw_status("0001");
 
+#if defined(TEENSY4_1)
+	uint8_t mac[6] { 0 };
+	teensyMAC(mac);
+	snprintf(name, sizeof name, "iTEENSY-%02x%02x%02x%02x", mac[2], mac[3], mac[4], mac[5]);
+#else
 	uint64_t mac = ESP.getEfuseMac();
 	uint8_t *chipid = reinterpret_cast<uint8_t *>(&mac);
 	snprintf(name, sizeof name, "iESP-%02x%02x%02x%02x", chipid[2], chipid[3], chipid[4], chipid[5]);
+#endif
 
 	draw_status("0002");
 
@@ -540,8 +578,10 @@ void setup() {
 		fail_flash();
 	}
 
+#if !defined(TEENSY4_1)
 	set_hostname(name);
 	WiFi.onEvent(WiFiEvent);
+#endif
 #if defined(WEMOS32_ETH)
 	//begin(int MISO_GPIO, int MOSI_GPIO, int SCLK_GPIO, int CS_GPIO, int INT_GPIO, int SPI_CLOCK_MHZ, int SPI_HOST, bool use_mac_from_efuse=false)
 	bool eth_ok = false;
@@ -554,10 +594,21 @@ void setup() {
 		Serial.println(F("ENC28J60 failed"));
 		fail_flash();
 	}
+#elif defined(TEENSY4_1)
+	if (Ethernet.begin(mac) == 0) {
+		Serial.println(F("Failed to configure Ethernet using DHCP"));
+
+		if (Ethernet.hardwareStatus() == EthernetNoHardware)
+			Serial.println(F("Ethernet shield was not found"));
+		else if (Ethernet.linkStatus() == LinkOFF)
+			Serial.println(F("Ethernet cable is not connected"));
+	}
 #else
 	ETH.begin();  // ESP32-WT-ETH01, w32-eth01
 #endif
+#if !defined(TEENSY4_1)
 	setup_wifi();
+#endif
 	init_logger(name);
 
 	draw_status("0008");
@@ -566,8 +617,10 @@ void setup() {
 
 	draw_status("0010");
 
+#if !defined(TEENSY4_1)
 	esp_register_freertos_idle_hook_for_cpu(idle_task_0, 0);
 	esp_register_freertos_idle_hook_for_cpu(idle_task_1, 1);
+#endif
 
 	draw_status("0011");
 
@@ -605,6 +658,7 @@ void setup() {
 	draw_status("0015");
 	scsi_dev = new scsi(bs, trim_level, &ios);
 
+#if !defined(TEENSY4_1)
 	draw_status("0020");
 	auto reset_reason = esp_reset_reason();
 	if (reset_reason != ESP_RST_POWERON)
@@ -614,13 +668,20 @@ void setup() {
 
 	draw_status("0025");
 	esp_wifi_set_ps(WIFI_PS_NONE);
+#endif
 
 	draw_status("0028");
+#if defined(TEENSY4_1)
+	MDNS.begin(name);
+	MDNS.addService("iscsi", "tcp", 3260);
+#else
 	if (MDNS.begin(name))
 		MDNS.addService("iscsi", "tcp", 3260);
 	else
 		errlog("Failed starting mdns responder");
+#endif
 
+#if !defined(TEENSY4_1)
 	draw_status("0030");
 	heap_caps_register_failed_alloc_callback(heap_caps_alloc_failed_hook);
 
@@ -638,20 +699,19 @@ void setup() {
 		Serial.println(F("Not listening on Ethernet"));
 	write_led(led_green,  LOW);
 	write_led(led_yellow, LOW);
+#endif
 
+#if !defined(TEENSY4_1)
 	draw_status("0033");
-
 	enable_OTA();
 
 	draw_status("0035");
-
 	if (setCpuFrequencyMhz(240))
 		Serial.println(F("Clock frequency set"));
 	else
 		Serial.println(F("Clock frequency NOT set"));
 
 	draw_status("0050");
-
 	xTaskCreate(loopw, /* Function to implement the task */
 			"loop2", /* Name of the task */
 			10000,  /* Stack size in words */
@@ -659,6 +719,7 @@ void setup() {
 			127,  /* Priority of the task */
 			&task2  /* Task handle. */
 		   );
+#endif
 
 	draw_status("0100");
 }
@@ -667,13 +728,18 @@ void loop()
 {
 	draw_status("0201");
 	{
+		char buffer[16];
+#if defined(TEENSY4_1)
+		auto ip = Ethernet.localIP();
+		snprintf(buffer, sizeof buffer, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+#else
 		auto ipe = ETH.localIP();
 		auto ipw = WiFi.localIP();
-		char buffer[16];
 		if (ipe == IPAddress(uint32_t(0)))  // not connected to Ethernet? then use WiFi IP-address
 			snprintf(buffer, sizeof buffer, "%d.%d.%d.%d", ipw[0], ipw[1], ipw[2], ipw[3]);
 		else
 			snprintf(buffer, sizeof buffer, "%d.%d.%d.%d", ipe[0], ipe[1], ipe[2], ipe[3]);
+#endif
 
 		Serial.print(F("Will listen on (in a bit): "));
 		Serial.println(buffer);

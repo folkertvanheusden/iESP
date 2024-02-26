@@ -1,4 +1,8 @@
 #include <fcntl.h>
+#if !defined(TEENSY4_1)  // the teensyh version does not use threads
+#include <mutex>
+#endif
+#include <optional>
 #include <unistd.h>
 #include <sys/stat.h>
 
@@ -54,7 +58,9 @@ bool backend_sdcard::reinit(const bool close_first)
 		Serial.println(F("Init SD-card backend..."));
 	}
 
+#if !defined(TEENSY4_1)
 	SPI.begin(SD_SCLK, SD_MISO, SD_MOSI, SD_CS);
+#endif
 
 	bool ok = false;
 	for(int sp=50; sp>=14; sp -= 4) {
@@ -110,7 +116,9 @@ bool backend_sdcard::sync()
 
 	n_syncs++;
 
+#if !defined(TEENSY4_1)
 	std::lock_guard<std::mutex> lck(serial_access_lock);
+#endif
 
 	if (file.sync() == false)
 		errlog("SD card backend: sync failed");
@@ -138,7 +146,9 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 	uint64_t iscsi_block_size = get_block_size();
 	uint64_t byte_address     = block_nr * iscsi_block_size;  // iSCSI to bytes
 
+#if !defined(TEENSY4_1)
 	std::lock_guard<std::mutex> lck(serial_access_lock);
+#endif
 
 	if (file.seekSet(byte_address) == false) {
 		errlog("Cannot seek to position");
@@ -195,7 +205,9 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 	uint64_t iscsi_block_size = get_block_size();
 	uint64_t byte_address     = block_nr * iscsi_block_size;  // iSCSI to bytes
 
+#if !defined(TEENSY4_1)
 	std::lock_guard<std::mutex> lck(serial_access_lock);
+#endif
 
 	if (file.seekSet(byte_address) == false) {
 		errlog("Cannot seek to position");

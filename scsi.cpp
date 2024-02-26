@@ -768,6 +768,7 @@ scsi::scsi_rw_result scsi::read(const uint64_t block_nr, const uint32_t n_blocks
 
 scsi::scsi_lock_status scsi::reserve_device()
 {
+#if !defined(TEENSY4_1)
 	std::unique_lock lck(locked_by_lock);
 
 	auto cur_id = std::this_thread::get_id();
@@ -780,12 +781,15 @@ scsi::scsi_lock_status scsi::reserve_device()
 	}
 
 	locked_by = std::this_thread::get_id();
-
+#endif
 	return l_locked;
 }
 
 bool scsi::unlock_device()
 {
+#if defined(TEENSY4_1)
+	return true;
+#else
 	std::unique_lock lck(locked_by_lock);
 
 	if (locked_by.has_value() == false) {
@@ -801,10 +805,14 @@ bool scsi::unlock_device()
 	errlog("scsi::unlock_device: device is locked by someone else!");
 
 	return false;
+#endif
 }
 
 scsi::scsi_lock_status scsi::locking_status()
 {
+#if defined(TEENSY4_1)
+	return l_not_locked;  // TODO
+#else
 	std::unique_lock lck(locked_by_lock);
 
 	if (locked_by.has_value() == false)
@@ -814,6 +822,7 @@ scsi::scsi_lock_status scsi::locking_status()
 		return l_locked;
 
 	return l_locked_other;
+#endif
 }
 
 std::vector<uint8_t> scsi::error_reserve_6() const

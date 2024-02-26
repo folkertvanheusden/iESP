@@ -1,19 +1,28 @@
 #include <cstdarg>
 #include <cstdio>
 #include <optional>
+#include <string>
 #if defined(ARDUINO)
 #include <NTP.h>
+#if defined(TEENSY4_1)
+#include <NativeEthernet.h>
+#include <NativeEthernetUdp.h>
+#else
 #include <WiFi.h>
 #include <WiFiUdp.h>
+#endif
 #else
-#include <string>
 #include <syslog.h>
 #endif
 
 
 #if defined(ARDUINO)
 std::optional<std::string> syslog_host;
+#if defined(TEENSY4_1)
+EthernetUDP UDP;
+#else
 WiFiUDP UDP;
+#endif
 #endif
 std::string name { "?" };
 

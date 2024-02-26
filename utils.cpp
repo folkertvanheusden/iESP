@@ -177,3 +177,17 @@ uint64_t get_micros()
         return uint64_t(tv.tv_sec) * uint64_t(1000 * 1000) + uint64_t(tv.tv_nsec / 1000);
 #endif
 }
+
+#if defined(TEENSY4_1)
+void teensyMAC(uint8_t *const mac)
+{
+	uint32_t m1 = HW_OCOTP_MAC1;
+	uint32_t m2 = HW_OCOTP_MAC0;
+	mac[0] = m1 >> 8;
+	mac[1] = m1 >> 0;
+	mac[2] = m2 >> 24;
+	mac[3] = m2 >> 16;
+	mac[4] = m2 >> 8;
+	mac[5] = m2 >> 0;
+}
+#endif

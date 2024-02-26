@@ -1,7 +1,9 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
+#if !defined(TEENSY4_1)
 #include <mutex>
+#endif
 #include <thread>
 #include <utility>
 
@@ -50,8 +52,10 @@ private:
 	const int         trim_level { 1   };
 	io_stats_t *const is     { nullptr };
 
+#if !defined(TEENSY4_1)
 	std::mutex locked_by_lock;
 	std::optional<std::thread::id> locked_by;
+#endif
 
 	std::optional<std::vector<uint8_t> > validate_request(const uint64_t lba, const uint32_t n_blocks) const;
 

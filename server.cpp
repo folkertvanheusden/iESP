@@ -1,19 +1,21 @@
-#if defined(ESP32) || defined(RP2040W)
+#if defined(ESP32) || defined(RP2040W) || defined(TEENSY4_1)
 #include <Arduino.h>
+#ifndef TEENSY4_1
 #include <WiFi.h>
 #include <esp_pthread.h>
+#endif
 #endif
 #include <atomic>
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
-#if !defined(ESP32) && !defined(RP2040W)
+#if !defined(ESP32) && !defined(RP2040W) && !defined(TEENSY4_1)
 #include <poll.h>
 #endif
 #include <thread>
 #include <unistd.h>
-#if !defined(RP2040W)
+#if !defined(RP2040W) && !defined(TEENSY4_1)
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -436,6 +438,7 @@ void server::handler()
 			continue;
 		}
 
+#if !defined(TEENSY4_1)
 		for(size_t i=0; i<threads.size();) {
 			if (*threads.at(i).second) {
 				DOLOG("server::handler: thread cleaned up\n");
@@ -452,6 +455,7 @@ void server::handler()
 		std::atomic_bool *flag = new std::atomic_bool(false);
 
 		std::thread *th = new std::thread([=, this]() {
+#endif
 			std::string endpoint = cc->get_endpoint_name();
 
 #if defined(ESP32) || defined(RP2040W)
@@ -552,10 +556,12 @@ void server::handler()
 			delete cc;
 			delete ses;
 
+#if !defined(TEENSY4_1)
 			*flag = true;
 		});
 
 		threads.push_back({ th, flag });
+#endif
 
 #if defined(ESP32)
 		Serial.printf("Heap space: %u\r\n", get_free_heap_space());

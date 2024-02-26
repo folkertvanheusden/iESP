@@ -1,4 +1,6 @@
+#if !defined(TEENSY4_1)
 #include <mutex>
+#endif
 #include <SdFat.h>
 #include <string>
 
@@ -15,7 +17,9 @@ private:
 	const int led_read    { -1 };
 	const int led_write   { -1 };
 
+#if !defined(TEENSY4_1)
 	std::mutex serial_access_lock;
+#endif
 
 	bool reinit(const bool close_first);
 

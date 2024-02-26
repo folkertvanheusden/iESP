@@ -40,7 +40,7 @@ void my_getrandom(void *const tgt, const size_t n)
 	while(i<n)
 		reinterpret_cast<uint8_t *>(tgt)[i++] = get_rand_32();
 }
-#else
+#elif defined(ESP32)
 #include <esp_random.h>
 
 void init_my_getrandom()
@@ -50,5 +50,19 @@ void init_my_getrandom()
 void my_getrandom(void *const tgt, const size_t n)
 {
 	esp_fill_random(tgt, n);
+}
+#elif defined(TEENSY4_1)
+#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
+void init_my_getrandom()
+{
+}
+
+void my_getrandom(void *const tgt, const size_t n)
+{
+	// TODO
+	for(size_t i=0; i<n; i++)
+		reinterpret_cast<uint8_t *>(tgt)[i] = rand();
 }
 #endif
