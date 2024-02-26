@@ -587,20 +587,20 @@ void setup() {
 
 	snmp.setUDP(&snmp_udp);
 	snmp.addTimestampHandler(".1.3.6.1.2.1.1.3.0",            &hundredsofasecondcounter);
-	snmp.addReadOnlyStaticStringHandler(".1.3.6.1.4.1.2021.13.15.1.1.2", "iESP");
+	snmp.addReadOnlyStaticStringHandler(".1.3.6.1.4.1.2021.13.15.1.1.2", "iESP" );
 	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.3", &ios.n_reads      );
 	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.4", &ios.n_writes     );
 	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.5", &ios.bytes_read   );
 	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.6", &ios.bytes_written);
 	snmp.addCounter32Handler(".1.3.6.1.4.1.2021.11.54",       &ios.io_wait      );
-	snmp.addIntegerHandler(".1.3.6.1.4.1.2021.11.9.0",  &cpu_usage           );
-	snmp.addIntegerHandler(".1.3.6.1.4.1.2021.4.11.0",  &ram_free_kb         );
-	snmp.addIntegerHandler(".1.3.6.1.4.1.2021.9.1.9.1", &percentage_diskspace);
+	snmp.addIntegerHandler  (".1.3.6.1.4.1.2021.11.9.0",      &cpu_usage        );
+	snmp.addIntegerHandler  (".1.3.6.1.4.1.2021.4.11.0",      &ram_free_kb      );
+	snmp.addIntegerHandler(".1.3.6.1.4.1.2021.9.1.9.1",    &percentage_diskspace);
 	snmp.addReadOnlyStaticStringHandler(".1.3.6.1.2.1.1.1.0", "iESP");
 	snmp.addReadOnlyIntegerHandler(".1.3.6.1.4.1.2021.100.1", 1);
 	snmp.addReadOnlyStaticStringHandler(".1.3.6.1.4.1.2021.100.2", version_str);
 	snmp.addReadOnlyStaticStringHandler(".1.3.6.1.4.1.2021.100.3", __DATE__);
-	snmp.addCounter32Handler("1.3.6.1.2.1.142.1.10.2.1.1", &is.iscsiSsnCmdPDUs);
+	snmp.addCounter32Handler("1.3.6.1.2.1.142.1.10.2.1.1", &is.iscsiSsnCmdPDUs  );
 	snmp.addCounter64Handler("1.3.6.1.2.1.142.1.10.2.1.3", &is.iscsiSsnTxDataOctets);
 	snmp.addCounter64Handler("1.3.6.1.2.1.142.1.10.2.1.4", &is.iscsiSsnRxDataOctets);
 
