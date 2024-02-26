@@ -68,23 +68,20 @@ DynamicJsonDocument cfg(4096);
 std::vector<std::pair<std::string, std::string> > wifi_targets;
 int trim_level = 0;
 
-#if !defined(TEENSY4_1)
-TaskHandle_t task2;
-#endif
-
 #if defined(TEENSY4_1)
 LittleFS_Program myfs;
-#else
-LittleFS myfs;
-#endif
 
-#if defined(TEENSY4_1)
 EthernetUDP snmp_udp;
 EthernetUDP ntp_udp;
 #else
+LittleFS myfs;
+
+TaskHandle_t task2;
+
 WiFiUDP snmp_udp;
 WiFiUDP ntp_udp;
 #endif
+
 SNMPAgent snmp("public", "private");
 NTP ntp(ntp_udp);
 
