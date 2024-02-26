@@ -3,3 +3,6 @@
   - async writes
   - name of disk-image on SD card
 - does not send syslog when connected to wifi only
+- Percentage of space used on disk: .1.3.6.1.4.1.2021.9.1.9.1: retrieve 100 blocks from disk with semi-random offset and check if contents is 0x00
+   perc = int(size / 100)
+   offset = std::min(std::max(0, perc * 100 + random(-5, 5) * perc), 100);
