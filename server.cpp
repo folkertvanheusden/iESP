@@ -1,7 +1,6 @@
 #if defined(ESP32) || defined(RP2040W)
 #include <Arduino.h>
 #include <WiFi.h>
-#include <esp_pthread.h>
 #endif
 #include <atomic>
 #include <cassert>
@@ -420,13 +419,6 @@ iscsi_response_parameters *server::select_parameters(iscsi_pdu_bhs *const pdu, s
 
 void server::handler()
 {
-#if defined(ESP32)
-	esp_pthread_cfg_t cfg = esp_pthread_get_default_config();
-	Serial.printf("Original pthread stack size: %d\r\n", cfg.stack_size);
-	cfg.stack_size = 8192;
-	esp_pthread_set_cfg(&cfg);
-#endif
-
 	std::vector<std::pair<std::thread *, std::atomic_bool *> > threads;
 
 	while(!stop) {

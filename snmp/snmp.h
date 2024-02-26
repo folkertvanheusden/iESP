@@ -9,6 +9,8 @@
 #include "snmp_data.h"
 
 
+#define SNMP_RECV_BUFFER_SIZE 1600
+
 typedef struct _oid_req_t_ {
 	std::vector<std::string> oids;
 	uint64_t req_id { 0 };
@@ -30,6 +32,7 @@ private:
 #elif defined(TEENSY4_1)
 	EthernetUDP      handle;
 #endif
+	uint8_t         *buffer { nullptr };  // for receiving requests
 	std::thread     *th { nullptr };
 	std::atomic_bool *const stop { nullptr };
 

@@ -16,6 +16,9 @@
 #else
 #include <ETH.h>
 #endif
+#if defined(ESP32)
+#include <esp_pthread.h>
+#endif
 #include <LittleFS.h>
 #include <NTP.h>
 
@@ -48,6 +51,10 @@ int led_green  = -1;
 int led_yellow = -1;
 int led_red    = -1;
 #endif
+
+std::string snmp_name = "iESP";
+snmp      *snmp_      { nullptr };
+snmp_data *snmp_data_ { nullptr };
 
 DynamicJsonDocument cfg(4096);
 #define IESP_CFG_FILE "/cfg-iESP.json"
@@ -580,37 +587,44 @@ void setup() {
 	esp_register_freertos_idle_hook_for_cpu(idle_task_0, 0);
 	esp_register_freertos_idle_hook_for_cpu(idle_task_1, 1);
 
+#if defined(ESP32)
+	esp_pthread_cfg_t cfg = esp_pthread_get_default_config();
+	Serial.printf("Original pthread stack size: %d\r\n", cfg.stack_size);
+	cfg.stack_size = 8192;
+	esp_pthread_set_cfg(&cfg);
+#endif
+
 	draw_status("0011");
-	snmp_data snmp_data_;
-	snmp_data_.register_oid("1.3.6.1.4.1.2021.13.15.1.1.2", "iESP"  );
-	snmp_data_.register_oid("1.3.6.1.2.1.1.1.0", "iESP"  );
-	//snmp_data_.register_oid("1.3.6.1.2.1.1.2.0", new snmp_data_type_oid("1.3.6.1.4.1.57850.1"));
-	snmp_data_.register_oid("1.3.6.1.2.1.1.3.0", new snmp_data_type_running_since());
-	snmp_data_.register_oid("1.3.6.1.2.1.1.4.0", "Folkert van Heusden <mail@vanheusden.com>");
-	snmp_data_.register_oid("1.3.6.1.2.1.1.5.0", "iESP");
-	snmp_data_.register_oid("1.3.6.1.2.1.1.6.0", "The Netherlands, Europe, Earth");
-	snmp_data_.register_oid("1.3.6.1.2.1.1.7.0", snmp_integer::si_integer, 254);
-	snmp_data_.register_oid("1.3.6.1.2.1.1.8.0", snmp_integer::si_integer, 0);
-	// snmp_data_.register_oid("1.3.6.1.2.1.1.3.0", snmp_integer::snmp_integer_type::si_timestamp, &hundredsofasecondcounter);
-	snmp_data_.register_oid("1.3.6.1.4.1.2021.100.2", version_str);
-	snmp_data_.register_oid("1.3.6.1.4.1.2021.100.3", __DATE__);
-	snmp_data_.register_oid("1.3.6.1.4.1.2021.100.1", snmp_integer::snmp_integer_type::si_integer, 1);
-	snmp_data_.register_oid(".1.3.6.1.4.1.2021.4.11.0",     new snmp_data_type_stats_int(&ram_free_kb));
-	snmp_data_.register_oid("1.3.6.1.4.1.2021.13.15.1.1.3", new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &ios.n_reads      ));
-	snmp_data_.register_oid("1.3.6.1.4.1.2021.13.15.1.1.4", new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &ios.n_writes     ));
-	snmp_data_.register_oid("1.3.6.1.4.1.2021.13.15.1.1.5", new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &ios.bytes_read   ));
-	snmp_data_.register_oid("1.3.6.1.4.1.2021.13.15.1.1.6", new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &ios.bytes_written));
-	snmp_data_.register_oid("1.3.6.1.4.1.2021.11.54",       new snmp_data_type_stats_uint32_t(&ios.io_wait));
-	snmp_data_.register_oid("1.3.6.1.2.1.142.1.1.1.1.10",   new snmp_data_type_stats_uint32_t(&is.iscsiInstSsnFailures));
-	snmp_data_.register_oid("1.3.6.1.2.1.142.1.10.2.1.1",   new snmp_data_type_stats_uint32_t(&is.iscsiSsnCmdPDUs));
-	snmp_data_.register_oid("1.3.6.1.2.1.142.1.10.2.1.3",   new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &is.iscsiSsnTxDataOctets));
-	snmp_data_.register_oid("1.3.6.1.2.1.142.1.10.2.1.4",   new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &is.iscsiSsnRxDataOctets));
-	snmp_data_.register_oid("1.3.6.1.2.1.142.1.1.2.1.3",    new snmp_data_type_stats_uint32_t(&is.iscsiInstSsnFormatErrors));
-	snmp_data_.register_oid("1.3.6.1.4.1.2021.9.1.9.1",     new snmp_data_type_stats_int(&percentage_diskspace));
-	snmp_data_.register_oid("1.3.6.1.4.1.2021.11.9.0",      new snmp_data_type_stats_int(&cpu_usage));
+	snmp_data_ = new snmp_data();
+	snmp_data_->register_oid("1.3.6.1.4.1.2021.13.15.1.1.2", snmp_name);
+	snmp_data_->register_oid("1.3.6.1.2.1.1.1.0", snmp_name);
+	//snmp_data_->register_oid("1.3.6.1.2.1.1.2.0", new snmp_data_type_oid("1.3.6.1.4.1.57850.1"));
+	snmp_data_->register_oid("1.3.6.1.2.1.1.3.0", new snmp_data_type_running_since());
+	snmp_data_->register_oid("1.3.6.1.2.1.1.4.0", "Folkert van Heusden <mail@vanheusden.com>");
+	snmp_data_->register_oid("1.3.6.1.2.1.1.5.0", snmp_name);
+	snmp_data_->register_oid("1.3.6.1.2.1.1.6.0", "The Netherlands, Europe, Earth");
+	snmp_data_->register_oid("1.3.6.1.2.1.1.7.0", snmp_integer::si_integer, 254);
+	snmp_data_->register_oid("1.3.6.1.2.1.1.8.0", snmp_integer::si_integer, 0);
+	// snmp_data_->register_oid("1.3.6.1.2.1.1.3.0", snmp_integer::snmp_integer_type::si_timestamp, &hundredsofasecondcounter);
+	snmp_data_->register_oid("1.3.6.1.4.1.2021.100.2", version_str);
+	snmp_data_->register_oid("1.3.6.1.4.1.2021.100.3", __DATE__);
+	snmp_data_->register_oid("1.3.6.1.4.1.2021.100.1", snmp_integer::snmp_integer_type::si_integer, 1);
+	snmp_data_->register_oid("1.3.6.1.4.1.2021.4.11.0",     new snmp_data_type_stats_int(&ram_free_kb));
+	snmp_data_->register_oid("1.3.6.1.4.1.2021.13.15.1.1.3", new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &ios.n_reads      ));
+	snmp_data_->register_oid("1.3.6.1.4.1.2021.13.15.1.1.4", new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &ios.n_writes     ));
+	snmp_data_->register_oid("1.3.6.1.4.1.2021.13.15.1.1.5", new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &ios.bytes_read   ));
+	snmp_data_->register_oid("1.3.6.1.4.1.2021.13.15.1.1.6", new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &ios.bytes_written));
+	snmp_data_->register_oid("1.3.6.1.4.1.2021.11.54",       new snmp_data_type_stats_uint32_t(&ios.io_wait));
+	snmp_data_->register_oid("1.3.6.1.2.1.142.1.1.1.1.10",   new snmp_data_type_stats_uint32_t(&is.iscsiInstSsnFailures));
+	snmp_data_->register_oid("1.3.6.1.2.1.142.1.10.2.1.1",   new snmp_data_type_stats_uint32_t(&is.iscsiSsnCmdPDUs));
+	snmp_data_->register_oid("1.3.6.1.2.1.142.1.10.2.1.3",   new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &is.iscsiSsnTxDataOctets));
+	snmp_data_->register_oid("1.3.6.1.2.1.142.1.10.2.1.4",   new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &is.iscsiSsnRxDataOctets));
+	snmp_data_->register_oid("1.3.6.1.2.1.142.1.1.2.1.3",    new snmp_data_type_stats_uint32_t(&is.iscsiInstSsnFormatErrors));
+	snmp_data_->register_oid("1.3.6.1.4.1.2021.9.1.9.1",     new snmp_data_type_stats_int(&percentage_diskspace));
+	snmp_data_->register_oid("1.3.6.1.4.1.2021.11.9.0",      new snmp_data_type_stats_int(&cpu_usage));
 
 	draw_status("0012");
-	snmp snmp_(&snmp_data_, &stop);
+	snmp_ = new snmp(snmp_data_, &stop);
 
 	draw_status("0013");
 	bs = new backend_sdcard(led_green, led_yellow);

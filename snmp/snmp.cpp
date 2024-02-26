@@ -37,6 +37,8 @@ snmp::snmp(snmp_data *const sd, std::atomic_bool *const stop): sd(sd), stop(stop
 #else
 	handle.begin(161);
 #endif
+	buffer = new uint8_t[SNMP_RECV_BUFFER_SIZE]();
+
 	th = new std::thread(&snmp::thread, this);
 }
 
@@ -48,6 +50,8 @@ snmp::~snmp()
 
 	th->join();
 	delete th;
+
+	delete [] buffer;
 }
 
 uint64_t snmp::get_INTEGER(const uint8_t *p, const size_t length)
@@ -356,7 +360,6 @@ void snmp::thread()
 #endif
 
 	while(!*stop) {
-		uint8_t     buffer[4096] { 0 };
 #if !defined(ARDUINO) || defined(ESP32)
 		sockaddr_in clientaddr   {   };
 		socklen_t   len          { sizeof clientaddr };
@@ -364,7 +367,7 @@ void snmp::thread()
 		if (poll(fds, 1, 100) == 0)
 			continue;
 
-		int rc = recvfrom(fd, buffer, sizeof(buffer), 0, reinterpret_cast<sockaddr *>(&clientaddr), &len);
+		int rc = recvfrom(fd, buffer, SNMP_RECV_BUFFER_SIZE, 0, reinterpret_cast<sockaddr *>(&clientaddr), &len);
 		if (rc == -1)
 			break;
 #else
