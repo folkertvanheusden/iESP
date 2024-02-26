@@ -1,5 +1,6 @@
 // (C) 2022-2024 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <cstdint>
+#include <poll.h>
 #include <thread>
 #include <unistd.h>
 #include <arpa/inet.h>
@@ -10,7 +11,7 @@
 #include "snmp_elem.h"
 
 
-snmp::snmp(snmp_data *const sd): sd(sd)
+snmp::snmp(snmp_data *const sd, std::atomic_bool *const stop): sd(sd), stop(stop)
 {
 	fd = socket(AF_INET, SOCK_DGRAM, 0);
 
@@ -334,10 +335,15 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 
 void snmp::thread()
 {
-	for(;;) {
+	pollfd fds[] { { fd, POLLIN, 0 } };
+
+	while(!*stop) {
 		uint8_t     buffer[4096] { 0 };
 		sockaddr_in clientaddr   {   };
 		socklen_t   len          { sizeof clientaddr };
+
+		if (poll(fds, 1, 100) == 0)
+			continue;
 
 		int rc = recvfrom(fd, buffer, sizeof(buffer), 0, reinterpret_cast<sockaddr *>(&clientaddr), &len);
 		if (rc == -1)

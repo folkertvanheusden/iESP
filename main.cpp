@@ -88,7 +88,7 @@ int main(int argc, char *argv[])
 		snmp_data_.register_oid("1.3.6.1.2.1.142.1.10.2.1.3",   new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &is.iscsiSsnTxDataOctets));
 		snmp_data_.register_oid("1.3.6.1.2.1.142.1.10.2.1.4",   new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &is.iscsiSsnRxDataOctets));
 
-		snmp_ = new snmp(&snmp_data_);
+		snmp_ = new snmp(&snmp_data_, &stop);
 	}
 
 	/*
