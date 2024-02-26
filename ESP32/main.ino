@@ -35,14 +35,18 @@ char name[16] { 0 };
 backend_sdcard  *bs { nullptr };
 scsi *scsi_dev { nullptr };
 
-#ifdef CONFIG_ETH_ENABLED
+#if defined(WT_ETH01)
 int led_green  = 4;
 int led_yellow = 5;
 int led_red    = 35;
-#else
+#elif defined(WEMOS32_ETH)
 int led_green  = 17;
 int led_yellow = 16;
 int led_red    = 32;
+#else
+int led_green  = -1;
+int led_yellow = -1;
+int led_red    = -1;
 #endif
 
 DynamicJsonDocument cfg(4096);
