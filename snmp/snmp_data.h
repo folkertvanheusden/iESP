@@ -47,13 +47,38 @@ public:
 class snmp_data_type_stats : public snmp_data_type
 {
 private:
-	const snmp_integer::snmp_integer_type type;
-
 	uint64_t *const counter;
+
+protected:
+	const snmp_integer::snmp_integer_type type;
 
 public:
 	snmp_data_type_stats(const snmp_integer::snmp_integer_type type, uint64_t *const counter);
-	~snmp_data_type_stats();
+	virtual ~snmp_data_type_stats();
+
+	snmp_elem * get_data() override;
+};
+
+class snmp_data_type_stats_int: public snmp_data_type
+{
+private:
+	int *const counter;
+
+public:
+	snmp_data_type_stats_int(int *const counter);
+	virtual ~snmp_data_type_stats_int();
+
+	snmp_elem * get_data() override;
+};
+
+class snmp_data_type_stats_uint32_t: public snmp_data_type
+{
+private:
+	uint32_t *const counter;
+
+public:
+	snmp_data_type_stats_uint32_t(uint32_t *const counter);
+	virtual ~snmp_data_type_stats_uint32_t();
 
 	snmp_elem * get_data() override;
 };

@@ -1,9 +1,20 @@
 // (C) 2022-2024 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <cstdint>
-#include <poll.h>
 #include <thread>
 #include <unistd.h>
+#if defined(ESP32)
+#include <Arduino.h>
+#elif defined(TEENSY4_1)
+#include <NativeEthernet.h>
+#include <NativeEthernetUdp.h>
+#else
 #include <arpa/inet.h>
+#include <poll.h>
+#endif
+#if !defined(TEENSY4_1)
+#include <sys/socket.h>
+#include <sys/types.h>
+#endif
 
 #include "../log.h"
 #include "../utils.h"
@@ -13,6 +24,7 @@
 
 snmp::snmp(snmp_data *const sd, std::atomic_bool *const stop): sd(sd), stop(stop)
 {
+#if !defined(ARDUINO) || defined(ESP32)
 	fd = socket(AF_INET, SOCK_DGRAM, 0);
 
 	sockaddr_in servaddr { };
@@ -22,13 +34,17 @@ snmp::snmp(snmp_data *const sd, std::atomic_bool *const stop): sd(sd), stop(stop
 
 	if (bind(fd, reinterpret_cast<const struct sockaddr *>(&servaddr), sizeof servaddr) == -1)
 		DOLOG("Failed to bind to SNMP UDP port\n");
-	else
-		th = new std::thread(&snmp::thread, this);
+#else
+	handle.begin(161);
+#endif
+	th = new std::thread(&snmp::thread, this);
 }
 
 snmp::~snmp()
 {
+#if !defined(ARDUINO) || defined(ESP32)
 	close(fd);
+#endif
 
 	th->join();
 	delete th;
@@ -335,10 +351,13 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 
 void snmp::thread()
 {
+#if !defined(ARDUINO) || defined(ESP32)
 	pollfd fds[] { { fd, POLLIN, 0 } };
+#endif
 
 	while(!*stop) {
 		uint8_t     buffer[4096] { 0 };
+#if !defined(ARDUINO) || defined(ESP32)
 		sockaddr_in clientaddr   {   };
 		socklen_t   len          { sizeof clientaddr };
 
@@ -348,6 +367,13 @@ void snmp::thread()
 		int rc = recvfrom(fd, buffer, sizeof(buffer), 0, reinterpret_cast<sockaddr *>(&clientaddr), &len);
 		if (rc == -1)
 			break;
+#else
+		int rc = handle.parsePacket();
+		if (rc == 0) {
+			delay(1);
+			continue;
+		}
+#endif
 
 		if (rc > 0) {
 			oid_req_t or_;
@@ -358,8 +384,15 @@ void snmp::thread()
 			uint8_t *packet_out  = nullptr;
 			size_t   output_size = 0;
 			gen_reply(or_, &packet_out, &output_size);
-			if (output_size)
+			if (output_size) {
+#if !defined(ARDUINO) || defined(ESP32)
 				sendto(fd, packet_out, output_size, 0, reinterpret_cast<sockaddr *>(&clientaddr), len);
+#else
+				handle.beginPacket(handle.remoteIP(), handle.remotePort());
+				handle.write(packet_out, output_size);
+				handle.endPacket();
+#endif
+			}
 			free(packet_out);
 		}
 	}

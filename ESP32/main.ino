@@ -18,7 +18,6 @@
 #endif
 #include <LittleFS.h>
 #include <NTP.h>
-#include <SNMP_Agent.h>
 
 #include "backend-sdcard.h"
 #include "com-sockets.h"
@@ -27,6 +26,7 @@
 #include "utils.h"
 #include "wifi.h"
 #include "version.h"
+#include "snmp/snmp.h"
 
 
 bool ota_update = false;
@@ -57,8 +57,6 @@ int trim_level = 0;
 
 TaskHandle_t task2;
 
-WiFiUDP snmp_udp;
-SNMPAgent snmp("public", "private");
 uint32_t hundredsofasecondcounter = 0;
 io_stats_t ios { };
 iscsi_stats_t is { };
@@ -398,7 +396,6 @@ void loopw(void *) {
 		ntp.update();
 		ArduinoOTA.handle();
 		hundredsofasecondcounter = now / 10;
-		snmp.loop();
 
 		vTaskDelay(100 / portTICK_PERIOD_MS);
 
@@ -584,35 +581,40 @@ void setup() {
 	esp_register_freertos_idle_hook_for_cpu(idle_task_1, 1);
 
 	draw_status("0011");
-
-	snmp.setUDP(&snmp_udp);
-	snmp.addTimestampHandler(".1.3.6.1.2.1.1.3.0",            &hundredsofasecondcounter);
-	snmp.addReadOnlyStaticStringHandler(".1.3.6.1.4.1.2021.13.15.1.1.2", "iESP" );
-	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.3", &ios.n_reads      );
-	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.4", &ios.n_writes     );
-	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.5", &ios.bytes_read   );
-	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.6", &ios.bytes_written);
-	snmp.addCounter32Handler(".1.3.6.1.4.1.2021.11.54",       &ios.io_wait      );
-	snmp.addIntegerHandler  (".1.3.6.1.4.1.2021.11.9.0",      &cpu_usage        );
-	snmp.addIntegerHandler  (".1.3.6.1.4.1.2021.4.11.0",      &ram_free_kb      );
-	snmp.addIntegerHandler(".1.3.6.1.4.1.2021.9.1.9.1",    &percentage_diskspace);
-	snmp.addReadOnlyStaticStringHandler(".1.3.6.1.2.1.1.1.0", "iESP");
-	snmp.addReadOnlyIntegerHandler(".1.3.6.1.4.1.2021.100.1", 1);
-	snmp.addReadOnlyStaticStringHandler(".1.3.6.1.4.1.2021.100.2", version_str);
-	snmp.addReadOnlyStaticStringHandler(".1.3.6.1.4.1.2021.100.3", __DATE__);
-	snmp.addCounter32Handler("1.3.6.1.2.1.142.1.10.2.1.1", &is.iscsiSsnCmdPDUs  );
-	snmp.addCounter64Handler("1.3.6.1.2.1.142.1.10.2.1.3", &is.iscsiSsnTxDataOctets);
-	snmp.addCounter64Handler("1.3.6.1.2.1.142.1.10.2.1.4", &is.iscsiSsnRxDataOctets);
-	snmp.addCounter32Handler("1.3.6.1.2.1.142.1.1.1.1.10", &is.iscsiInstSsnFailures);
-	snmp.addCounter32Handler("1.3.6.1.2.1.142.1.1.2.1.3", &is.iscsiInstSsnFormatErrors);
-
-	snmp.sortHandlers();
-	snmp.begin();
+	snmp_data snmp_data_;
+	snmp_data_.register_oid("1.3.6.1.4.1.2021.13.15.1.1.2", "iESP"  );
+	snmp_data_.register_oid("1.3.6.1.2.1.1.1.0", "iESP"  );
+	//snmp_data_.register_oid("1.3.6.1.2.1.1.2.0", new snmp_data_type_oid("1.3.6.1.4.1.57850.1"));
+	snmp_data_.register_oid("1.3.6.1.2.1.1.3.0", new snmp_data_type_running_since());
+	snmp_data_.register_oid("1.3.6.1.2.1.1.4.0", "Folkert van Heusden <mail@vanheusden.com>");
+	snmp_data_.register_oid("1.3.6.1.2.1.1.5.0", "iESP");
+	snmp_data_.register_oid("1.3.6.1.2.1.1.6.0", "The Netherlands, Europe, Earth");
+	snmp_data_.register_oid("1.3.6.1.2.1.1.7.0", snmp_integer::si_integer, 254);
+	snmp_data_.register_oid("1.3.6.1.2.1.1.8.0", snmp_integer::si_integer, 0);
+	// snmp_data_.register_oid("1.3.6.1.2.1.1.3.0", snmp_integer::snmp_integer_type::si_timestamp, &hundredsofasecondcounter);
+	snmp_data_.register_oid("1.3.6.1.4.1.2021.100.2", version_str);
+	snmp_data_.register_oid("1.3.6.1.4.1.2021.100.3", __DATE__);
+	snmp_data_.register_oid("1.3.6.1.4.1.2021.100.1", snmp_integer::snmp_integer_type::si_integer, 1);
+	snmp_data_.register_oid(".1.3.6.1.4.1.2021.4.11.0",     new snmp_data_type_stats_int(&ram_free_kb));
+	snmp_data_.register_oid("1.3.6.1.4.1.2021.13.15.1.1.3", new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &ios.n_reads      ));
+	snmp_data_.register_oid("1.3.6.1.4.1.2021.13.15.1.1.4", new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &ios.n_writes     ));
+	snmp_data_.register_oid("1.3.6.1.4.1.2021.13.15.1.1.5", new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &ios.bytes_read   ));
+	snmp_data_.register_oid("1.3.6.1.4.1.2021.13.15.1.1.6", new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &ios.bytes_written));
+	snmp_data_.register_oid("1.3.6.1.4.1.2021.11.54",       new snmp_data_type_stats_uint32_t(&ios.io_wait));
+	snmp_data_.register_oid("1.3.6.1.2.1.142.1.1.1.1.10",   new snmp_data_type_stats_uint32_t(&is.iscsiInstSsnFailures));
+	snmp_data_.register_oid("1.3.6.1.2.1.142.1.10.2.1.1",   new snmp_data_type_stats_uint32_t(&is.iscsiSsnCmdPDUs));
+	snmp_data_.register_oid("1.3.6.1.2.1.142.1.10.2.1.3",   new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &is.iscsiSsnTxDataOctets));
+	snmp_data_.register_oid("1.3.6.1.2.1.142.1.10.2.1.4",   new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &is.iscsiSsnRxDataOctets));
+	snmp_data_.register_oid("1.3.6.1.2.1.142.1.1.2.1.3",    new snmp_data_type_stats_uint32_t(&is.iscsiInstSsnFormatErrors));
+	snmp_data_.register_oid("1.3.6.1.4.1.2021.9.1.9.1",     new snmp_data_type_stats_int(&percentage_diskspace));
+	snmp_data_.register_oid("1.3.6.1.4.1.2021.11.9.0",      new snmp_data_type_stats_int(&cpu_usage));
 
 	draw_status("0012");
+	snmp snmp_(&snmp_data_, &stop);
 
+	draw_status("0013");
 	bs = new backend_sdcard(led_green, led_yellow);
-	draw_status("000c");
+	draw_status("0014");
 	if (bs->begin() == false) {
 		errlog("Failed to load initialize storage backend!");
 		draw_status("000b");

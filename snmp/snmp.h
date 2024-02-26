@@ -25,7 +25,11 @@ class snmp
 {
 private:
 	snmp_data *const sd { nullptr };
+#if !defined(ARDUINO) || defined(ESP32)
 	int              fd { -1      };
+#elif defined(TEENSY4_1)
+	EthernetUDP      handle;
+#endif
 	std::thread     *th { nullptr };
 	std::atomic_bool *const stop { nullptr };
 

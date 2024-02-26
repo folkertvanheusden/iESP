@@ -1,5 +1,6 @@
 #include <algorithm>
-#include <assert.h>
+#include <cassert>
+#include <cstdint>
 
 #include "snmp_data.h"
 #include "../utils.h"
@@ -93,6 +94,32 @@ snmp_data_type_stats::~snmp_data_type_stats()
 snmp_elem * snmp_data_type_stats::get_data()
 {
 	return new snmp_integer(type, *counter);
+}
+
+snmp_data_type_stats_int::snmp_data_type_stats_int(int *const counter) : counter(counter)
+{
+}
+
+snmp_data_type_stats_int::~snmp_data_type_stats_int()
+{
+}
+
+snmp_elem * snmp_data_type_stats_int::get_data()
+{
+	return new snmp_integer(snmp_integer::snmp_integer_type::si_integer, *counter);
+}
+
+snmp_data_type_stats_uint32_t::snmp_data_type_stats_uint32_t(uint32_t *const counter) : counter(counter)
+{
+}
+
+snmp_data_type_stats_uint32_t::~snmp_data_type_stats_uint32_t()
+{
+}
+
+snmp_elem * snmp_data_type_stats_uint32_t::get_data()
+{
+	return new snmp_integer(snmp_integer::snmp_integer_type::si_integer, *counter);
 }
 
 snmp_data_type_running_since::snmp_data_type_running_since():
