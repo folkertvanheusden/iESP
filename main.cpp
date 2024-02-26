@@ -130,9 +130,11 @@ int main(int argc, char *argv[])
 		snmp_data_.register_oid("1.3.6.1.4.1.2021.13.15.1.1.5", new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &ios.bytes_read   ));
 		snmp_data_.register_oid("1.3.6.1.4.1.2021.13.15.1.1.6", new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &ios.bytes_written));
 		snmp_data_.register_oid("1.3.6.1.4.1.2021.11.54",       new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter32, &ios.io_wait      ));
+		snmp_data_.register_oid("1.3.6.1.2.1.142.1.1.1.1.10",   new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter32, &is.iscsiInstSsnFailures));
 		snmp_data_.register_oid("1.3.6.1.2.1.142.1.10.2.1.1",   new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter32, &is.iscsiSsnCmdPDUs));
 		snmp_data_.register_oid("1.3.6.1.2.1.142.1.10.2.1.3",   new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &is.iscsiSsnTxDataOctets));
 		snmp_data_.register_oid("1.3.6.1.2.1.142.1.10.2.1.4",   new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &is.iscsiSsnRxDataOctets));
+		snmp_data_.register_oid("1.3.6.1.2.1.142.1.1.2.1.3",    new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter32, &is.iscsiInstSsnFormatErrors));
 		snmp_data_.register_oid("1.3.6.1.4.1.2021.9.1.9.1",     new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_integer,   &percentage_diskspace));
 		snmp_data_.register_oid("1.3.6.1.4.1.2021.11.9.0",      new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_integer,   &cpu_usage));
 

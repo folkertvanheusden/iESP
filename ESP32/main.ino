@@ -603,6 +603,8 @@ void setup() {
 	snmp.addCounter32Handler("1.3.6.1.2.1.142.1.10.2.1.1", &is.iscsiSsnCmdPDUs  );
 	snmp.addCounter64Handler("1.3.6.1.2.1.142.1.10.2.1.3", &is.iscsiSsnTxDataOctets);
 	snmp.addCounter64Handler("1.3.6.1.2.1.142.1.10.2.1.4", &is.iscsiSsnRxDataOctets);
+	snmp.addCounter32Handler("1.3.6.1.2.1.142.1.1.1.1.10", &is.iscsiInstSsnFailures);
+	snmp.addCounter32Handler("1.3.6.1.2.1.142.1.1.2.1.3", &is.iscsiInstSsnFormatErrors);
 
 	snmp.sortHandlers();
 	snmp.begin();

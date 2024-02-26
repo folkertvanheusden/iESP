@@ -473,6 +473,7 @@ void server::handler()
 				iscsi_pdu_bhs *pdu = incoming.first;
 				if (!pdu) {
 					DOLOG("server::handler: no PDU received, aborting socket connection\n");
+					is->iscsiInstSsnFailures++;
 					break;
 				}
 
@@ -484,6 +485,8 @@ void server::handler()
 
 				if (incoming.second) {  // something wrong with the received PDU?
 					errlog("server::handler: invalid PDU received");
+
+					is->iscsiInstSsnFormatErrors++;
 
 					std::optional<blob_t> reject = generate_reject_pdu(*pdu);
 					if (reject.has_value() == false) {
@@ -509,6 +512,7 @@ void server::handler()
 					}
 					else {
 						ok = false;
+						is->iscsiInstSsnFailures++;
 					}
 
 					delete pdu;
