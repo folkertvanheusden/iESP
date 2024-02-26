@@ -98,10 +98,7 @@ retry:
 	// virtual sizes
 	card_size   = file.fileSize();
 	sector_size = 512;
-
 	Serial.printf("Virtual disk size: %zuMB\r\n", size_t(card_size / 1024 / 1024));
-
-	Serial.println(F("Init LEDs"));
 
 	write_led(led_read,  LOW);
 	write_led(led_write, LOW);
