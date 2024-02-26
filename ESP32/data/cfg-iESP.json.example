@@ -6,5 +6,6 @@
 	],
 	"syslog-host" : "94.142.246.161",
 	"trim-level": 2,
-	"eth-wait-time": 10
+	"eth-wait-time": 10,
+	"update-df-interval": 0
 }
