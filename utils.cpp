@@ -177,3 +177,5 @@ uint64_t get_micros()
         return uint64_t(tv.tv_sec) * uint64_t(1000 * 1000) + uint64_t(tv.tv_nsec / 1000);
 #endif
 }
+
+uint64_t running_since = get_micros();
