@@ -8,6 +8,7 @@
 #include "com-sockets.h"
 #include "log.h"
 #include "server.h"
+#include "utils.h"
 #include "snmp/snmp.h"
 
 
@@ -17,6 +18,21 @@ void sigh(int sig)
 {
 	stop = true;
 	DOLOG("Stop signal received\n");
+}
+
+void maintenance_thread(std::atomic_bool *const stop, backend *const bf, uint64_t *const df_percentage)
+{
+	uint64_t prev_df_poll = 0;
+
+	while(!*stop) {
+		usleep(101000);
+
+		uint64_t now = get_micros();
+		if (now - prev_df_poll >= 30000000) {
+			*df_percentage = bf->get_free_space_percentage();
+			prev_df_poll   = now;
+		}
+	}
 }
 
 void help()
@@ -63,6 +79,8 @@ int main(int argc, char *argv[])
 	io_stats_t    ios { };
 	iscsi_stats_t is  { };
 
+	uint64_t percentage_diskspace = 0;
+
 	snmp_data snmp_data_;
 	snmp *snmp_ = nullptr;
 	if (use_snmp) {
@@ -87,6 +105,7 @@ int main(int argc, char *argv[])
 		snmp_data_.register_oid("1.3.6.1.2.1.142.1.10.2.1.1",   new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter32, &is.iscsiSsnCmdPDUs));
 		snmp_data_.register_oid("1.3.6.1.2.1.142.1.10.2.1.3",   new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &is.iscsiSsnTxDataOctets));
 		snmp_data_.register_oid("1.3.6.1.2.1.142.1.10.2.1.4",   new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &is.iscsiSsnRxDataOctets));
+		snmp_data_.register_oid("1.3.6.1.4.1.2021.9.1.9.1",     new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_integer,   &percentage_diskspace));
 
 		snmp_ = new snmp(&snmp_data_, &stop);
 	}
@@ -94,7 +113,6 @@ int main(int argc, char *argv[])
 	/*
 	snmp.addIntegerHandler(".1.3.6.1.4.1.2021.11.9.0",  &cpu_usage           );
 	snmp.addIntegerHandler(".1.3.6.1.4.1.2021.4.11.0",  &ram_free_kb         );
-	snmp.addIntegerHandler(".1.3.6.1.4.1.2021.9.1.9.1", &percentage_diskspace);
 	*/
 
 	backend_file bf(dev);
@@ -110,10 +128,15 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	std::thread *mth = new std::thread(maintenance_thread, &stop, &bf, &percentage_diskspace);
+
 	server s(&sd, &c, &is);
 	s.handler();
 
 	delete snmp_;
+
+	mth->join();
+	delete mth;
 
 	return 0;
 }
