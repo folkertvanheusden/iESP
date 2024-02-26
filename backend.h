@@ -9,6 +9,7 @@ protected:
 	uint64_t bytes_written { 0 };
 	uint64_t n_syncs       { 0 };
 	uint64_t n_trims       { 0 };
+	uint64_t ts_last_acces { 0 };
 
 public:
 	backend();
@@ -21,6 +22,8 @@ public:
 
 	// mainly for thin provisioning
 	virtual uint8_t get_free_space_percentage();
+
+	virtual bool is_idle();
 
 	virtual bool sync() = 0;
 

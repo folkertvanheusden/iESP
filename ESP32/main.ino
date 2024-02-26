@@ -390,7 +390,7 @@ void loopw(void *) {
 // TODO powerdown display
 		}
 
-		if (now - last_diskfree_update >= update_df_interval * 1000 && update_df_interval != 0) {
+		if (now - last_diskfree_update >= update_df_interval * 1000 && update_df_interval != 0 && bs->is_idle()) {
 			percentage_diskspace = bs->get_free_space_percentage();
 			last_diskfree_update = now;
 		}

@@ -2,10 +2,12 @@
 
 #include "backend.h"
 #include "random.h"
+#include "utils.h"
 
 
 backend::backend()
 {
+	ts_last_acces = get_micros();
 }
 
 backend::~backend()
@@ -23,6 +25,13 @@ void backend::get_and_reset_stats(uint64_t *const bytes_read, uint64_t *const by
 	this->bytes_written = 0;
 	this->n_syncs       = 0;
 	this->n_trims       = 0;
+}
+
+bool backend::is_idle()
+{
+	uint64_t now = get_micros();
+
+	return now - ts_last_acces >= 499000;  // about halve a second ago?
 }
 
 uint8_t backend::get_free_space_percentage()

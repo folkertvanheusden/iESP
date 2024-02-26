@@ -47,7 +47,7 @@ void maintenance_thread(std::atomic_bool *const stop, backend *const bf, uint64_
 
 		uint64_t now = get_micros();
 
-		if (now - prev_df_poll >= 30000000) {
+		if (now - prev_df_poll >= 30000000 && bf->is_idle()) {
 			*df_percentage = bf->get_free_space_percentage();
 			prev_df_poll   = now;
 		}

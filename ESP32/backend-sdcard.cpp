@@ -4,6 +4,7 @@
 
 #include "backend-sdcard.h"
 #include "log.h"
+#include "utils.h"
 
 #ifdef RP2040W
 #define SD_CS 17
@@ -114,6 +115,8 @@ bool backend_sdcard::sync()
 
 	write_led(led_write, LOW);
 
+	ts_last_acces = get_micros();
+
 	return true;
 }
 
@@ -165,6 +168,8 @@ ok:
 
 	write_led(led_write, LOW);
 
+	ts_last_acces = get_micros();
+
 	return rc;
 }
 
@@ -180,6 +185,7 @@ bool backend_sdcard::trim(const uint64_t block_nr, const uint32_t n_blocks)
 		}
 	}
 	delete [] data;
+	ts_last_acces = get_micros();
 	n_trims++;
 	return rc;
 }
@@ -220,5 +226,6 @@ ok:
 	if (!rc)
 		errlog("Cannot read (%d)", file.getError());
 	write_led(led_read, LOW);
+	ts_last_acces = get_micros();
 	return rc;
 }
