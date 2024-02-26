@@ -55,14 +55,19 @@ void my_getrandom(void *const tgt, const size_t n)
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <Entropy.h>
+
+EntropyClass ec;
+
 void init_my_getrandom()
 {
+	ec.Initialize();
 }
 
 void my_getrandom(void *const tgt, const size_t n)
 {
-	// TODO
-	for(size_t i=0; i<n; i++)
-		reinterpret_cast<uint8_t *>(tgt)[i] = rand();
+	for(size_t i=0; i<n; i++) {
+		reinterpret_cast<uint8_t *>(tgt)[i] = ec.random();  // TODO 32bit at a time
+	}
 }
 #endif
