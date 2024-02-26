@@ -191,3 +191,5 @@ void teensyMAC(uint8_t *const mac)
 	mac[5] = m2 >> 0;
 }
 #endif
+
+uint64_t running_since = get_micros();

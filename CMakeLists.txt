@@ -23,6 +23,9 @@ add_executable(
 	scsi.cpp
 	session.cpp
 	utils.cpp
+	snmp/snmp.cpp
+	snmp/snmp_data.cpp
+	snmp/snmp_elem.cpp
 )
 
 set(CMAKE_BUILD_TYPE Debug)

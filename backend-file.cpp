@@ -6,6 +6,7 @@
 
 #include "backend-file.h"
 #include "log.h"
+#include "utils.h"
 
 
 backend_file::backend_file(const std::string & filename): filename(filename), fd(-1)
@@ -44,6 +45,7 @@ uint64_t backend_file::get_block_size() const
 
 bool backend_file::sync()
 {
+	ts_last_acces = get_micros();
 	if (fsync(fd) == 0)
 		return true;
 
@@ -61,6 +63,7 @@ bool backend_file::write(const uint64_t block_nr, const uint32_t n_blocks, const
 	ssize_t rc = pwrite(fd, data, n_bytes, offset);
 	if (rc == -1)
 		DOLOG("backend_file::write: ERROR writing; %s\n", strerror(errno));
+	ts_last_acces = get_micros();
 	return rc == n_bytes;
 }
 
@@ -85,6 +88,7 @@ bool backend_file::trim(const uint64_t block_nr, const uint32_t n_blocks)
 	if (rc == -1)
 		DOLOG("backend_file::trim: ERROR unmaping; %s\n", strerror(errno));
 	n_trims++;
+	ts_last_acces = get_micros();
 	return rc == 0;
 }
 
@@ -99,5 +103,6 @@ bool backend_file::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_
 		DOLOG("backend_file::read: ERROR reading; %s\n", strerror(errno));
 	else if (rc != n_bytes)
 		DOLOG("backend_file::read: short read, requested: %zu, received: %zd\n", n_bytes, rc);
+	ts_last_acces = get_micros();
 	return rc == n_bytes;
 }

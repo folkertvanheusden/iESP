@@ -96,6 +96,8 @@ uint64_t max_idle_ticks = 1855000;
 int cpu_usage = 0;
 int ram_free_kb = 0;
 int eth_wait_seconds = 0;
+int update_df_interval = 0;
+int percentage_diskspace = 0;
 
 long int draw_status_ts = 0;
 
@@ -178,6 +180,8 @@ bool load_configuration() {
 	trim_level = cfg["trim-level"].as<int>();
 
 	eth_wait_seconds = cfg["eth-wait-time"].as<int>();
+
+	update_df_interval = cfg["update-df-interval"].as<int>();
 
 	data_file.close();
 
@@ -416,11 +420,17 @@ void setup_wifi() {
 void loopw(void *) {
 	Serial.println(F("Thread started"));
 
-	int cu_count = 0;
+	int  cu_count = 0;
+	unsigned long last_diskfree_update = millis();
 	for(;;) {
 		auto now = millis();
 		if (now - draw_status_ts > 5000) {
 // TODO powerdown display
+		}
+
+		if (now - last_diskfree_update >= update_df_interval * 1000 && update_df_interval != 0 && bs->is_idle()) {
+			percentage_diskspace = bs->get_free_space_percentage();
+			last_diskfree_update = now;
 		}
 
 		ntp.update();
@@ -646,19 +656,20 @@ void setup() {
 
 	snmp.setUDP(&snmp_udp);
 	snmp.addTimestampHandler(".1.3.6.1.2.1.1.3.0",            &hundredsofasecondcounter);
-	snmp.addReadOnlyStaticStringHandler(".1.3.6.1.4.1.2021.13.15.1.1.2", "iESP");
+	snmp.addReadOnlyStaticStringHandler(".1.3.6.1.4.1.2021.13.15.1.1.2", "iESP" );
 	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.3", &ios.n_reads      );
 	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.4", &ios.n_writes     );
 	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.5", &ios.bytes_read   );
 	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.6", &ios.bytes_written);
 	snmp.addCounter32Handler(".1.3.6.1.4.1.2021.11.54",       &ios.io_wait      );
-	snmp.addIntegerHandler(".1.3.6.1.4.1.2021.11.9.0", &cpu_usage);
-	snmp.addIntegerHandler(".1.3.6.1.4.1.2021.4.11.0", &ram_free_kb);
+	snmp.addIntegerHandler  (".1.3.6.1.4.1.2021.11.9.0",      &cpu_usage        );
+	snmp.addIntegerHandler  (".1.3.6.1.4.1.2021.4.11.0",      &ram_free_kb      );
+	snmp.addIntegerHandler(".1.3.6.1.4.1.2021.9.1.9.1",    &percentage_diskspace);
 	snmp.addReadOnlyStaticStringHandler(".1.3.6.1.2.1.1.1.0", "iESP");
 	snmp.addReadOnlyIntegerHandler(".1.3.6.1.4.1.2021.100.1", 1);
 	snmp.addReadOnlyStaticStringHandler(".1.3.6.1.4.1.2021.100.2", version_str);
 	snmp.addReadOnlyStaticStringHandler(".1.3.6.1.4.1.2021.100.3", __DATE__);
-	snmp.addCounter32Handler("1.3.6.1.2.1.142.1.10.2.1.1", &is.iscsiSsnCmdPDUs);
+	snmp.addCounter32Handler("1.3.6.1.2.1.142.1.10.2.1.1", &is.iscsiSsnCmdPDUs  );
 	snmp.addCounter64Handler("1.3.6.1.2.1.142.1.10.2.1.3", &is.iscsiSsnTxDataOctets);
 	snmp.addCounter64Handler("1.3.6.1.2.1.142.1.10.2.1.4", &is.iscsiSsnRxDataOctets);
 

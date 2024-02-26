@@ -71,3 +71,9 @@ void my_getrandom(void *const tgt, const size_t n)
 	}
 }
 #endif
+
+uint32_t my_getrandom() {
+	uint32_t v = 0;
+	my_getrandom(&v, sizeof v);
+	return v;
+}
