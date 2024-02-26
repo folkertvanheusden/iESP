@@ -83,7 +83,12 @@ bool backend_sdcard::reinit(const bool close_first)
 	sd.ls(LS_DATE | LS_SIZE);
 
 retry:
-	if (file.open(FILENAME, O_RDWR) == false) {
+#if defined(TEENSY4_1)
+	if (file.open(FILENAME, FILE_READ | FILE_WRITE) == false)
+#else
+	if (file.open(FILENAME, O_RDWR) == false)
+#endif
+	{
 		errlog("Cannot access test.dat on SD-card");
 		write_led(led_read,  LOW);
 		write_led(led_write, LOW);

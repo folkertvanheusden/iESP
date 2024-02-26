@@ -25,7 +25,11 @@
 #include <SNMP_Agent.h>
 
 #include "backend-sdcard.h"
+#if defined(TEENSY4_1)
+#include "com-arduino.h"
+#else
 #include "com-sockets.h"
+#endif
 #include "log.h"
 #include "server.h"
 #include "utils.h"
@@ -62,6 +66,12 @@ int trim_level = 0;
 
 #if !defined(TEENSY4_1)
 TaskHandle_t task2;
+#endif
+
+#if defined(TEENSY4_1)
+LittleFS_Program myfs;
+#else
+LittleFS myfs;
 #endif
 
 #if defined(TEENSY4_1)
@@ -131,7 +141,11 @@ void fail_flash() {
 }
 
 bool load_configuration() {
-	File data_file = LittleFS.open(IESP_CFG_FILE, "r");
+#if defined(TEENSY4_1)
+	File data_file = myfs.open(IESP_CFG_FILE, FILE_READ);
+#else
+	File data_file = myfs.open(IESP_CFG_FILE, "r");
+#endif
 	if (!data_file)
 		return false;
 
@@ -188,7 +202,7 @@ void enable_OTA() {
 			errlog("OTA start\n");
 			ota_update = true;
 			stop = true;
-			LittleFS.end();
+			myfs.end();
 			});
 	ArduinoOTA.onEnd([]() {
 			errlog("OTA end");
@@ -563,18 +577,21 @@ void setup() {
 		pinMode(led_red, OUTPUT);
 
 	draw_status("0004");
-
-	if (!LittleFS.begin()) {
+#if defined(TEENSY4_1)
+	if (!myfs.begin(4096))
+#else
+	if (!LittleFS.begin())
+#endif
+	{
 		Serial.println(F("LittleFS.begin() failed"));
 		draw_status("0005");
 	}
 
 	draw_status("0006");
-	
 	if (load_configuration() == false) {
 		Serial.println(F("Failed to load configuration, using defaults!"));
 #if defined(TEENSY4_1)
-		ls(LittleFS_Program, "/");
+		ls(myfs, "/");
 #endif
 		draw_status("0007");
 		fail_flash();
@@ -747,7 +764,11 @@ void loop()
 		Serial.println(buffer);
 
 		draw_status("0205");
+#if defined(TEENSY4_1)
+		com_arduino c(3260);
+#else
 		com_sockets c(buffer, 3260, &stop);
+#endif
 		if (c.begin() == false) {
 			errlog("Failed to initialize communication layer!");
 			draw_status("0210");
