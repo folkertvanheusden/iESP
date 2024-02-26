@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <getopt.h>
 #include <unistd.h>
+#include <sys/resource.h>
 
 #include "backend-file.h"
 #include "com-sockets.h"
@@ -20,17 +21,43 @@ void sigh(int sig)
 	DOLOG("Stop signal received\n");
 }
 
-void maintenance_thread(std::atomic_bool *const stop, backend *const bf, uint64_t *const df_percentage)
+uint64_t get_cpu_usage_us()
+{
+	rusage ru { };
+
+	if (getrusage(RUSAGE_SELF, &ru) == 0) {
+		return ru.ru_utime.tv_sec * 1000000 + ru.ru_utime.tv_usec +
+		       ru.ru_stime.tv_sec * 1000000 + ru.ru_stime.tv_usec;
+	}
+
+	DOLOG("getrusage failed\n");
+
+	return 0;
+}
+
+void maintenance_thread(std::atomic_bool *const stop, backend *const bf, uint64_t *const df_percentage, uint64_t *const cpu_usage)
 {
 	uint64_t prev_df_poll = 0;
+	uint64_t prev_w_poll  = 0;
+
+	uint64_t prev_cpu_usage = get_cpu_usage_us();
 
 	while(!*stop) {
 		usleep(101000);
 
 		uint64_t now = get_micros();
+
 		if (now - prev_df_poll >= 30000000) {
 			*df_percentage = bf->get_free_space_percentage();
 			prev_df_poll   = now;
+		}
+
+		if (now - prev_w_poll >= 1000000) {
+			uint64_t current_cpu_usage = get_cpu_usage_us();
+			*cpu_usage = (current_cpu_usage - prev_cpu_usage) / 10000;
+			prev_cpu_usage = current_cpu_usage;
+
+			prev_w_poll = now;
 		}
 	}
 }
@@ -79,6 +106,7 @@ int main(int argc, char *argv[])
 	io_stats_t    ios { };
 	iscsi_stats_t is  { };
 
+	uint64_t cpu_usage            = 0;
 	uint64_t percentage_diskspace = 0;
 
 	snmp_data snmp_data_;
@@ -106,6 +134,7 @@ int main(int argc, char *argv[])
 		snmp_data_.register_oid("1.3.6.1.2.1.142.1.10.2.1.3",   new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &is.iscsiSsnTxDataOctets));
 		snmp_data_.register_oid("1.3.6.1.2.1.142.1.10.2.1.4",   new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &is.iscsiSsnRxDataOctets));
 		snmp_data_.register_oid("1.3.6.1.4.1.2021.9.1.9.1",     new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_integer,   &percentage_diskspace));
+		snmp_data_.register_oid("1.3.6.1.4.1.2021.11.9.0",      new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_integer,   &cpu_usage));
 
 		snmp_ = new snmp(&snmp_data_, &stop);
 	}
@@ -128,7 +157,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	std::thread *mth = new std::thread(maintenance_thread, &stop, &bf, &percentage_diskspace);
+	std::thread *mth = new std::thread(maintenance_thread, &stop, &bf, &percentage_diskspace, &cpu_usage);
 
 	server s(&sd, &c, &is);
 	s.handler();

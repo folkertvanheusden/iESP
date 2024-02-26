@@ -35,7 +35,7 @@ The ESP32 version listens to SNMP using the Arduino\_SNMP library. The Posix ver
 * .1.3.6.1.4.1.2021.13.15.1.1.4 - number of bytes written
 * .1.3.6.1.4.1.2021.13.15.1.1.5 - number of reads
 * .1.3.6.1.4.1.2021.13.15.1.1.6 - number of writes
-* .1.3.6.1.4.1.2021.11.9.0 - CPU usage                      (not in Posix version)
+* .1.3.6.1.4.1.2021.11.9.0 - CPU usage
 * .1.3.6.1.4.1.2021.11.54 - I/O wait in 100ths of a second
 * .1.3.6.1.4.1.2021.4.11.0 - free RAM (kB heap space)       (not in Posix version)
 * .1.3.6.1.2.1.142.1.10.2.1.1 - iscsiSsnCmdPDUs
