@@ -5,8 +5,8 @@
 #if defined(ARDUINO)
 #include <NTP.h>
 #if defined(TEENSY4_1)
-#include <NativeEthernet.h>
-#include <NativeEthernetUdp.h>
+#include <QNEthernet.h>
+namespace qn = qindesign::network;
 #else
 #include <WiFi.h>
 #include <WiFiUdp.h>
@@ -19,7 +19,7 @@
 #if defined(ARDUINO)
 std::optional<std::string> syslog_host;
 #if defined(TEENSY4_1)
-EthernetUDP UDP;
+qn::EthernetUDP UDP;
 #else
 WiFiUDP UDP;
 #endif

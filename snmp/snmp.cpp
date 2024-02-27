@@ -5,8 +5,8 @@
 #if defined(ESP32)
 #include <Arduino.h>
 #elif defined(TEENSY4_1)
-#include <NativeEthernet.h>
-#include <NativeEthernetUdp.h>
+#include <QNEthernet.h>
+namespace qn = qindesign::network;
 #else
 #include <arpa/inet.h>
 #include <poll.h>
@@ -35,7 +35,7 @@ snmp::snmp(snmp_data *const sd, std::atomic_bool *const stop): sd(sd), stop(stop
 	if (bind(fd, reinterpret_cast<const struct sockaddr *>(&servaddr), sizeof servaddr) == -1)
 		DOLOG("Failed to bind to SNMP UDP port\n");
 #else
-	handle = new EthernetUDP();
+	handle = new qn::EthernetUDP();
 	handle->begin(161);
 #endif
 	buffer = new uint8_t[SNMP_RECV_BUFFER_SIZE]();

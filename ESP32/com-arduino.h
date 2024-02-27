@@ -1,6 +1,7 @@
+#pragma once
 #if defined(TEENSY4_1)
-#include <NativeEthernet.h>
-#include <NativeEthernetUdp.h>
+#include <QNEthernet.h>
+namespace qn = qindesign::network;
 #endif
 
 #include "com.h"
@@ -10,14 +11,14 @@ class com_client_arduino : public com_client
 {
 private:
 #if defined(TEENSY4_1)
-	mutable EthernetClient wc;
+	mutable qn::EthernetClient wc;
 #else
 	mutable WiFiClient wc;
 #endif
 
 public:
 #if defined(TEENSY4_1)
-	com_client_arduino(EthernetClient & wc);
+	com_client_arduino(qn::EthernetClient & wc);
 #else
 	com_client_arduino(WiFiClient & wc);
 #endif
@@ -34,7 +35,7 @@ class com_arduino : public com
 private:
 	const int   port   { 3260    };
 #if defined(TEENSY4_1)
-	EthernetServer *server { nullptr };
+	qn::EthernetServer *server { nullptr };
 #else
 	WiFiServer *server { nullptr };
 #endif

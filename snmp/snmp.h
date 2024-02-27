@@ -6,8 +6,8 @@
 #include <thread>
 #include <vector>
 #if defined(TEENSY4_1)
-#include <NativeEthernet.h>
-#include <NativeEthernetUdp.h>
+#include <QNEthernet.h>
+namespace qn = qindesign::network;
 #endif
 
 #include "snmp_data.h"
@@ -34,7 +34,7 @@ private:
 #if !defined(ARDUINO) || defined(ESP32)
 	int              fd { -1      };
 #elif defined(TEENSY4_1)
-	EthernetUDP      *handle { nullptr };
+	qn::EthernetUDP *handle { nullptr };
 #endif
 	uint8_t         *buffer { nullptr };  // for receiving requests
 	std::thread     *th { nullptr };

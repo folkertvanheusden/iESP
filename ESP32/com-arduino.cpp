@@ -1,3 +1,4 @@
+#include <Arduino.h>
 #include <atomic>
 #include <errno.h>
 #include <cstring>
@@ -25,7 +26,7 @@ com_arduino::com_arduino(const int port): com(nullptr), port(port)
 bool com_arduino::begin()
 {
 #if defined(TEENSY4_1)
-	server = new EthernetServer(port);
+	server = new qn::EthernetServer(port);
 #else
 	Serial.println(F("Set hostname"));
 	WiFi.hostname("iPICO");
@@ -76,7 +77,7 @@ com_arduino::~com_arduino()
 std::string com_arduino::get_local_address()
 {
 #if defined(TEENSY4_1)
-	auto ip = Ethernet.localIP();
+	auto ip = qn::Ethernet.localIP();
 #else
 	auto ip = WiFi.localIP();
 #endif
@@ -95,7 +96,7 @@ com_client *com_arduino::accept()
 		// ugly hack
 		snmp_->poll();
 
-		Ethernet.maintain();
+		qn::Ethernet.maintain();
 
 		auto wc = server->accept();  // is non-blocking
 		if (wc) {
@@ -117,7 +118,7 @@ com_client *com_arduino::accept()
 }
 
 #if defined(TEENSY4_1)
-com_client_arduino::com_client_arduino(EthernetClient & wc): wc(wc), com_client(nullptr)
+com_client_arduino::com_client_arduino(qn::EthernetClient & wc): wc(wc), com_client(nullptr)
 {
 }
 #else
@@ -142,7 +143,7 @@ bool com_client_arduino::send(const uint8_t *const from, const size_t n)
 			return false;
 
 #if defined(TEENSY4_1)
-		Ethernet.maintain();
+		qn::Ethernet.maintain();
 #else
 		watchdog_update();
 #endif
@@ -167,7 +168,7 @@ bool com_client_arduino::recv(uint8_t *const to, const size_t n)
 #if defined(TEENSY4_1)
 		// ugly hack
 		snmp_->poll();
-		Ethernet.maintain();
+		qn::Ethernet.maintain();
 #else
 		watchdog_update();
 #endif

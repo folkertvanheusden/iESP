@@ -37,9 +37,8 @@
 #include "snmp.h"
 #include "utils.h"
 #if defined(TEENSY4_1)
-#include <SPI.h>
-#include <NativeEthernet.h>
-#include <NativeEthernetUdp.h>
+#include <QNEthernet.h>
+namespace qn = qindesign::network;
 #else
 #include "wifi.h"
 #endif
@@ -79,8 +78,8 @@ int trim_level = 0;
 #if defined(TEENSY4_1)
 LittleFS_Program myfs;
 
-EthernetUDP snmp_udp;
-EthernetUDP ntp_udp;
+qn::EthernetUDP snmp_udp;
+qn::EthernetUDP ntp_udp;
 #else
 LittleFS myfs;
 
@@ -634,17 +633,17 @@ void setup() {
 		fail_flash();
 	}
 #elif defined(TEENSY4_1)
-	if (Ethernet.begin(mac) == 0) {
+	if (qn::Ethernet.begin(mac) == 0) {
 		Serial.println(F("Failed to configure Ethernet using DHCP"));
 
-		if (Ethernet.hardwareStatus() == EthernetNoHardware)
+		if (qn::Ethernet.hardwareStatus() == qindesign::network::EthernetNoHardware)
 			Serial.println(F("Ethernet shield was not found"));
-		else if (Ethernet.linkStatus() == LinkOFF)
+		else if (qn::Ethernet.linkStatus() == qindesign::network::LinkOFF)
 			Serial.println(F("Ethernet cable is not connected"));
 	}
 	else {
 		Serial.print(F("Ethernet initialized ("));
-		Serial.print(Ethernet.localIP());
+		Serial.print(qn::Ethernet.localIP());
 		Serial.println(F(")"));
 	}
 #else
@@ -702,13 +701,17 @@ void setup() {
 
 	draw_status("0028");
 #if defined(TEENSY4_1)
-	MDNS.begin(name, 1);
-	MDNS.addService("_iscsi._tcp", 3260);
+	if (qn::MDNS.begin(name))
+		qn::MDNS.addService("iscsi", "tcp", 3260);
+	else
+		errlog("Failed starting MDNS responder");
 #else
+#if 0
 	if (MDNS.begin(name))
 		MDNS.addService("iscsi", "tcp", 3260);
 	else
-		errlog("Failed starting mdns responder");
+		errlog("Failed starting MDNS responder");
+#endif
 #endif
 
 #if !defined(TEENSY4_1)
@@ -760,7 +763,7 @@ void loop()
 	{
 		char buffer[16];
 #if defined(TEENSY4_1)
-		auto ip = Ethernet.localIP();
+		auto ip = qn::Ethernet.localIP();
 		snprintf(buffer, sizeof buffer, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
 #else
 		auto ipe = ETH.localIP();
