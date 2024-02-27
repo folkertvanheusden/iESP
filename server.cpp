@@ -111,8 +111,9 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 			errlog("server::receive_pdu: initialize PDU: validation failed");
 		}
 
-#if defined(ESP32) || !defined(NDEBUG)
 		if (bhs.get_opcode() == iscsi_pdu_bhs::iscsi_bhs_opcode::o_login_req) {
+			is->iscsiTgtLoginAccepts++;
+#if defined(ESP32) || !defined(NDEBUG)
 			auto initiator = reinterpret_cast<iscsi_pdu_login_request *>(pdu_obj)->get_initiator();
 			if (initiator.has_value()) {
 #ifdef ESP32
@@ -122,8 +123,11 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 				DOLOG("server::receive_pdu: initiator: %s\n", initiator.value().c_str());
 #endif
 			}
-		}
 #endif
+		}
+
+		if (bhs.get_opcode() == iscsi_pdu_bhs::iscsi_bhs_opcode::o_logout_req)
+			is->iscsiTgtLogoutNormals++;
 
 		size_t ahs_len = pdu_obj->get_ahs_length();
 		if (ahs_len) {
