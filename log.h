@@ -1,3 +1,9 @@
+#if defined(TEENSY4_1)
+#define DOLOG(fmt, ...) do {                \
+                printf(fmt "\r", ##__VA_ARGS__); \
+        } while(0)
+#endif
+
 #if !defined(ARDUINO)
 #ifndef NDEBUG
 #include <cstdio>
@@ -19,10 +25,10 @@
                 printf(fmt, ##__VA_ARGS__); \
         } while(0)
 #else
-#define DOLOG(fmt, ...) do { } while(0)
+//#define DOLOG(fmt, ...) do { } while(0)
 #endif
 #else
-#define DOLOG(fmt, ...) do { } while(0)
+//#define DOLOG(fmt, ...) do { } while(0)
 #endif
 
 #include <cstdarg>

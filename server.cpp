@@ -51,11 +51,13 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 		errlog("server::receive_pdu: PDU receive error");
 		return { nullptr, false };
 	}
+	printf("pdu received\r\n");
 
 	bytes_recv += sizeof pdu;
 	is->iscsiSsnRxDataOctets += sizeof pdu;
 
 	iscsi_pdu_bhs bhs;
+	printf("bhs.set\r\n");
 	if (bhs.set(*s, pdu, sizeof pdu) == false) {
 		errlog("server::receive_pdu: BHS validation error");
 		return { nullptr, false };
@@ -73,6 +75,7 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 	iscsi_pdu_bhs *pdu_obj   = nullptr;
 	bool           pdu_error = false;
 
+	printf("select type\r\n");
 	switch(bhs.get_opcode()) {
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_login_req:
 			pdu_obj = new iscsi_pdu_login_request();
@@ -108,11 +111,13 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 	if (pdu_obj) {
 		bool ok = true;
 
+	printf("set again\r\n");
 		if (pdu_obj->set(*s, pdu, sizeof pdu) == false) {
 			ok = false;
 			errlog("server::receive_pdu: initialize PDU: validation failed");
 		}
 
+	printf("login req\r\n");
 		if (bhs.get_opcode() == iscsi_pdu_bhs::iscsi_bhs_opcode::o_login_req) {
 			is->iscsiTgtLoginAccepts++;
 #if defined(ESP32) || !defined(NDEBUG)
@@ -131,6 +136,7 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 		if (bhs.get_opcode() == iscsi_pdu_bhs::iscsi_bhs_opcode::o_logout_req)
 			is->iscsiTgtLogoutNormals++;
 
+	printf("ahs\r\n");
 		size_t ahs_len = pdu_obj->get_ahs_length();
 		if (ahs_len) {
 			DOLOG("server::receive_pdu: read %zu ahs bytes\n", ahs_len);
@@ -149,6 +155,7 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 			is->iscsiSsnRxDataOctets += ahs_len;
 		}
 
+	printf("data\r\n");
 		size_t data_length = pdu_obj->get_data_length();
 		if (data_length) {
 			size_t padded_data_length = (data_length + 3) & ~3;
@@ -175,6 +182,8 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 			pdu_obj = nullptr;
 		}
 	}
+
+	printf("zuruck\r\n");
 
 	return { pdu_obj, pdu_error };
 }
@@ -469,6 +478,7 @@ void server::handler()
 			bool     ok  = true;
 
 			do {
+		printf("WAIt for pdu\r\n");
 				auto incoming = receive_pdu(cc, &ses);
 				iscsi_pdu_bhs *pdu = incoming.first;
 				if (!pdu) {
@@ -476,6 +486,7 @@ void server::handler()
 					is->iscsiInstSsnFailures++;
 					break;
 				}
+		printf("pdu received\r\n");
 
 				is->iscsiSsnCmdPDUs++;
 
@@ -505,8 +516,10 @@ void server::handler()
 					DOLOG("server::handler: transmitted reject PDU\n");
 				}
 				else {
+		printf("select response\r\n");
 					auto parameters = select_parameters(pdu, ses, s);
 					if (parameters) {
+		printf("send response\r\n");
 						push_response(cc, ses, pdu, parameters);
 						delete parameters;
 					}
@@ -517,6 +530,7 @@ void server::handler()
 
 					delete pdu;
 				}
+		printf("pdu finsihed\r\n");
 
 #if defined(ESP32) || defined(RP2040W)
 				auto tx_end = micros();
@@ -541,6 +555,7 @@ void server::handler()
 					busy       = 0;
 				}
 #endif
+			printf("ok: %d\r\n", ok);
 			}
 			while(ok);
 #if defined(ESP32) || defined(RP2040W)
