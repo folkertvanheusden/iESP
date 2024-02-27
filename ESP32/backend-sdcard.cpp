@@ -1,7 +1,5 @@
 #include <fcntl.h>
-#if !defined(TEENSY4_1)  // the teensyh version does not use threads
 #include <mutex>
-#endif
 #include <optional>
 #include <unistd.h>
 #include <sys/stat.h>
@@ -52,31 +50,19 @@ bool backend_sdcard::reinit(const bool close_first)
 	write_led(led_write, HIGH);
 	if (close_first) {
 		file.close();
-#if !defined(TEENSY4_1)
-		SD_.end();
-#endif
+		sd.end();
 		Serial.println(F("Re-init SD-card backend..."));
 	}
 	else {
 		Serial.println(F("Init SD-card backend..."));
 	}
 
-#if defined(TEENSY4_1)
-	if (SD_.begin(BUILTIN_SDCARD))
-		Serial.println(F("Init SD-card succeeded"));
-	else {
-		Serial.println(F("Init SD-card failed!"));
-		write_led(led_read,  LOW);
-		write_led(led_write, LOW);
-		return false;
-	}
-#else
 	SPI.begin(SD_SCLK, SD_MISO, SD_MOSI, SD_CS);
 
 	bool ok = false;
 	for(int sp=50; sp>=14; sp -= 4) {
 		Serial.printf("Trying %d MHz...\r\n", sp);
-		if (SD_.begin(SdSpiConfig(SD_CS, DEDICATED_SPI, SD_SCK_MHZ(sp)))) {
+		if (sd.begin(SdSpiConfig(SD_CS, DEDICATED_SPI, SD_SCK_MHZ(sp)))) {
 			ok = true;
 			Serial.printf("Accessing SD card at %d MHz\r\n", sp);
 			break;
@@ -85,21 +71,16 @@ bool backend_sdcard::reinit(const bool close_first)
 
 	if (ok == false) {
 		Serial.printf("SD-card mount failed (assuming CS is on pin %d)\r\n", SD_CS);
-		SD_.initErrorPrint(&Serial);
+		sd.initErrorPrint(&Serial);
 		write_led(led_read,  LOW);
 		write_led(led_write, LOW);
 		return false;
 	}
 
-	SD_.ls(LS_DATE | LS_SIZE);
-#endif
+	sd.ls(LS_DATE | LS_SIZE);
 
 retry:
-#if defined(TEENSY4_1)
-	if (file.open(FILENAME, FILE_READ | FILE_WRITE) == false)
-#else
 	if (file.open(FILENAME, O_RDWR) == false)
-#endif
 	{
 		errlog("Cannot access test.dat on SD-card");
 		write_led(led_read,  LOW);
@@ -121,9 +102,7 @@ retry:
 backend_sdcard::~backend_sdcard()
 {
 	file.close();
-#if !defined(TEENSY4_1)
-	SD_.end();
-#endif
+	sd.end();
 }
 
 bool backend_sdcard::sync()
@@ -132,9 +111,7 @@ bool backend_sdcard::sync()
 
 	n_syncs++;
 
-#if !defined(TEENSY4_1)
 	std::lock_guard<std::mutex> lck(serial_access_lock);
-#endif
 
 	if (file.sync() == false)
 		errlog("SD card backend: sync failed");
@@ -164,9 +141,7 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 	uint64_t iscsi_block_size = get_block_size();
 	uint64_t byte_address     = block_nr * iscsi_block_size;  // iSCSI to bytes
 
-#if !defined(TEENSY4_1)
 	std::lock_guard<std::mutex> lck(serial_access_lock);
-#endif
 
 	if (file.seekSet(byte_address) == false) {
 		errlog("Cannot seek to position");
@@ -180,11 +155,13 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 	bool rc = false;
 	for(int k=2; k>=0; k--) {  // 2 is arbitrarily chosen
 		for(int i=0; i<5; i++) {  // 5 is arbitrarily chosen
-			rc = file.write(data, n_bytes_to_write) == n_bytes_to_write;
+			size_t bytes_written = file.write(data, n_bytes_to_write);
+			rc = bytes_written == n_bytes_to_write;
 			if (rc)
 				goto ok;
+			Serial.printf("Wrote %zu bytes instead of %zu\r\n", bytes_written, n_bytes_to_write);
 			delay((i + 1) * 100); // 100ms is arbitrarily chosen
-			Serial.println(F("Retrying write"));
+			Serial.printf("Retrying write of %" PRIu32 " blocks starting at block number % " PRIu64 "\r\n", n_blocks, block_nr);
 		}
 
 		if (k)
@@ -226,9 +203,7 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 	uint64_t iscsi_block_size = get_block_size();
 	uint64_t byte_address     = block_nr * iscsi_block_size;  // iSCSI to bytes
 
-#if !defined(TEENSY4_1)
 	std::lock_guard<std::mutex> lck(serial_access_lock);
-#endif
 
 	if (file.seekSet(byte_address) == false) {
 		errlog("Cannot seek to position");
@@ -242,11 +217,13 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 	bool rc = false;
 	for(int k=2; k>=0; k--) {  // 2 is arbitrarily chosen
 		for(int i=0; i<5; i++) {  // 5 is arbitrarily chosen
-			rc = file.read(data, n_bytes_to_read) == n_bytes_to_read;
+			size_t bytes_read = file.read(data, n_bytes_to_read);
+			rc = bytes_read == n_bytes_to_read;
 			if (rc)
 				goto ok;
+			Serial.printf("Read %zu bytes instead of %zu\r\n", bytes_read, n_bytes_to_read);
 			delay((i + 1) * 100); // 100ms is arbitrarily chosen
-			Serial.println(F("Retrying read"));
+			Serial.printf("Retrying read of %" PRIu32 " blocks starting at block number % " PRIu64 "\r\n", n_blocks, block_nr);
 		}
 
 		if (k)

@@ -26,10 +26,11 @@
 #include <LittleFS.h>
 #include <NTP.h>
 
-#include "backend-sdcard.h"
 #if defined(TEENSY4_1)
+#include "backend-sdcard-teensy41.h"
 #include "com-arduino.h"
 #else
+#include "backend-sdcard.h"
 #include "com-sockets.h"
 #endif
 #include "log.h"
@@ -49,7 +50,7 @@ namespace qn = qindesign::network;
 bool ota_update = false;
 std::atomic_bool stop { false };
 char name[16] { 0 };
-backend_sdcard  *bs { nullptr };
+backend  *bs   { nullptr };
 scsi *scsi_dev { nullptr };
 
 #if defined(WT_ETH01)
@@ -676,7 +677,11 @@ void setup() {
 	init_snmp(&snmp_, &snmp_data_, &ios, &is, &percentage_diskspace, &cpu_usage, &ram_free_kb, &stop);
 
 	draw_status("0012");
+#if defined(TEENSY4_1)
+	bs = new backend_sdcard_teensy41(led_green, led_yellow);
+#else
 	bs = new backend_sdcard(led_green, led_yellow);
+#endif
 	draw_status("0013");
 	if (bs->begin() == false) {
 		errlog("Failed to load initialize storage backend!");
