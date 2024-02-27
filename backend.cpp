@@ -56,12 +56,17 @@ uint8_t backend::get_free_space_percentage()
 		}
 		while(block_nr >= size);
 
-		if (read(block_nr, 1, buffer) == false)
-			return 0;
+		if (read(block_nr, 1, buffer) == false) {
+			empty_count = 0;
+			break;
+		}
 
 		if (memcmp(buffer, empty, 512) == 0)
 			empty_count++;
 	}
+
+	delete [] buffer;
+	delete [] empty;
 
 	return empty_count;
 }
