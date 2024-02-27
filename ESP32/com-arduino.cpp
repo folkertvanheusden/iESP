@@ -143,7 +143,7 @@ bool com_client_arduino::send(const uint8_t *const from, const size_t n)
 		watchdog_update();
 #endif
 
-		ssize_t cur_n = wc.write(p, n);
+		ssize_t cur_n = wc.write(p, todo);
 		if (cur_n < 0)
 			break;
 
