@@ -35,7 +35,8 @@ snmp::snmp(snmp_data *const sd, std::atomic_bool *const stop): sd(sd), stop(stop
 	if (bind(fd, reinterpret_cast<const struct sockaddr *>(&servaddr), sizeof servaddr) == -1)
 		DOLOG("Failed to bind to SNMP UDP port\n");
 #else
-	handle.begin(161);
+	handle = new EthernetUDP();
+	handle->begin(161);
 #endif
 	buffer = new uint8_t[SNMP_RECV_BUFFER_SIZE]();
 
@@ -48,6 +49,9 @@ snmp::~snmp()
 {
 #if !defined(ARDUINO) || defined(ESP32)
 	close(fd);
+#endif
+#if defined(TEENSY4_1)
+	delete handle;
 #endif
 
 	th->join();
@@ -357,12 +361,15 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 #if defined(TEENSY4_1)
 void snmp::poll()
 {
-	int rc = handle.parsePacket();
+	int rc = handle->parsePacket();
 	if (rc == 0)
 		return;
 
 	if (rc > 0) {
+		Serial.println(F("DAAR"));
 		oid_req_t or_;
+
+		handle->read(buffer, rc);
 
 		if (!process_BER(buffer, rc, &or_, false, 2))
 			return;
@@ -371,9 +378,10 @@ void snmp::poll()
 		size_t   output_size = 0;
 		gen_reply(or_, &packet_out, &output_size);
 		if (output_size) {
-			handle.beginPacket(handle.remoteIP(), handle.remotePort());
-			handle.write(packet_out, output_size);
-			handle.endPacket();
+	Serial.println(F("send"));
+			handle->beginPacket(handle->remoteIP(), handle->remotePort());
+			handle->write(packet_out, output_size);
+			handle->endPacket();
 		}
 		free(packet_out);
 	}
@@ -397,11 +405,13 @@ void snmp::thread()
 		if (rc == -1)
 			break;
 #else
-		int rc = handle.parsePacket();
+		int rc = handle->parsePacket();
 		if (rc == 0) {
 			delay(1);
 			continue;
 		}
+
+		handle->read(buffer, rc);
 #endif
 
 		if (rc > 0) {
@@ -418,9 +428,9 @@ void snmp::thread()
 				if (sendto(fd, packet_out, output_size, 0, reinterpret_cast<sockaddr *>(&clientaddr), len) == -1)
 					errlog("Failed to transmit SNMP reply packet\n");
 #else
-				handle.beginPacket(handle.remoteIP(), handle.remotePort());
-				handle.write(packet_out, output_size);
-				handle.endPacket();
+				handle->beginPacket(handle->remoteIP(), handle->remotePort());
+				handle->write(packet_out, output_size);
+				handle->endPacket();
 #endif
 			}
 			free(packet_out);
