@@ -37,6 +37,7 @@
 #include "snmp.h"
 #include "utils.h"
 #if defined(TEENSY4_1)
+#include <SPI.h>
 #include <NativeEthernet.h>
 #include <NativeEthernetUdp.h>
 #else
@@ -610,7 +611,9 @@ void setup() {
 		ls(myfs, "/");
 #endif
 		draw_status("0007");
+#if !defined(TEENSY4_1)
 		fail_flash();
+#endif
 	}
 
 #if !defined(TEENSY4_1)
@@ -637,6 +640,11 @@ void setup() {
 			Serial.println(F("Ethernet shield was not found"));
 		else if (Ethernet.linkStatus() == LinkOFF)
 			Serial.println(F("Ethernet cable is not connected"));
+	}
+	else {
+		Serial.print(F("Ethernet initialized ("));
+		Serial.print(Ethernet.localIP());
+		Serial.println(F(")"));
 	}
 #else
 	ETH.begin();  // ESP32-WT-ETH01, w32-eth01
