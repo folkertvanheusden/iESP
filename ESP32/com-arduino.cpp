@@ -139,21 +139,19 @@ bool com_client_arduino::send(const uint8_t *const from, const size_t n)
 	size_t         todo = n;
 
 	while(todo > 0) {
-		if (wc.connected() == false)
-			return false;
-
-#if defined(TEENSY4_1)
-		qn::Ethernet.maintain();
-#else
+#if !defined(TEENSY4_1)
 		watchdog_update();
 #endif
 
-		size_t cur_n = wc.write(p, n);
-		p    += cur_n;
-		todo -= cur_n;
+		ssize_t cur_n = wc.write(p, n);
+		if (cur_n < 0)
+			break;
 
-		if (todo)
-			yield();
+		if (cur_n > 0) {
+			// Serial.printf("sent %zd\r\n", cur_n);
+			p    += cur_n;
+			todo -= cur_n;
+		}
 	}
 
 	return true;
@@ -168,20 +166,18 @@ bool com_client_arduino::recv(uint8_t *const to, const size_t n)
 #if defined(TEENSY4_1)
 		// ugly hack
 		snmp_->poll();
-		qn::Ethernet.maintain();
 #else
 		watchdog_update();
 #endif
 
-		size_t cur_n = wc.read(p, todo);
-		p    += cur_n;
-		todo -= cur_n;
+		ssize_t cur_n = wc.read(p, todo);
+		if (cur_n < 0)
+			break;
 
-		if (todo) {
-			yield();
-
-			if (wc.connected() == false)
-				return false;
+		if (cur_n > 0) {
+			// Serial.printf("read %zd\r\n", cur_n);
+			p    += cur_n;
+			todo -= cur_n;
 		}
 	}
 
