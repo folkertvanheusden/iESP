@@ -1,6 +1,9 @@
 #include <atomic>
 #include "scsi.h"
 #include "server.h"
+#if defined(ARDUINO)
+#include "version.h"
+#endif
 #include "snmp/snmp.h"
 
 
@@ -16,7 +19,9 @@ void init_snmp(snmp **const snmp_, snmp_data **const snmp_data_, io_stats_t *con
 	(*snmp_data_)->register_oid("1.3.6.1.2.1.1.6.0",            "The Netherlands, Europe, Earth");
 	(*snmp_data_)->register_oid("1.3.6.1.2.1.1.7.0",            snmp_integer::si_integer, 254);
 	(*snmp_data_)->register_oid("1.3.6.1.2.1.1.8.0",            snmp_integer::si_integer, 0);
-
+#if defined(ARDUINO)
+	(*snmp_data_)->register_oid("1.3.6.1.4.1.2021.100.2",       version_str);
+#endif
 	(*snmp_data_)->register_oid("1.3.6.1.4.1.2021.100.3",       __DATE__);
 	(*snmp_data_)->register_oid("1.3.6.1.4.1.2021.100.1",       snmp_integer::snmp_integer_type::si_integer, 1);
 
