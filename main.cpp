@@ -9,6 +9,7 @@
 #include "com-sockets.h"
 #include "log.h"
 #include "server.h"
+#include "snmp.h"
 #include "utils.h"
 #include "snmp/snmp.h"
 
@@ -35,12 +36,12 @@ uint64_t get_cpu_usage_us()
 	return 0;
 }
 
-void maintenance_thread(std::atomic_bool *const stop, backend *const bf, uint64_t *const df_percentage, uint64_t *const cpu_usage)
+void maintenance_thread(std::atomic_bool *const stop, backend *const bf, int *const df_percentage, int *const cpu_usage)
 {
 	uint64_t prev_df_poll = 0;
 	uint64_t prev_w_poll  = 0;
 
-	uint64_t prev_cpu_usage = get_cpu_usage_us();
+	int prev_cpu_usage = get_cpu_usage_us();
 
 	while(!*stop) {
 		usleep(101000);
@@ -53,7 +54,7 @@ void maintenance_thread(std::atomic_bool *const stop, backend *const bf, uint64_
 		}
 
 		if (now - prev_w_poll >= 1000000) {
-			uint64_t current_cpu_usage = get_cpu_usage_us();
+			int current_cpu_usage = get_cpu_usage_us();
 			*cpu_usage = (current_cpu_usage - prev_cpu_usage) / 10000;
 			prev_cpu_usage = current_cpu_usage;
 
@@ -106,45 +107,13 @@ int main(int argc, char *argv[])
 	io_stats_t    ios { };
 	iscsi_stats_t is  { };
 
-	uint64_t cpu_usage            = 0;
-	uint64_t percentage_diskspace = 0;
+	int cpu_usage            = 0;
+	int percentage_diskspace = 0;
 
-	snmp_data snmp_data_;
-	snmp *snmp_ = nullptr;
-	if (use_snmp) {
-		snmp_data_.register_oid("1.3.6.1.4.1.2021.13.15.1.1.2", "iESP"  );
-		snmp_data_.register_oid("1.3.6.1.2.1.1.1.0", "iESP"  );
-		//snmp_data_.register_oid("1.3.6.1.2.1.1.2.0", new snmp_data_type_oid("1.3.6.1.4.1.57850.1"));
-		snmp_data_.register_oid("1.3.6.1.2.1.1.3.0", new snmp_data_type_running_since());
-		snmp_data_.register_oid("1.3.6.1.2.1.1.4.0", "Folkert van Heusden <mail@vanheusden.com>");
-		snmp_data_.register_oid("1.3.6.1.2.1.1.5.0", "iESP");
-		snmp_data_.register_oid("1.3.6.1.2.1.1.6.0", "The Netherlands, Europe, Earth");
-		snmp_data_.register_oid("1.3.6.1.2.1.1.7.0", snmp_integer::si_integer, 254);
-		snmp_data_.register_oid("1.3.6.1.2.1.1.8.0", snmp_integer::si_integer, 0);
-
-		snmp_data_.register_oid("1.3.6.1.4.1.2021.100.3", __DATE__);
-		snmp_data_.register_oid("1.3.6.1.4.1.2021.100.1", snmp_integer::snmp_integer_type::si_integer, 1);
-
-		snmp_data_.register_oid("1.3.6.1.4.1.2021.13.15.1.1.3", new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &ios.n_reads      ));
-		snmp_data_.register_oid("1.3.6.1.4.1.2021.13.15.1.1.4", new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &ios.n_writes     ));
-		snmp_data_.register_oid("1.3.6.1.4.1.2021.13.15.1.1.5", new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &ios.bytes_read   ));
-		snmp_data_.register_oid("1.3.6.1.4.1.2021.13.15.1.1.6", new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &ios.bytes_written));
-		snmp_data_.register_oid("1.3.6.1.4.1.2021.11.54",       new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter32, &ios.io_wait      ));
-		snmp_data_.register_oid("1.3.6.1.2.1.142.1.1.1.1.10",   new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter32, &is.iscsiInstSsnFailures));
-		snmp_data_.register_oid("1.3.6.1.2.1.142.1.10.2.1.1",   new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter32, &is.iscsiSsnCmdPDUs));
-		snmp_data_.register_oid("1.3.6.1.2.1.142.1.10.2.1.3",   new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &is.iscsiSsnTxDataOctets));
-		snmp_data_.register_oid("1.3.6.1.2.1.142.1.10.2.1.4",   new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &is.iscsiSsnRxDataOctets));
-		snmp_data_.register_oid("1.3.6.1.2.1.142.1.1.2.1.3",    new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter32, &is.iscsiInstSsnFormatErrors));
-		snmp_data_.register_oid("1.3.6.1.4.1.2021.9.1.9.1",     new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_integer,   &percentage_diskspace));
-		snmp_data_.register_oid("1.3.6.1.4.1.2021.11.9.0",      new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_integer,   &cpu_usage));
-
-		snmp_ = new snmp(&snmp_data_, &stop);
-	}
-
-	/*
-	snmp.addIntegerHandler(".1.3.6.1.4.1.2021.11.9.0",  &cpu_usage           );
-	snmp.addIntegerHandler(".1.3.6.1.4.1.2021.4.11.0",  &ram_free_kb         );
-	*/
+	snmp      *snmp_      { nullptr };
+	snmp_data *snmp_data_ { nullptr };
+	if (use_snmp)
+		init_snmp(&snmp_, &snmp_data_, &ios, &is, &percentage_diskspace, &cpu_usage, &stop);
 
 	backend_file bf(dev);
 	if (bf.begin() == false) {

@@ -18,11 +18,7 @@ typedef struct {
 	uint64_t bytes_written;
 	// 1.3.6.1.4.1.2021.11.54: "The number of 'ticks' (typically 1/100s) spent waiting for IO."
 	// https://www.circitor.fr/Mibs/Html/U/UCD-SNMP-MIB.php#ssCpuRawWait
-#if defined(ARDUINO)
 	uint32_t io_wait;  // will be updated once per second
-#else
-	uint64_t io_wait;  // will be updated once per second
-#endif
 	uint64_t io_wait_cur;  // work, in microseconds!
 } io_stats_t;
 
