@@ -36,7 +36,7 @@ uint64_t get_cpu_usage_us()
 	return 0;
 }
 
-void maintenance_thread(std::atomic_bool *const stop, backend *const bf, int *const df_percentage, int *const cpu_usage)
+void maintenance_thread(std::atomic_bool *const stop, backend *const bf, int *const df_percentage, int *const cpu_usage, int *const ram_free_kb)
 {
 	uint64_t prev_df_poll = 0;
 	uint64_t prev_w_poll  = 0;
@@ -57,6 +57,13 @@ void maintenance_thread(std::atomic_bool *const stop, backend *const bf, int *co
 			int current_cpu_usage = get_cpu_usage_us();
 			*cpu_usage = (current_cpu_usage - prev_cpu_usage) / 10000;
 			prev_cpu_usage = current_cpu_usage;
+
+			rlimit rlim { };
+			rusage ru   { };
+			if (getrlimit(RLIMIT_DATA, &rlim) == 0 && getrusage(RUSAGE_SELF, &ru) == 0)
+				*ram_free_kb = rlim.rlim_max / 1024 - ru.ru_maxrss;
+			else
+				*ram_free_kb = 0;
 
 			prev_w_poll = now;
 		}
@@ -109,11 +116,12 @@ int main(int argc, char *argv[])
 
 	int cpu_usage            = 0;
 	int percentage_diskspace = 0;
+	int ram_free_kb          = 0;
 
 	snmp      *snmp_      { nullptr };
 	snmp_data *snmp_data_ { nullptr };
 	if (use_snmp)
-		init_snmp(&snmp_, &snmp_data_, &ios, &is, &percentage_diskspace, &cpu_usage, &stop);
+		init_snmp(&snmp_, &snmp_data_, &ios, &is, &percentage_diskspace, &cpu_usage, &ram_free_kb, &stop);
 
 	backend_file bf(dev);
 	if (bf.begin() == false) {
@@ -128,7 +136,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	std::thread *mth = new std::thread(maintenance_thread, &stop, &bf, &percentage_diskspace, &cpu_usage);
+	std::thread *mth = new std::thread(maintenance_thread, &stop, &bf, &percentage_diskspace, &cpu_usage, &ram_free_kb);
 
 	server s(&sd, &c, &is);
 	s.handler();

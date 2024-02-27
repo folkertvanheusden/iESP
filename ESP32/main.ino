@@ -595,7 +595,7 @@ void setup() {
 #endif
 
 	draw_status("0011");
-	init_snmp(&snmp_, &snmp_data_, &ios, &is, &percentage_diskspace, &cpu_usage, &stop);
+	init_snmp(&snmp_, &snmp_data_, &ios, &is, &percentage_diskspace, &cpu_usage, &ram_free_kb, &stop);
 
 	draw_status("0013");
 	bs = new backend_sdcard(led_green, led_yellow);
