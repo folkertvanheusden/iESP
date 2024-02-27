@@ -2,9 +2,7 @@
 #include <errno.h>
 #include <cstring>
 #include <unistd.h>
-#ifdef TEENSY4_1
-#include <NativeEthernet.h>
-#else
+#if !defined(TEENSY4_1)
 #include <WiFi.h>
 #include <hardware/watchdog.h>
 #endif
@@ -14,6 +12,7 @@
 #include "utils.h"
 #if defined(TEENSY4_1)
 #include "snmp/snmp.h"  // ugly hack
+extern snmp *snmp_;
 #else
 #include "wifi.h"
 #endif
@@ -69,7 +68,9 @@ bool com_arduino::begin()
 
 com_arduino::~com_arduino()
 {
+#if !defined(TEENSY4_1)
 	delete server;
+#endif
 }
 
 std::string com_arduino::get_local_address()
@@ -87,17 +88,32 @@ std::string com_arduino::get_local_address()
 
 com_client *com_arduino::accept()
 {
-#if !defined(TEENSY4_1)
+#if defined(TEENSY4_1)
+	Serial.println(F("Waiting for iSCSI connection..."));
+
+	for(;;) {
+		// ugly hack
+		snmp_->poll();
+
+		Ethernet.maintain();
+
+		auto wc = server->accept();  // is non-blocking
+		if (wc) {
+			Serial.println(F("New session!"));
+
+			return new com_client_arduino(wc);
+		}
+	}
+#else
 	while(!server->hasClient()) {
 		watchdog_update();
 		delay(10);
 	}
-#endif
+
 	auto wc = server->accept();
 
-	Serial.println(F("New session!"));
-
 	return new com_client_arduino(wc);
+#endif
 }
 
 #if defined(TEENSY4_1)
@@ -125,7 +141,9 @@ bool com_client_arduino::send(const uint8_t *const from, const size_t n)
 		if (wc.connected() == false)
 			return false;
 
-#if !defined(TEENSY4_1)
+#if defined(TEENSY4_1)
+		Ethernet.maintain();
+#else
 		watchdog_update();
 #endif
 
@@ -146,17 +164,17 @@ bool com_client_arduino::recv(uint8_t *const to, const size_t n)
 	size_t   todo = n;
 
 	while(todo > 0) {
-		size_t cur_n = wc.read(p, todo);
-		p    += cur_n;
-		todo -= cur_n;
-
 #if defined(TEENSY4_1)
 		// ugly hack
-		extern snmp *snmp_;
 		snmp_->poll();
+		Ethernet.maintain();
 #else
 		watchdog_update();
 #endif
+
+		size_t cur_n = wc.read(p, todo);
+		p    += cur_n;
+		todo -= cur_n;
 
 		if (todo) {
 			yield();
