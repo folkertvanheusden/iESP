@@ -109,6 +109,7 @@ int percentage_diskspace = 0;
 long int draw_status_ts = 0;
 
 void draw_status(const std::string & str) {
+Serial.println(str.c_str());
 // TODO update display
 	draw_status_ts = millis();
 }
@@ -610,8 +611,8 @@ void setup() {
 #if defined(TEENSY4_1)
 		ls(myfs, "/");
 #endif
-		draw_status("0007");
 #if !defined(TEENSY4_1)
+		draw_status("0007");
 		fail_flash();
 #endif
 	}
@@ -675,12 +676,12 @@ void setup() {
 	draw_status("0011");
 	init_snmp(&snmp_, &snmp_data_, &ios, &is, &percentage_diskspace, &cpu_usage, &ram_free_kb, &stop);
 
-	draw_status("0013");
+	draw_status("0012");
 	bs = new backend_sdcard(led_green, led_yellow);
-	draw_status("0014");
+	draw_status("0013");
 	if (bs->begin() == false) {
 		errlog("Failed to load initialize storage backend!");
-		draw_status("000b");
+		draw_status("0014");
 		fail_flash();
 	}
 

@@ -1,7 +1,9 @@
-#if !defined(TEENSY4_1)
+#if defined(TEENSY4_1)
+#include <SD.h>
+#else
 #include <mutex>
-#endif
 #include <SdFat.h>
+#endif
 #include <string>
 
 #include "backend.h"
@@ -10,7 +12,12 @@
 class backend_sdcard : public backend
 {
 private:
+#if defined(TEENSY4_1)
+#define SD_ SD
+#else
 	SdFs      sd;
+#define SD_ sd
+#endif
 	FsFile    file;
 	uint64_t  card_size   { 0  };
 	size_t    sector_size { 0  };

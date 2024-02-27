@@ -52,21 +52,31 @@ bool backend_sdcard::reinit(const bool close_first)
 	write_led(led_write, HIGH);
 	if (close_first) {
 		file.close();
-		sd.end();
+#if !defined(TEENSY4_1)
+		SD_.end();
+#endif
 		Serial.println(F("Re-init SD-card backend..."));
 	}
 	else {
 		Serial.println(F("Init SD-card backend..."));
 	}
 
-#if !defined(TEENSY4_1)
+#if defined(TEENSY4_1)
+	if (SD_.begin(BUILTIN_SDCARD))
+		Serial.println(F("Init SD-card succeeded"));
+	else {
+		Serial.println(F("Init SD-card failed!"));
+		write_led(led_read,  LOW);
+		write_led(led_write, LOW);
+		return false;
+	}
+#else
 	SPI.begin(SD_SCLK, SD_MISO, SD_MOSI, SD_CS);
-#endif
 
 	bool ok = false;
 	for(int sp=50; sp>=14; sp -= 4) {
 		Serial.printf("Trying %d MHz...\r\n", sp);
-		if (sd.begin(SdSpiConfig(SD_CS, DEDICATED_SPI, SD_SCK_MHZ(sp)))) {
+		if (SD_.begin(SdSpiConfig(SD_CS, DEDICATED_SPI, SD_SCK_MHZ(sp)))) {
 			ok = true;
 			Serial.printf("Accessing SD card at %d MHz\r\n", sp);
 			break;
@@ -75,13 +85,14 @@ bool backend_sdcard::reinit(const bool close_first)
 
 	if (ok == false) {
 		Serial.printf("SD-card mount failed (assuming CS is on pin %d)\r\n", SD_CS);
-		sd.initErrorPrint(&Serial);
+		SD_.initErrorPrint(&Serial);
 		write_led(led_read,  LOW);
 		write_led(led_write, LOW);
 		return false;
 	}
 
-	sd.ls(LS_DATE | LS_SIZE);
+	SD_.ls(LS_DATE | LS_SIZE);
+#endif
 
 retry:
 #if defined(TEENSY4_1)
@@ -110,7 +121,9 @@ retry:
 backend_sdcard::~backend_sdcard()
 {
 	file.close();
-	sd.end();
+#if !defined(TEENSY4_1)
+	SD_.end();
+#endif
 }
 
 bool backend_sdcard::sync()
