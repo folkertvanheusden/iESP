@@ -22,6 +22,7 @@ add_executable(
 	server.cpp
 	scsi.cpp
 	session.cpp
+	snmp.cpp
 	utils.cpp
 	snmp/snmp.cpp
 	snmp/snmp_data.cpp

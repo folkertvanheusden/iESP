@@ -12,7 +12,9 @@
 #include "com-arduino.h"
 #include "log.h"
 #include "utils.h"
-#ifndef TEENSY4_1
+#if defined(TEENSY4_1)
+#include "snmp/snmp.h"  // ugly hack
+#else
 #include "wifi.h"
 #endif
 
@@ -148,7 +150,11 @@ bool com_client_arduino::recv(uint8_t *const to, const size_t n)
 		p    += cur_n;
 		todo -= cur_n;
 
-#if !defined(TEENSY4_1)
+#if defined(TEENSY4_1)
+		// ugly hack
+		extern snmp *snmp_;
+		snmp_->poll();
+#else
 		watchdog_update();
 #endif
 

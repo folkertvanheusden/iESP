@@ -5,9 +5,15 @@
 #include <string>
 #include <thread>
 #include <vector>
+#if defined(TEENSY4_1)
+#include <NativeEthernet.h>
+#include <NativeEthernetUdp.h>
+#endif
 
 #include "snmp_data.h"
 
+
+#define SNMP_RECV_BUFFER_SIZE 1600
 
 typedef struct _oid_req_t_ {
 	std::vector<std::string> oids;
@@ -25,7 +31,12 @@ class snmp
 {
 private:
 	snmp_data *const sd { nullptr };
+#if !defined(ARDUINO) || defined(ESP32)
 	int              fd { -1      };
+#elif defined(TEENSY4_1)
+	EthernetUDP      handle;
+#endif
+	uint8_t         *buffer { nullptr };  // for receiving requests
 	std::thread     *th { nullptr };
 	std::atomic_bool *const stop { nullptr };
 
@@ -39,10 +50,16 @@ private:
 	void     add_octet_string(uint8_t **const packet_out, size_t *const output_size, const char *const str);
 	void     gen_reply  (oid_req_t & oids_req, uint8_t **const packet_out, size_t *const output_size);
 
+#if !defined(TEENSY4_1)
 	void     thread     ();
+#endif
 
 public:
 	snmp(snmp_data *const sd, std::atomic_bool *const stop);
 	snmp(const snmp &) = delete;
 	virtual ~snmp();
+
+#if defined(TEENSY4_1)
+	void     poll       ();
+#endif
 };

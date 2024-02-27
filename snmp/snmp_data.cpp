@@ -1,5 +1,6 @@
 #include <algorithm>
-#include <assert.h>
+#include <cassert>
+#include <cstdint>
 
 #include "snmp_data.h"
 #include "../utils.h"
@@ -95,6 +96,32 @@ snmp_elem * snmp_data_type_stats::get_data()
 	return new snmp_integer(type, *counter);
 }
 
+snmp_data_type_stats_int::snmp_data_type_stats_int(int *const counter) : counter(counter)
+{
+}
+
+snmp_data_type_stats_int::~snmp_data_type_stats_int()
+{
+}
+
+snmp_elem * snmp_data_type_stats_int::get_data()
+{
+	return new snmp_integer(snmp_integer::snmp_integer_type::si_integer, *counter);
+}
+
+snmp_data_type_stats_uint32_t::snmp_data_type_stats_uint32_t(uint32_t *const counter) : counter(counter)
+{
+}
+
+snmp_data_type_stats_uint32_t::~snmp_data_type_stats_uint32_t()
+{
+}
+
+snmp_elem * snmp_data_type_stats_uint32_t::get_data()
+{
+	return new snmp_integer(snmp_integer::snmp_integer_type::si_integer, *counter);
+}
+
 snmp_data_type_running_since::snmp_data_type_running_since():
 	running_since((get_micros() - ::running_since) / 10000)
 {
@@ -130,7 +157,9 @@ void snmp_data::register_oid(const std::string & oid, snmp_data_type *const e)
 
 	std::string                    cur_oid;
 
+#if !defined(TEENSY4_1)
 	std::unique_lock<std::mutex>   lck(lock);
+#endif
 
 	for(size_t i=0; i<parts.size(); i++) {
 		if (cur_oid.empty() == false)
@@ -177,7 +206,9 @@ void snmp_data::register_oid(const std::string & oid, const snmp_integer::snmp_i
 
 std::optional<snmp_elem *> snmp_data::find_by_oid(const std::string & oid)
 {
+#if !defined(TEENSY4_1)
 	std::unique_lock<std::mutex> lck(lock);
+#endif
 
 	std::vector<snmp_data_type *> *p_lut = &data;
 
@@ -207,7 +238,9 @@ std::optional<snmp_elem *> snmp_data::find_by_oid(const std::string & oid)
 
 std::string snmp_data::find_next_oid(const std::string & oid)
 {
+#if !defined(TEENSY4_1)
 	std::unique_lock<std::mutex> lck(lock);
+#endif
 
 	std::vector<snmp_data_type *> *p_lut = &data;
 	snmp_data_type *parent = nullptr;

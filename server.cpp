@@ -2,7 +2,6 @@
 #include <Arduino.h>
 #ifndef TEENSY4_1
 #include <WiFi.h>
-#include <esp_pthread.h>
 #endif
 #endif
 #include <atomic>
@@ -114,8 +113,9 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 			errlog("server::receive_pdu: initialize PDU: validation failed");
 		}
 
-#if defined(ESP32) || !defined(NDEBUG)
 		if (bhs.get_opcode() == iscsi_pdu_bhs::iscsi_bhs_opcode::o_login_req) {
+			is->iscsiTgtLoginAccepts++;
+#if defined(ESP32) || !defined(NDEBUG)
 			auto initiator = reinterpret_cast<iscsi_pdu_login_request *>(pdu_obj)->get_initiator();
 			if (initiator.has_value()) {
 #ifdef ESP32
@@ -125,8 +125,11 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 				DOLOG("server::receive_pdu: initiator: %s\n", initiator.value().c_str());
 #endif
 			}
-		}
 #endif
+		}
+
+		if (bhs.get_opcode() == iscsi_pdu_bhs::iscsi_bhs_opcode::o_logout_req)
+			is->iscsiTgtLogoutNormals++;
 
 		size_t ahs_len = pdu_obj->get_ahs_length();
 		if (ahs_len) {
@@ -422,13 +425,6 @@ iscsi_response_parameters *server::select_parameters(iscsi_pdu_bhs *const pdu, s
 
 void server::handler()
 {
-#if defined(ESP32)
-	esp_pthread_cfg_t cfg = esp_pthread_get_default_config();
-	Serial.printf("Original pthread stack size: %d\r\n", cfg.stack_size);
-	cfg.stack_size = 8192;
-	esp_pthread_set_cfg(&cfg);
-#endif
-
 	std::vector<std::pair<std::thread *, std::atomic_bool *> > threads;
 
 	while(!stop) {
@@ -477,6 +473,7 @@ void server::handler()
 				iscsi_pdu_bhs *pdu = incoming.first;
 				if (!pdu) {
 					DOLOG("server::handler: no PDU received, aborting socket connection\n");
+					is->iscsiInstSsnFailures++;
 					break;
 				}
 
@@ -488,6 +485,8 @@ void server::handler()
 
 				if (incoming.second) {  // something wrong with the received PDU?
 					errlog("server::handler: invalid PDU received");
+
+					is->iscsiInstSsnFormatErrors++;
 
 					std::optional<blob_t> reject = generate_reject_pdu(*pdu);
 					if (reject.has_value() == false) {
@@ -513,6 +512,7 @@ void server::handler()
 					}
 					else {
 						ok = false;
+						is->iscsiInstSsnFailures++;
 					}
 
 					delete pdu;

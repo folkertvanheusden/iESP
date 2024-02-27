@@ -30,7 +30,7 @@ On the ESP32 it uses the connected SD-card. Make sure it is formatted in 'exfat'
 
 On Linux/FreeBSD, it assumes you have a test.dat file of appropriate size in the current directory. Run iESP with '-h' to see a list of switches. You probably need to change the listen-address for example.
 
-The ESP32 version listens to SNMP using the Arduino\_SNMP library. The Posix version has a custom SNMP library.
+This software has a custom SNMP library.
 * .1.3.6.1.4.1.2021.13.15.1.1.3 - number of bytes read
 * .1.3.6.1.4.1.2021.13.15.1.1.4 - number of bytes written
 * .1.3.6.1.4.1.2021.13.15.1.1.5 - number of reads

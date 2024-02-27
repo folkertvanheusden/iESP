@@ -20,9 +20,11 @@
 #elif !defined(TEENSY4_1)
 #include <ETH.h>
 #endif
+#if defined(ESP32)
+#include <esp_pthread.h>
+#endif
 #include <LittleFS.h>
 #include <NTP.h>
-#include <SNMP_Agent.h>
 
 #include "backend-sdcard.h"
 #if defined(TEENSY4_1)
@@ -32,6 +34,7 @@
 #endif
 #include "log.h"
 #include "server.h"
+#include "snmp.h"
 #include "utils.h"
 #if defined(TEENSY4_1)
 #include <NativeEthernet.h>
@@ -40,6 +43,7 @@
 #include "wifi.h"
 #endif
 #include "version.h"
+#include "snmp/snmp.h"
 
 
 bool ota_update = false;
@@ -62,6 +66,9 @@ int led_yellow = -1;
 int led_red    = -1;
 #endif
 
+snmp      *snmp_      { nullptr };
+snmp_data *snmp_data_ { nullptr };
+
 DynamicJsonDocument cfg(4096);
 #define IESP_CFG_FILE "/cfg-iESP.json"
 
@@ -82,7 +89,6 @@ WiFiUDP snmp_udp;
 WiFiUDP ntp_udp;
 #endif
 
-SNMPAgent snmp("public", "private");
 NTP ntp(ntp_udp);
 
 uint32_t hundredsofasecondcounter = 0;
@@ -436,7 +442,6 @@ void loopw(void *) {
 		ntp.update();
 		ArduinoOTA.handle();
 		hundredsofasecondcounter = now / 10;
-		snmp.loop();
 
 		vTaskDelay(100 / portTICK_PERIOD_MS);
 
@@ -652,34 +657,19 @@ void setup() {
 	esp_register_freertos_idle_hook_for_cpu(idle_task_1, 1);
 #endif
 
+#if defined(ESP32)
+	esp_pthread_cfg_t cfg = esp_pthread_get_default_config();
+	Serial.printf("Original pthread stack size: %d\r\n", cfg.stack_size);
+	cfg.stack_size = 8192;
+	esp_pthread_set_cfg(&cfg);
+#endif
+
 	draw_status("0011");
+	init_snmp(&snmp_, &snmp_data_, &ios, &is, &percentage_diskspace, &cpu_usage, &ram_free_kb, &stop);
 
-	snmp.setUDP(&snmp_udp);
-	snmp.addTimestampHandler(".1.3.6.1.2.1.1.3.0",            &hundredsofasecondcounter);
-	snmp.addReadOnlyStaticStringHandler(".1.3.6.1.4.1.2021.13.15.1.1.2", "iESP" );
-	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.3", &ios.n_reads      );
-	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.4", &ios.n_writes     );
-	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.5", &ios.bytes_read   );
-	snmp.addCounter64Handler(".1.3.6.1.4.1.2021.13.15.1.1.6", &ios.bytes_written);
-	snmp.addCounter32Handler(".1.3.6.1.4.1.2021.11.54",       &ios.io_wait      );
-	snmp.addIntegerHandler  (".1.3.6.1.4.1.2021.11.9.0",      &cpu_usage        );
-	snmp.addIntegerHandler  (".1.3.6.1.4.1.2021.4.11.0",      &ram_free_kb      );
-	snmp.addIntegerHandler(".1.3.6.1.4.1.2021.9.1.9.1",    &percentage_diskspace);
-	snmp.addReadOnlyStaticStringHandler(".1.3.6.1.2.1.1.1.0", "iESP");
-	snmp.addReadOnlyIntegerHandler(".1.3.6.1.4.1.2021.100.1", 1);
-	snmp.addReadOnlyStaticStringHandler(".1.3.6.1.4.1.2021.100.2", version_str);
-	snmp.addReadOnlyStaticStringHandler(".1.3.6.1.4.1.2021.100.3", __DATE__);
-	snmp.addCounter32Handler("1.3.6.1.2.1.142.1.10.2.1.1", &is.iscsiSsnCmdPDUs  );
-	snmp.addCounter64Handler("1.3.6.1.2.1.142.1.10.2.1.3", &is.iscsiSsnTxDataOctets);
-	snmp.addCounter64Handler("1.3.6.1.2.1.142.1.10.2.1.4", &is.iscsiSsnRxDataOctets);
-
-	snmp.sortHandlers();
-	snmp.begin();
-
-	draw_status("0012");
-
+	draw_status("0013");
 	bs = new backend_sdcard(led_green, led_yellow);
-	draw_status("000c");
+	draw_status("0014");
 	if (bs->begin() == false) {
 		errlog("Failed to load initialize storage backend!");
 		draw_status("000b");
