@@ -415,7 +415,8 @@ void snmp::thread()
 			gen_reply(or_, &packet_out, &output_size);
 			if (output_size) {
 #if !defined(ARDUINO) || defined(ESP32)
-				sendto(fd, packet_out, output_size, 0, reinterpret_cast<sockaddr *>(&clientaddr), len);
+				if (sendto(fd, packet_out, output_size, 0, reinterpret_cast<sockaddr *>(&clientaddr), len) == -1)
+					errlog("Failed to transmit SNMP reply packet\n");
 #else
 				handle.beginPacket(handle.remoteIP(), handle.remotePort());
 				handle.write(packet_out, output_size);
