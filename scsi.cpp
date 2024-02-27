@@ -332,9 +332,6 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			lba             = get_uint64_t(&CDB[2]);
 			transfer_length = get_uint32_t(&CDB[10]);
 		}
-		else {
-			errlog("scsi::send: WRITE_1x internal error");
-		}
 
 		DOLOG("scsi::send: WRITE_1%c, offset %" PRIu64 ", %u sectors\n", opcode == o_write_10 ? '0' : '6', lba, transfer_length);
 
@@ -609,7 +606,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			uint32_t transfer_length = get_uint32_t(&pd[i + 8]);
 
 			auto vr = validate_request(lba, transfer_length);
-			if (vr.has_value()) {
+			if (vr.has_value() || transfer_length > 8192) {  // sanity check TODO hardcoded limit
 				errlog("scsi::send: UNMAP parameters invalid");
 				response.sense_data = vr.value();
 				rc = rw_fail_general;

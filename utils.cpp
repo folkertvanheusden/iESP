@@ -1,5 +1,6 @@
 #include <cstdarg>
 #include <cstdint>
+#include <cstring>
 #include <string>
 #include <unistd.h>
 #include <vector>
@@ -171,8 +172,11 @@ uint64_t get_micros()
 #if defined(ARDUINO)
 	return micros();
 #else
-        struct timespec tv;
-        clock_gettime(CLOCK_REALTIME, &tv);
+        struct timespec tv { };
+        if (clock_gettime(CLOCK_REALTIME, &tv) == -1) {
+		errlog("get_micros: clock_gettime failed (%s)", strerror(errno));
+		return 0;
+	}
 
         return uint64_t(tv.tv_sec) * uint64_t(1000 * 1000) + uint64_t(tv.tv_nsec / 1000);
 #endif
