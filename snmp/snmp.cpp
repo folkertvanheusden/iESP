@@ -366,7 +366,6 @@ void snmp::poll()
 		return;
 
 	if (rc > 0) {
-		Serial.println(F("DAAR"));
 		oid_req_t or_;
 
 		handle->read(buffer, rc);
@@ -378,7 +377,6 @@ void snmp::poll()
 		size_t   output_size = 0;
 		gen_reply(or_, &packet_out, &output_size);
 		if (output_size) {
-	Serial.println(F("send"));
 			handle->beginPacket(handle->remoteIP(), handle->remotePort());
 			handle->write(packet_out, output_size);
 			handle->endPacket();
