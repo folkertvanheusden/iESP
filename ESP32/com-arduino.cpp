@@ -154,7 +154,7 @@ bool com_client_arduino::send(const uint8_t *const from, const size_t n)
 		}
 	}
 
-	return true;
+	return todo == 0;
 }
 
 bool com_client_arduino::recv(uint8_t *const to, const size_t n)
@@ -181,7 +181,7 @@ bool com_client_arduino::recv(uint8_t *const to, const size_t n)
 		}
 	}
 
-	return true;
+	return todo == 0;
 }
 
 std::string com_client_arduino::get_endpoint_name() const
