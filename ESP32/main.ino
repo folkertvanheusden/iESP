@@ -15,7 +15,9 @@
 #include <esp_wifi.h>
 #include <ESPmDNS.h>
 #endif
-#if defined(WEMOS32_ETH)
+#if defined(WEMOS32)
+//
+#elif defined(WEMOS32_ETH)
 #include <ESP32-ENC28J60.h>
 #elif !defined(TEENSY4_1)
 #include <ETH.h>
@@ -25,6 +27,7 @@
 #endif
 #include <LittleFS.h>
 #include <NTP.h>
+#include <TM1637.h>
 
 #if defined(TEENSY4_1)
 #include "backend-sdcard-teensy41.h"
@@ -57,7 +60,7 @@ scsi *scsi_dev { nullptr };
 int led_green  = 4;
 int led_yellow = 5;
 int led_red    = 35;
-#elif defined(WEMOS32_ETH)
+#elif defined(WEMOS32_ETH) || defined(WEMOS32)
 int led_green  = 17;
 int led_yellow = 16;
 int led_red    = 32;
@@ -104,11 +107,14 @@ int eth_wait_seconds = 0;
 int update_df_interval = 0;
 int percentage_diskspace = 0;
 
+TM1637 TM;
+
 long int draw_status_ts = 0;
 
-void draw_status(const std::string & str) {
-Serial.println(str.c_str());
-// TODO update display
+void draw_status(const uint32_t v) {
+	TM.setBrightness(4);
+	TM.displayInt(v);
+
 	draw_status_ts = millis();
 }
 
@@ -307,6 +313,7 @@ void WiFiEvent(WiFiEvent_t event)
 			msg += "WIFI_REASON_ASSOC_FAIL"; break;
 		case WIFI_REASON_HANDSHAKE_TIMEOUT:
 			msg += "WIFI_REASON_HANDSHAKE_TIMEOUT"; break;
+#if !defined(WEMOS32)
 		case ARDUINO_EVENT_ETH_START:
 			msg += "ETH Started";
 			//set eth hostname here
@@ -335,6 +342,7 @@ void WiFiEvent(WiFiEvent_t event)
 			msg += "ETH Stopped";
 			eth_connected = false;
 			break;
+#endif
 		default:
 			Serial.printf("Unknown/unexpected ETH event %d\r\n", event);
 			break;
@@ -370,21 +378,21 @@ void setup_wifi()
 	write_led(led_green,  HIGH);
 	write_led(led_yellow, HIGH);
 
-	draw_status("0020");
+	draw_status(20);
 	enable_wifi_debug();
 
-	draw_status("0021");
+	draw_status(21);
 	WiFi.onEvent(WiFiEvent);
 
 	connect_status_t cs = CS_IDLE;
-	draw_status("0022");
+	draw_status(22);
 	start_wifi({ });
 
 	Serial.print(F("Scanning for accesspoints"));
-	draw_status("0023");
+	draw_status(23);
 	scan_access_points_start();
 
-	draw_status("0024");
+	draw_status(24);
 	while(scan_access_points_wait() == false) {
 #ifdef LED_BUILTIN
 		digitalWrite(LED_BUILTIN, HIGH);
@@ -396,15 +404,15 @@ void setup_wifi()
 		delay(100);
 	}
 
-	draw_status("0025");
+	draw_status(25);
 	auto available_access_points = scan_access_points_get();
 	Serial.printf("Found %zu accesspoints\r\n", available_access_points.size());
 
-	draw_status("0026");
+	draw_status(26);
 	auto state = try_connect_init(wifi_targets, available_access_points, 300, progress_indicator);
 
 	Serial.println(F("Connecting"));
-	draw_status("0027");
+	draw_status(27);
 	for(;;) {
 		cs = try_connect_tick(state);
 
@@ -420,9 +428,9 @@ void setup_wifi()
 
 	// could not connect
 	if (cs == CS_CONNECTED)
-		draw_status("0029");
+		draw_status(29);
 	else
-		draw_status("0028");
+		draw_status(28);
 }
 
 void loopw(void *)
@@ -434,7 +442,8 @@ void loopw(void *)
 	for(;;) {
 		auto now = millis();
 		if (now - draw_status_ts > 5000) {
-// TODO powerdown display
+			TM.setBrightness(1);
+			draw_status_ts = now;
 		}
 
 		if (now - last_diskfree_update >= update_df_interval * 1000 && update_df_interval != 0 && bs->is_idle()) {
@@ -562,9 +571,10 @@ void setup() {
 	Serial.setDebugOutput(true);
 #endif
 
-	// TODO init display
+	TM.begin(21, 22, 4);
+	TM.setBrightness(1);
 
-	draw_status("0001");
+	draw_status(1);
 
 #if defined(TEENSY4_1)
 	uint8_t mac[6] { 0 };
@@ -576,7 +586,7 @@ void setup() {
 	snprintf(name, sizeof name, "iESP-%02x%02x%02x%02x", chipid[2], chipid[3], chipid[4], chipid[5]);
 #endif
 
-	draw_status("0002");
+	draw_status(2);
 
 	Serial.println(F("iESP, (C) 2023-2024 by Folkert van Heusden <mail@vanheusden.com>"));
 	Serial.println(F("Compiled on " __DATE__ " " __TIME__));
@@ -585,7 +595,7 @@ void setup() {
 	Serial.print(F("System name: "));
 	Serial.println(name);
 
-	draw_status("0003");
+	draw_status(3);
 
 #ifdef LED_BUILTIN
 	pinMode(LED_BUILTIN, OUTPUT);
@@ -597,7 +607,7 @@ void setup() {
 	if (led_red != -1)
 		pinMode(led_red, OUTPUT);
 
-	draw_status("0004");
+	draw_status(4);
 #if defined(TEENSY4_1)
 	if (!myfs.begin(4096))
 #else
@@ -605,10 +615,11 @@ void setup() {
 #endif
 	{
 		Serial.println(F("LittleFS.begin() failed"));
-		draw_status("0005");
+		draw_status(5);
 	}
 
-	draw_status("0006");
+	draw_status(6);
+	
 	if (load_configuration() == false) {
 		Serial.println(F("Failed to load configuration, using defaults!"));
 #if 0
@@ -618,10 +629,8 @@ void setup() {
 		do_ls(LittleFS, "/");
 #endif
 #endif
-#if !defined(TEENSY4_1)
-		draw_status("0007");
+		draw_status(7);
 		fail_flash();
-#endif
 	}
 
 #if !defined(TEENSY4_1)
@@ -640,6 +649,7 @@ void setup() {
 		Serial.println(F("ENC28J60 failed"));
 		fail_flash();
 	}
+
 #elif defined(TEENSY4_1)
 	if (qn::Ethernet.begin(mac) == 0) {
 		Serial.println(F("Failed to configure Ethernet using DHCP"));
@@ -654,6 +664,8 @@ void setup() {
 		Serial.print(qn::Ethernet.localIP());
 		Serial.println(F(")"));
 	}
+#elif defined(WEMOS32)
+//
 #else
 	ETH.begin();  // ESP32-WT-ETH01, w32-eth01
 #endif
@@ -662,11 +674,11 @@ void setup() {
 #endif
 	init_logger(name);
 
-	draw_status("0008");
+	draw_status(8);
 
 	ntp.begin();
 
-	draw_status("0010");
+	draw_status(10);
 
 #if !defined(TEENSY4_1)
 	esp_register_freertos_idle_hook_for_cpu(idle_task_0, 0);
@@ -680,57 +692,55 @@ void setup() {
 	esp_pthread_set_cfg(&cfg);
 #endif
 
-	draw_status("0011");
+	draw_status(11);
 	init_snmp(&snmp_, &snmp_data_, &ios, &is, &percentage_diskspace, &cpu_usage, &ram_free_kb, &stop);
 
-	draw_status("0012");
+	draw_status(13);
 #if defined(TEENSY4_1)
 	bs = new backend_sdcard_teensy41(led_green, led_yellow);
 #else
 	bs = new backend_sdcard(led_green, led_yellow);
 #endif
-	draw_status("0013");
+	draw_status(14);
 	if (bs->begin() == false) {
 		errlog("Failed to load initialize storage backend!");
-		draw_status("0014");
+		draw_status(15);
 		fail_flash();
 	}
 
-	draw_status("0015");
+	draw_status(16);
 	scsi_dev = new scsi(bs, trim_level, &ios);
 
 #if !defined(TEENSY4_1)
-	draw_status("0020");
+	draw_status(20);
 	auto reset_reason = esp_reset_reason();
 	if (reset_reason != ESP_RST_POWERON)
 		errlog("Reset reason: %s (%d), software version %s", reset_name(reset_reason), reset_reason, version_str);
 	else
 		errlog("System (re-)started, software version %s", version_str);
 
-	draw_status("0025");
+	draw_status(25);
 	esp_wifi_set_ps(WIFI_PS_NONE);
 #endif
 
-	draw_status("0028");
+	draw_status(28);
 #if defined(TEENSY4_1)
 	if (qn::MDNS.begin(name))
 		qn::MDNS.addService("iscsi", "tcp", 3260);
 	else
 		errlog("Failed starting MDNS responder");
 #else
-#if 0
 	if (MDNS.begin(name))
 		MDNS.addService("iscsi", "tcp", 3260);
 	else
 		errlog("Failed starting MDNS responder");
 #endif
-#endif
 
 #if !defined(TEENSY4_1)
-	draw_status("0030");
+	draw_status(30);
 	heap_caps_register_failed_alloc_callback(heap_caps_alloc_failed_hook);
 
-	draw_status("0032");
+	draw_status(32);
 	write_led(led_green,  HIGH);
 	write_led(led_yellow, HIGH);
 	Serial.printf("Waiting %d seconds for Ethernet: ", eth_wait_seconds);
@@ -747,16 +757,17 @@ void setup() {
 #endif
 
 #if !defined(TEENSY4_1)
-	draw_status("0033");
+	draw_status(33);
 	enable_OTA();
 
-	draw_status("0035");
+	draw_status(35);
 	if (setCpuFrequencyMhz(240))
 		Serial.println(F("Clock frequency set"));
 	else
 		Serial.println(F("Clock frequency NOT set"));
 
-	draw_status("0050");
+	draw_status(50);
+
 	xTaskCreate(loopw, /* Function to implement the task */
 			"loop2", /* Name of the task */
 			10000,  /* Stack size in words */
@@ -766,16 +777,19 @@ void setup() {
 		   );
 #endif
 
-	draw_status("0100");
+	draw_status(100);
 }
 
 void loop()
 {
-	draw_status("0201");
+	draw_status(201);
 	{
 		char buffer[16];
 #if defined(TEENSY4_1)
 		auto ip = qn::Ethernet.localIP();
+		snprintf(buffer, sizeof buffer, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+#elif defined(WEMOS32)
+		auto ip = WiFi.localIP();
 		snprintf(buffer, sizeof buffer, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
 #else
 		auto ipe = ETH.localIP();
@@ -785,11 +799,10 @@ void loop()
 		else
 			snprintf(buffer, sizeof buffer, "%d.%d.%d.%d", ipe[0], ipe[1], ipe[2], ipe[3]);
 #endif
-
 		Serial.print(F("Will listen on (in a bit): "));
 		Serial.println(buffer);
 
-		draw_status("0205");
+		draw_status(205);
 #if defined(TEENSY4_1)
 		com_arduino c(3260);
 #else
@@ -797,21 +810,21 @@ void loop()
 #endif
 		if (c.begin() == false) {
 			errlog("Failed to initialize communication layer!");
-			draw_status("0210");
+			draw_status(210);
 			fail_flash();
 		}
 
-		draw_status("0220");
+		draw_status(220);
 		server s(scsi_dev, &c, &is);
 		Serial.printf("Free heap space: %u\r\n", get_free_heap_space());
 		Serial.println(F("Go!"));
-		draw_status("0230");
+		draw_status(500);
 		s.handler();
-		draw_status("0250");
+		draw_status(900);
 	}
 
 	if (ota_update) {
-		draw_status("0500");
+		draw_status(950);
 		errlog("Halting for OTA update");
 
 		for(;;)
