@@ -160,9 +160,10 @@ bool com_client_arduino::send(const uint8_t *const from, const size_t n)
 			if (wc.connected() == false)
 				return false;
 
-			if (millis() - start > 1000) {
+			auto now = millis();
+			if (now - start > 1000) {
 				Serial.println(todo);
-				start = millis();
+				start = now;
 			}
 		}
 	}
@@ -200,9 +201,10 @@ bool com_client_arduino::recv(uint8_t *const to, const size_t n)
 			if (wc.connected() == false)
 				return false;
 
-			if (millis() - start > 1000) {
+			auto now = millis();
+			if (now - start > 1000) {
 				Serial.println(todo);
-				start = millis();
+				start = now;
 			}
 		}
 	}
