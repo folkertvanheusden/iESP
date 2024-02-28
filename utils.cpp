@@ -82,6 +82,7 @@ std::vector<std::string> split(std::string in, const std::string & splitter)
 	return out;
 }
 
+#if !defined(ARDUINO)
 std::string to_hex(const uint8_t *const in, const size_t n)
 {
 	std::string out;
@@ -108,6 +109,7 @@ std::string to_hex(const uint8_t *const in, const size_t n)
 
 	return out;
 }
+#endif
 
 std::string myformat(const char *const fmt, ...)
 {

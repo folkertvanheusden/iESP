@@ -138,10 +138,6 @@ bool com_client_arduino::send(const uint8_t *const from, const size_t n)
 	const uint8_t *p    = from;
 	size_t         todo = n;
 
-	Serial.printf("WRITE %zu bytes to socket\r\n", n);
-
-	auto start = millis();
-
 	while(todo > 0 && wc) {
 #if !defined(TEENSY4_1)
 		watchdog_update();
@@ -152,16 +148,8 @@ bool com_client_arduino::send(const uint8_t *const from, const size_t n)
 			break;
 
 		if (cur_n > 0) {
-			Serial.printf("sent %zd\r\n", cur_n);
 			p    += cur_n;
 			todo -= cur_n;
-		}
-		else {
-			auto now = millis();
-			if (now - start > 1000) {
-				Serial.println(todo);
-				start = now;
-			}
 		}
 	}
 
@@ -176,10 +164,6 @@ bool com_client_arduino::recv(uint8_t *const to, const size_t n)
 	uint8_t *p    = to;
 	size_t   todo = n;
 
-	Serial.printf("READ %zu bytes from socket\r\n", n);
-
-	auto start = millis();
-
 	while(todo > 0 && wc) {
 #if defined(TEENSY4_1)
 		// ugly hack
@@ -193,16 +177,8 @@ bool com_client_arduino::recv(uint8_t *const to, const size_t n)
 			break;
 
 		if (cur_n > 0) {
-			Serial.printf("read %zd\r\n", cur_n);
 			p    += cur_n;
 			todo -= cur_n;
-		}
-		else {
-			auto now = millis();
-			if (now - start > 1000) {
-				Serial.println(todo);
-				start = now;
-			}
 		}
 	}
 
