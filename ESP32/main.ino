@@ -82,8 +82,6 @@ LittleFS_Program myfs;
 qn::EthernetUDP snmp_udp;
 qn::EthernetUDP ntp_udp;
 #else
-LittleFS myfs;
-
 TaskHandle_t task2;
 
 WiFiUDP snmp_udp;
@@ -155,7 +153,7 @@ bool load_configuration() {
 #if defined(TEENSY4_1)
 	File data_file = myfs.open(IESP_CFG_FILE, FILE_READ);
 #else
-	File data_file = myfs.open(IESP_CFG_FILE, "r");
+	File data_file = LittleFS.open(IESP_CFG_FILE, "r");
 #endif
 	if (!data_file)
 		return false;
@@ -215,7 +213,7 @@ void enable_OTA() {
 			errlog("OTA start\n");
 			ota_update = true;
 			stop = true;
-			myfs.end();
+			LittleFS.end();
 			});
 	ArduinoOTA.onEnd([]() {
 			errlog("OTA end");
@@ -354,7 +352,8 @@ void heap_caps_alloc_failed_hook(size_t requested_size, uint32_t caps, const cha
 	write_led(led_red, LOW);
 }
 
-bool progress_indicator(const int nr, const int mx, const std::string & which) {
+bool progress_indicator(const int nr, const int mx, const std::string & which)
+{
 #ifdef LED_BUILTIN
 	digitalWrite(LED_BUILTIN, HIGH);
 #endif
@@ -366,7 +365,8 @@ bool progress_indicator(const int nr, const int mx, const std::string & which) {
 	return true;
 }
 
-void setup_wifi() {
+void setup_wifi()
+{
 	write_led(led_green,  HIGH);
 	write_led(led_yellow, HIGH);
 
@@ -425,7 +425,8 @@ void setup_wifi() {
 		draw_status("0028");
 }
 
-void loopw(void *) {
+void loopw(void *)
+{
 	Serial.println(F("Thread started"));
 
 	int  cu_count = 0;
@@ -468,7 +469,7 @@ void loopw(void *) {
 }
 #endif
 
-void ls(LittleFS::FS &fs, const String & name)
+void do_ls(fs::FS &fs, const String & name)
 {
 	Serial.print(F("Directory: "));
 	Serial.println(name);
@@ -485,7 +486,7 @@ void ls(LittleFS::FS &fs, const String & name)
 		if (file.isDirectory()) {
 			Serial.print("Dir: ");
 			Serial.println(file.name());
-			ls(fs, name + "/" + file.name());
+			do_ls(fs, name + "/" + file.name());
 		}
 		else {
 			Serial.print("File: ");
@@ -609,7 +610,9 @@ void setup() {
 	if (load_configuration() == false) {
 		Serial.println(F("Failed to load configuration, using defaults!"));
 #if defined(TEENSY4_1)
-		ls(myfs, "/");
+		do_ls(myfs, "/");
+#else
+		do_ls(LittleFS, "/");
 #endif
 #if !defined(TEENSY4_1)
 		draw_status("0007");
