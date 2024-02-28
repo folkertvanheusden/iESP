@@ -87,6 +87,7 @@ TM1637 TM;
 long int draw_status_ts = 0;
 
 void draw_status(const uint32_t v) {
+	TM.setBrightness(8);
 	TM.displayInt(v);
 
 	draw_status_ts = millis();
@@ -396,11 +397,12 @@ void loopw(void *) {
 	Serial.println(F("Thread started"));
 
 	int  cu_count = 0;
-	unsigned long last_diskfree_update = millis();
+	unsigned long last_diskfree_update = 0;
 	for(;;) {
 		auto now = millis();
 		if (now - draw_status_ts > 5000) {
-// TODO powerdown display
+			TM.setBrightness(1);
+			draw_status_ts = now;
 		}
 
 		if (now - last_diskfree_update >= update_df_interval * 1000 && update_df_interval != 0 && bs->is_idle()) {
