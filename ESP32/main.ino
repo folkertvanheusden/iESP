@@ -112,7 +112,7 @@ TM1637 TM;
 long int draw_status_ts = 0;
 
 void draw_status(const uint32_t v) {
-	TM.setBrightness(4);
+	TM.setBrightness(8);
 	TM.displayInt(v);
 
 	draw_status_ts = millis();
