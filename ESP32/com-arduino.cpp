@@ -138,7 +138,7 @@ bool com_client_arduino::send(const uint8_t *const from, const size_t n)
 	const uint8_t *p    = from;
 	size_t         todo = n;
 
-	while(todo > 0) {
+	while(todo > 0 && wc) {
 #if !defined(TEENSY4_1)
 		watchdog_update();
 #endif
@@ -162,7 +162,7 @@ bool com_client_arduino::recv(uint8_t *const to, const size_t n)
 	uint8_t *p    = to;
 	size_t   todo = n;
 
-	while(todo > 0) {
+	while(todo > 0 && wc) {
 #if defined(TEENSY4_1)
 		// ugly hack
 		snmp_->poll();
