@@ -334,6 +334,11 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 			buffer.n = std::min(uint32_t(4096), ack_interval.value());
 		else
 			buffer.n = 4096;
+#elif defined(TEENSY4_1)
+		if (ack_interval.has_value())
+			buffer.n = std::min(uint32_t(16384), ack_interval.value());
+		else
+			buffer.n = 16384;
 #else
 		if (ack_interval.has_value())
 			buffer.n = std::max(uint32_t(512), ack_interval.value());
