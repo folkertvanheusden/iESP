@@ -165,6 +165,9 @@ bool com_client_arduino::send(const uint8_t *const from, const size_t n)
 		}
 	}
 
+	if (wc)
+		wc.flush();
+
 	return todo == 0;
 }
 
