@@ -460,9 +460,11 @@ void setup() {
 //		fail_flash();
 	}
 
-#if !defined(TEENSY4_1)
+#if defined(TEENSY4_1)
+	qn::Ethernet.setHostname(name);
+#else
 	set_hostname(name);
-	WiFi.onEvent(WiFiEvent);
+	setup_wifi();
 #endif
 #if defined(WEMOS32_ETH)
 	//begin(int MISO_GPIO, int MOSI_GPIO, int SCLK_GPIO, int CS_GPIO, int INT_GPIO, int SPI_CLOCK_MHZ, int SPI_HOST, bool use_mac_from_efuse=false)
@@ -495,9 +497,6 @@ void setup() {
 //
 #else
 	ETH.begin();  // ESP32-WT-ETH01, w32-eth01
-#endif
-#if !defined(TEENSY4_1)
-	setup_wifi();
 #endif
 	init_logger(name);
 

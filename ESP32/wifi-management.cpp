@@ -1,3 +1,12 @@
+#include <Arduino.h>
+#include <esp_wifi.h>
+#include <string>
+
+#include "log.h"
+#include "main.h"
+#include "wifi.h"
+
+
 void WiFiEvent(WiFiEvent_t event)
 {
 	write_led(led_red, HIGH);
@@ -116,6 +125,8 @@ void setup_wifi()
 {
 	write_led(led_green,  HIGH);
 	write_led(led_yellow, HIGH);
+
+	WiFi.onEvent(WiFiEvent);
 
 	draw_status(20);
 	enable_wifi_debug();
