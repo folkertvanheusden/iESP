@@ -157,9 +157,6 @@ bool com_client_arduino::send(const uint8_t *const from, const size_t n)
 			todo -= cur_n;
 		}
 		else {
-			if (wc.connected() == false)
-				return false;
-
 			auto now = millis();
 			if (now - start > 1000) {
 				Serial.println(todo);
@@ -168,7 +165,7 @@ bool com_client_arduino::send(const uint8_t *const from, const size_t n)
 		}
 	}
 
-	return true;
+	return todo == 0;
 }
 
 bool com_client_arduino::recv(uint8_t *const to, const size_t n)
@@ -198,9 +195,6 @@ bool com_client_arduino::recv(uint8_t *const to, const size_t n)
 			todo -= cur_n;
 		}
 		else {
-			if (wc.connected() == false)
-				return false;
-
 			auto now = millis();
 			if (now - start > 1000) {
 				Serial.println(todo);
@@ -209,7 +203,7 @@ bool com_client_arduino::recv(uint8_t *const to, const size_t n)
 		}
 	}
 
-	return true;
+	return todo == 0;
 }
 
 std::string com_client_arduino::get_endpoint_name() const
