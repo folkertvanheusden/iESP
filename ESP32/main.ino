@@ -710,13 +710,13 @@ void loop()
 		server s(scsi_dev, &c, &is);
 		Serial.printf("Free heap space: %u\r\n", get_free_heap_space());
 		Serial.println(F("Go!"));
-		draw_status(230);
+		draw_status(500);
 		s.handler();
-		draw_status(250);
+		draw_status(900);
 	}
 
 	if (ota_update) {
-		draw_status(500);
+		draw_status(950);
 		errlog("Halting for OTA update");
 
 		for(;;)
