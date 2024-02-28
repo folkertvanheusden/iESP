@@ -634,19 +634,15 @@ blob_t iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *const s, const iscsi_pdu
 	__pdu_data_in__ pdu_data_in __attribute__((packed)) { };
 
 	set_bits(&pdu_data_in.b1, 0, 6, o_scsi_data_in);  // 0x25
-	uint32_t residual_count = 0;
 	if (last_block) {
 		set_bits(&pdu_data_in.b2, 7, 1, true);  // F
 		if (use_pdu_data_size < reply_to.get_ExpDatLen()) {
 			set_bits(&pdu_data_in.b2, 1, 1, true);  // U
-			residual_count = reply_to.get_ExpDatLen() - use_pdu_data_size;
 		}
 		else if (use_pdu_data_size > reply_to.get_ExpDatLen()) {
 			set_bits(&pdu_data_in.b2, 2, 1, true);  // O
-			residual_count = use_pdu_data_size - reply_to.get_ExpDatLen();
 		}
-		if (residual_count)
-			set_bits(&pdu_data_in.b2, 0, 1, true);  // S - ResidualCt is set
+		set_bits(&pdu_data_in.b2, 0, 1, true);  // S
 	}
 	pdu_data_in.datalenH   = pdu_data_in_data.n >> 16;
 	pdu_data_in.datalenM   = pdu_data_in_data.n >>  8;
@@ -658,14 +654,13 @@ blob_t iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *const s, const iscsi_pdu
 	pdu_data_in.MaxCmdSN   = htonl(reply_to.get_CmdSN() + 128);  // TODO?
 	pdu_data_in.DataSN     = htonl(s->get_inc_datasn(reply_to.get_Itasktag()));
 	pdu_data_in.bufferoff  = htonl(offset_in_data);
-	pdu_data_in.ResidualCt = htonl(residual_count);
+	pdu_data_in.ResidualCt = htonl(use_pdu_data_size - offset_in_data);
 
 	size_t out_size = sizeof(pdu_data_in) + pdu_data_in_data.n;
 	out_size = (out_size + 3) & ~3;
 
 	uint8_t *out = new (std::nothrow) uint8_t[out_size]();
 	if (out) {
-		assert(sizeof(pdu_data_in) == 48);
 		memcpy(out, &pdu_data_in, sizeof pdu_data_in);
 		if (pdu_data_in_data.n)
 			memcpy(&out[sizeof(pdu_data_in)], pdu_data_in_data.data, pdu_data_in_data.n);
