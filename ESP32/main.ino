@@ -46,7 +46,7 @@ scsi *scsi_dev { nullptr };
 int led_green  = 4;
 int led_yellow = 5;
 int led_red    = 35;
-#elif defined(WEMOS32_ETH)
+#elif defined(WEMOS32_ETH) || defined(WEMOS32)
 int led_green  = 17;
 int led_yellow = 16;
 int led_red    = 32;
