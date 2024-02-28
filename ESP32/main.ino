@@ -457,7 +457,7 @@ void setup() {
 #endif
 #endif
 		draw_status(7);
-		fail_flash();
+//		fail_flash();
 	}
 
 #if !defined(TEENSY4_1)
