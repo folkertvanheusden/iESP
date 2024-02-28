@@ -49,12 +49,8 @@ uint8_t backend::get_free_space_percentage()
 	for(int i=0; i<100; i++) {
 		uint64_t block_nr = 0;
 
-		// random in case a filesystem or whatever places static data at every 100th position
-		do {
-			block_nr = ((uint64_t(my_getrandom()) << 32) | my_getrandom()) % size;
-			block_nr += int32_t(my_getrandom() % (th100 * 2)) - th100;
-		}
-		while(block_nr >= size);
+		// random in case a filesystem or whatever places static data at every xth position
+		block_nr = ((uint64_t(my_getrandom()) << 32) | my_getrandom()) % size;
 
 		if (read(block_nr, 1, buffer) == false) {
 			empty_count = 0;
