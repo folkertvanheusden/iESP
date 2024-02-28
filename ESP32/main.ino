@@ -108,15 +108,17 @@ int eth_wait_seconds = 0;
 int update_df_interval = 0;
 int percentage_diskspace = 0;
 
-TM1637 TM;
+TM1637 *TM { nullptr };
 
 long int draw_status_ts = 0;
 
 void draw_status(const uint32_t v) {
-	TM.setBrightness(8);
-	TM.displayInt(v);
+	if (TM) {
+		draw_status_ts = millis();
 
-	draw_status_ts = millis();
+		TM->setBrightness(8);
+		TM->displayInt(v);
+	}
 }
 
 #if !defined(TEENSY4_1)
@@ -269,7 +271,8 @@ void loopw(void *)
 	for(;;) {
 		auto now = millis();
 		if (now - draw_status_ts > 5000) {
-			TM.setBrightness(1);
+			if (TM)
+				TM->setBrightness(1);
 			draw_status_ts = now;
 		}
 
@@ -398,8 +401,11 @@ void setup() {
 	Serial.setDebugOutput(true);
 #endif
 
-	TM.begin(21, 22, 4);
-	TM.setBrightness(1);
+#if !defined(TEENSY4_1)
+	TM = new TM1637();
+	TM->begin(21, 22, 4);  // TEENSY4.1: pins
+	TM->setBrightness(1);
+#endif
 
 	draw_status(1);
 
