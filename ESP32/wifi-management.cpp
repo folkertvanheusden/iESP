@@ -1,102 +1,102 @@
-void wifievent(wifievent_t event)
+void WiFiEvent(WiFiEvent_t event)
 {
-	write_led(led_red, high);
+	write_led(led_red, HIGH);
 
-	std::string msg = "wifi event: ";
+	std::string msg = "WiFi event: ";
 
 	switch(event) {
-		case wifi_reason_unspecified:
-			msg += "wifi_reason_unspecified"; break;
-		case wifi_reason_auth_expire:
-			msg += "wifi_reason_auth_expire"; break;
-		case wifi_reason_auth_leave:
-			msg += "wifi_reason_auth_leave"; break;
-		case wifi_reason_assoc_expire:
-			msg += "wifi_reason_assoc_expire"; break;
-		case wifi_reason_assoc_toomany:
-			msg += "wifi_reason_assoc_toomany"; break;
-		case wifi_reason_not_authed:
-			msg += "wifi_reason_not_authed"; break;
-		case wifi_reason_not_assoced:
-			msg += "wifi_reason_not_assoced"; break;
-		case wifi_reason_assoc_leave:
-			msg += "wifi_reason_assoc_leave"; break;
-		case wifi_reason_assoc_not_authed:
-			msg += "wifi_reason_assoc_not_authed"; break;
-		case wifi_reason_disassoc_pwrcap_bad:
-			msg += "wifi_reason_disassoc_pwrcap_bad"; break;
-		case wifi_reason_disassoc_supchan_bad:
-			msg += "wifi_reason_disassoc_supchan_bad"; break;
-		case wifi_reason_ie_invalid:
-			msg += "wifi_reason_ie_invalid"; break;
-		case wifi_reason_mic_failure:
-			msg += "wifi_reason_mic_failure"; break;
-		case wifi_reason_4way_handshake_timeout:
-			msg += "wifi_reason_4way_handshake_timeout"; break;
-		case wifi_reason_group_key_update_timeout:
-			msg += "wifi_reason_group_key_update_timeout"; break;
-		case wifi_reason_ie_in_4way_differs:
-			msg += "wifi_reason_ie_in_4way_differs"; break;
-//		case wifi_reason_group_cipher_invalid:
-//			msg += "wifi_reason_group_cipher_invalid"; break;
-//		case wifi_reason_pairwise_cipher_invalid:
-//			msg += "wifi_reason_pairwise_cipher_invalid"; break;
-//		case wifi_reason_akmp_invalid:
-//			msg += "wifi_reason_akmp_invalid"; break;
-//		case wifi_reason_unsupp_rsn_ie_version:
-//			msg += "wifi_reason_unsupp_rsn_ie_version"; break;
-//		case wifi_reason_invalid_rsn_ie_cap:
-//			msg += "wifi_reason_invalid_rsn_ie_cap"; break;
-		case wifi_reason_802_1x_auth_failed:
-			msg += "wifi_reason_802_1x_auth_failed"; break;
-		case wifi_reason_cipher_suite_rejected:
-			msg += "wifi_reason_cipher_suite_rejected"; break;
-		case wifi_reason_beacon_timeout:
-			msg += "wifi_reason_beacon_timeout"; break;
-		case wifi_reason_no_ap_found:
-			msg += "wifi_reason_no_ap_found"; break;
-		case wifi_reason_auth_fail:
-			msg += "wifi_reason_auth_fail"; break;
-		case wifi_reason_assoc_fail:
-			msg += "wifi_reason_assoc_fail"; break;
-		case wifi_reason_handshake_timeout:
-			msg += "wifi_reason_handshake_timeout"; break;
-#if !defined(wemos32)
-		case arduino_event_eth_start:
-			msg += "eth started";
+		case WIFI_REASON_UNSPECIFIED:
+			msg += "WIFI_REASON_UNSPECIFIED"; break;
+		case WIFI_REASON_AUTH_EXPIRE:
+			msg += "WIFI_REASON_AUTH_EXPIRE"; break;
+		case WIFI_REASON_AUTH_LEAVE:
+			msg += "WIFI_REASON_AUTH_LEAVE"; break;
+		case WIFI_REASON_ASSOC_EXPIRE:
+			msg += "WIFI_REASON_ASSOC_EXPIRE"; break;
+		case WIFI_REASON_ASSOC_TOOMANY:
+			msg += "WIFI_REASON_ASSOC_TOOMANY"; break;
+		case WIFI_REASON_NOT_AUTHED:
+			msg += "WIFI_REASON_NOT_AUTHED"; break;
+		case WIFI_REASON_NOT_ASSOCED:
+			msg += "WIFI_REASON_NOT_ASSOCED"; break;
+		case WIFI_REASON_ASSOC_LEAVE:
+			msg += "WIFI_REASON_ASSOC_LEAVE"; break;
+		case WIFI_REASON_ASSOC_NOT_AUTHED:
+			msg += "WIFI_REASON_ASSOC_NOT_AUTHED"; break;
+		case WIFI_REASON_DISASSOC_PWRCAP_BAD:
+			msg += "WIFI_REASON_DISASSOC_PWRCAP_BAD"; break;
+		case WIFI_REASON_DISASSOC_SUPCHAN_BAD:
+			msg += "WIFI_REASON_DISASSOC_SUPCHAN_BAD"; break;
+		case WIFI_REASON_IE_INVALID:
+			msg += "WIFI_REASON_IE_INVALID"; break;
+		case WIFI_REASON_MIC_FAILURE:
+			msg += "WIFI_REASON_MIC_FAILURE"; break;
+		case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
+			msg += "WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT"; break;
+		case WIFI_REASON_GROUP_KEY_UPDATE_TIMEOUT:
+			msg += "WIFI_REASON_GROUP_KEY_UPDATE_TIMEOUT"; break;
+		case WIFI_REASON_IE_IN_4WAY_DIFFERS:
+			msg += "WIFI_REASON_IE_IN_4WAY_DIFFERS"; break;
+//		case WIFI_REASON_GROUP_CIPHER_INVALID:
+//			msg += "WIFI_REASON_GROUP_CIPHER_INVALID"; break;
+//		case WIFI_REASON_PAIRWISE_CIPHER_INVALID:
+//			msg += "WIFI_REASON_PAIRWISE_CIPHER_INVALID"; break;
+//		case WIFI_REASON_AKMP_INVALID:
+//			msg += "WIFI_REASON_AKMP_INVALID"; break;
+//		case WIFI_REASON_UNSUPP_RSN_IE_VERSION:
+//			msg += "WIFI_REASON_UNSUPP_RSN_IE_VERSION"; break;
+//		case WIFI_REASON_INVALID_RSN_IE_CAP:
+//			msg += "WIFI_REASON_INVALID_RSN_IE_CAP"; break;
+		case WIFI_REASON_802_1X_AUTH_FAILED:
+			msg += "WIFI_REASON_802_1X_AUTH_FAILED"; break;
+		case WIFI_REASON_CIPHER_SUITE_REJECTED:
+			msg += "WIFI_REASON_CIPHER_SUITE_REJECTED"; break;
+		case WIFI_REASON_BEACON_TIMEOUT:
+			msg += "WIFI_REASON_BEACON_TIMEOUT"; break;
+		case WIFI_REASON_NO_AP_FOUND:
+			msg += "WIFI_REASON_NO_AP_FOUND"; break;
+		case WIFI_REASON_AUTH_FAIL:
+			msg += "WIFI_REASON_AUTH_FAIL"; break;
+		case WIFI_REASON_ASSOC_FAIL:
+			msg += "WIFI_REASON_ASSOC_FAIL"; break;
+		case WIFI_REASON_HANDSHAKE_TIMEOUT:
+			msg += "WIFI_REASON_HANDSHAKE_TIMEOUT"; break;
+#if !defined(WEMOS32)
+		case ARDUINO_EVENT_ETH_START:
+			msg += "ETH Started";
 			//set eth hostname here
-			eth.sethostname(name);
+			ETH.setHostname(name);
 			break;
-		case arduino_event_eth_connected:
-			msg += "eth connected";
+		case ARDUINO_EVENT_ETH_CONNECTED:
+			msg += "ETH Connected";
 			break;
-		case arduino_event_eth_got_ip: {
-			auto ip = eth.localip();
-			msg += "eth ipv4: ";
+		case ARDUINO_EVENT_ETH_GOT_IP: {
+			auto ip = ETH.localIP();
+			msg += "ETH IPv4: ";
 			msg += myformat("%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
-			if (eth.fullduplex())
-				msg += ", full_duplex";
+			if (ETH.fullDuplex())
+				msg += ", FULL_DUPLEX";
 			msg += ", ";
-			msg += myformat("%d", eth.linkspeed());
-			msg += "mb";
+			msg += myformat("%d", ETH.linkSpeed());
+			msg += "Mb";
 			eth_connected = true;
 			break;
 		}
-		case arduino_event_eth_disconnected:
-			msg += "eth disconnected";
+		case ARDUINO_EVENT_ETH_DISCONNECTED:
+			msg += "ETH Disconnected";
 			eth_connected = false;
 			break;
-		case arduino_event_eth_stop:
-			msg += "eth stopped";
+		case ARDUINO_EVENT_ETH_STOP:
+			msg += "ETH Stopped";
 			eth_connected = false;
 			break;
 #endif
 		default:
-			serial.printf("unknown/unexpected eth event %d\r\n", event);
+			Serial.printf("Unknown/unexpected ETH event %d\r\n", event);
 			break;
 	}
 	errlog(msg.c_str());
-	write_led(led_red, low);
+	write_led(led_red, LOW);
 }
 
 bool progress_indicator(const int nr, const int mx, const std::string & which)
