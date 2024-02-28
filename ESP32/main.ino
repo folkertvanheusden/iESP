@@ -469,6 +469,7 @@ void loopw(void *)
 }
 #endif
 
+#if 0
 void do_ls(fs::FS &fs, const String & name)
 {
 	Serial.print(F("Directory: "));
@@ -500,6 +501,7 @@ void do_ls(fs::FS &fs, const String & name)
 
 	dir.close();
 }
+#endif
 
 #if !defined(TEENSY4_1)
 const char *reset_name(const esp_reset_reason_t rr)
@@ -609,10 +611,12 @@ void setup() {
 	draw_status("0006");
 	if (load_configuration() == false) {
 		Serial.println(F("Failed to load configuration, using defaults!"));
+#if 0
 #if defined(TEENSY4_1)
 		do_ls(myfs, "/");
 #else
 		do_ls(LittleFS, "/");
+#endif
 #endif
 #if !defined(TEENSY4_1)
 		draw_status("0007");
