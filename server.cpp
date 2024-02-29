@@ -460,7 +460,7 @@ void server::handler()
 #endif
 			std::string endpoint = cc->get_endpoint_name();
 
-#if defined(ESP32) || defined(RP2040W)
+#if defined(ESP32) || defined(RP2040W) || defined(TEENSY4_1)
 			Serial.printf("new session with %s\r\n", endpoint.c_str());
 			uint32_t pdu_count   = 0;
 			auto     prev_output = millis();
@@ -485,7 +485,7 @@ void server::handler()
 
 				is->iscsiSsnCmdPDUs++;
 
-#if defined(ESP32) || defined(RP2040W)
+#if defined(ESP32) || defined(RP2040W) || defined(TEENSY4_1)
 				auto tx_start = micros();
 #endif
 
@@ -524,7 +524,7 @@ void server::handler()
 					delete pdu;
 				}
 
-#if defined(ESP32) || defined(RP2040W)
+#if defined(ESP32) || defined(RP2040W) || defined(TEENSY4_1)
 				auto tx_end = micros();
 				busy += tx_end - tx_start;
 
