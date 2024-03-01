@@ -197,3 +197,21 @@ void teensyMAC(uint8_t *const mac)
 #endif
 
 uint64_t running_since = get_micros();
+
+void encode_lun(uint8_t *const target, const uint64_t lun_nr)
+{
+	memset(target, 0x00, sizeof(uint64_t));
+
+	if (lun_nr < 256) {
+		target[0] = 0;
+		target[1] = lun_nr;
+	}
+	else if (lun_nr < 0x4000) {
+		target[0] = 1;
+		target[1] = lun_nr >> 8;
+		target[2] = lun_nr;
+	}
+	else {
+		memcpy(target, &lun_nr, 8);  // TODO
+	}
+}
