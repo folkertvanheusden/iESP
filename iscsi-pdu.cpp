@@ -582,14 +582,6 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get() const
 		bool last_block = count == n_to_do - 1;
 		if (last_block) {
 			set_bits(&pdu_data_in->b2, 7, 1, true);  // F
-			if (pdu_data_in_data.second < reply_to_copy.get_ExpDatLen()) {
-				set_bits(&pdu_data_in->b2, 1, 1, true);  // U
-				pdu_data_in->ResidualCt = htonl(reply_to_copy.get_ExpDatLen() - pdu_data_in_data.second);
-			}
-			else if (pdu_data_in_data.second > reply_to_copy.get_ExpDatLen()) {
-				set_bits(&pdu_data_in->b2, 2, 1, true);  // O
-				pdu_data_in->ResidualCt = htonl(pdu_data_in_data.second - reply_to_copy.get_ExpDatLen());
-			}
 			set_bits(&pdu_data_in->b2, 0, 1, true);  // S
 		}
 		size_t cur_len = std::min(use_pdu_data_size - i, size_t(512));
@@ -604,7 +596,6 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get() const
 		pdu_data_in->MaxCmdSN   = htonl(reply_to_copy.get_CmdSN() + 128);  // TODO?
 		pdu_data_in->DataSN     = htonl(s->get_inc_datasn(reply_to_copy.get_Itasktag()));
 		pdu_data_in->bufferoff  = htonl(i);
-		pdu_data_in->ResidualCt = htonl(use_pdu_data_size - i);
 
 		size_t out_size = sizeof(*pdu_data_in) + cur_len;
 		out_size = (out_size + 3) & ~3;
@@ -636,12 +627,6 @@ blob_t iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *const s, const iscsi_pdu
 	set_bits(&pdu_data_in.b1, 0, 6, o_scsi_data_in);  // 0x25
 	if (last_block) {
 		set_bits(&pdu_data_in.b2, 7, 1, true);  // F
-		if (use_pdu_data_size < reply_to.get_ExpDatLen()) {
-			set_bits(&pdu_data_in.b2, 1, 1, true);  // U
-		}
-		else if (use_pdu_data_size > reply_to.get_ExpDatLen()) {
-			set_bits(&pdu_data_in.b2, 2, 1, true);  // O
-		}
 		set_bits(&pdu_data_in.b2, 0, 1, true);  // S
 	}
 	pdu_data_in.datalenH   = pdu_data_in_data.n >> 16;
@@ -654,7 +639,7 @@ blob_t iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *const s, const iscsi_pdu
 	pdu_data_in.MaxCmdSN   = htonl(reply_to.get_CmdSN() + 128);  // TODO?
 	pdu_data_in.DataSN     = htonl(s->get_inc_datasn(reply_to.get_Itasktag()));
 	pdu_data_in.bufferoff  = htonl(offset_in_data);
-	pdu_data_in.ResidualCt = htonl(use_pdu_data_size - offset_in_data);
+	pdu_data_in.ResidualCt = 0;
 
 	size_t out_size = sizeof(pdu_data_in) + pdu_data_in_data.n;
 	out_size = (out_size + 3) & ~3;
