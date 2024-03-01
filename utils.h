@@ -17,4 +17,9 @@ void encode_lun(uint8_t *const target, const uint64_t lun_nr);
 std::string to_hex(const uint8_t *const in, const size_t n);
 #endif
 
+uint32_t NTOHL(const uint32_t x);
+uint16_t NTOHS(const uint16_t x);
+uint32_t HTONL(const uint32_t x);
+uint16_t HTONS(const uint16_t x);
+
 extern uint64_t running_since;

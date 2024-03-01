@@ -215,3 +215,23 @@ void encode_lun(uint8_t *const target, const uint64_t lun_nr)
 		memcpy(target, &lun_nr, 8);  // TODO
 	}
 }
+
+uint16_t HTONS(const uint16_t x)
+{
+	return (x << 8) | (x >> 8);
+}
+
+uint32_t HTONL(const uint32_t x)
+{
+	return (HTONS(x) << 16) | HTONS(x >> 16);
+}
+
+uint16_t NTOHS(const uint16_t x)
+{
+	return HTONS(x);
+}
+
+uint32_t NTOHL(const uint32_t x)
+{
+	return HTONL(x);
+}
