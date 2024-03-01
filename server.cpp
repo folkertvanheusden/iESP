@@ -303,9 +303,9 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 		reply_to.set(ses, temp.data, temp.n);
 		delete [] temp.data;
 
-	        auto use_pdu_data_size = stream_parameters.n_sectors * 512;
-		if (use_pdu_data_size > size_t(reply_to.get_ExpDatLen())) {
-			DOLOG("server::push_response: requested less (%zu) than wat is available (%u)\n", size_t(reply_to.get_ExpDatLen()), use_pdu_data_size);
+	        uint64_t use_pdu_data_size = uint64_t(stream_parameters.n_sectors) * 512;
+		if (use_pdu_data_size > reply_to.get_ExpDatLen()) {
+			DOLOG("server::push_response: requested less (%u) than wat is available (%" PRIu64 ")\n", reply_to.get_ExpDatLen(), use_pdu_data_size);
 			use_pdu_data_size = reply_to.get_ExpDatLen();
 		}
 
