@@ -1,20 +1,20 @@
 what it is
 ----------
-iESP is an iSCSI target for the ESP32 microcontroller (altough it runs fine on Linux as well).
+iESP is an iSCSI target for the ESP32 and Teensy 4.1 microcontroller (altough it runs fine on Linux as well).
 In theory this allows you to boot your VMWare cluster from an SD-card.
 
 
 requirements
 ------------
-* Either a Linux/FreeBSD-box or an ESP32 microcontroller with an SD-card reader connected to it.
-* platformio (for ESP32)
+* Either a Linux/FreeBSD-box or a supported microcontroller (from now on uC) with an SD-card reader connected to it.
+* platformio (for microcontrollers)
 * cmake (for Linux/FreeBSD)
 
 
 compiling
 ---------
-For the ESP32:
-* cd ESP32
+For the ESP32/Teensy4.1:
+* cd microcontrollers
 * pio run -t upload
 
 For Linux/FreeBSD:
@@ -26,7 +26,7 @@ For Linux/FreeBSD:
 
 using
 -----
-On the ESP32 it uses the connected SD-card. Make sure it is formatted in 'exfat' format (because of the file size). Create a test.dat file on the SD-card of the size you want your iSCSI target to be. The ESP32 version needs to be configured first: under ESP32/data there's a file called cfg-iESP.json.example. Rename this to cfg-iESP.json and enter appropriate WiFi settings. Leave "syslog-host" empty to not send error logging to a syslog server.
+On the uC it uses the connected SD-card. Make sure it is formatted in 'exfat' format (because of the file size). Create a test.dat file on the SD-card of the size you want your iSCSI target to be. The uC version needs to be configured first: under microcontrollers/data there's a file called cfg-iESP.json.example. Rename this to cfg-iESP.json and enter e.g. appropriate WiFi settings (if applicable). Leave "syslog-host" empty to not send error logging to a syslog server.
 
 On Linux/FreeBSD, it assumes you have a test.dat file of appropriate size in the current directory. Run iESP with '-h' to see a list of switches. You probably need to change the listen-address for example.
 
