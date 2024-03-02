@@ -19,6 +19,11 @@ fh.close()
 # lint of configuration
 try:
     j = json.loads(open('data/cfg-iESP.json', 'r').read())
+
 except json.decoder.JSONDecodeError as je:
     print(f'data/cfg-iESP.json is invalid, please check ({je})')
+    sys.exit(1)
+
+except FileNotFoundError as enotf:
+    print(f'data/cfg-iESP.json not found, please provide ({enotf})')
     sys.exit(1)
