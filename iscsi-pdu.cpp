@@ -459,7 +459,7 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *cons
 		return { };
 	}
 
-	if (scsi_reply.value().io.is_inline == false) {
+	if (scsi_reply.value().io.is_inline == false && scsi_reply.value().io.what.location.n_sectors > 0) {
 		DOLOG("iscsi_pdu_scsi_cmd::get_response: queing stream\n");
 
 		response.to_stream = scsi_reply.value().io.what.location;
