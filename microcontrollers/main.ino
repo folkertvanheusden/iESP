@@ -66,9 +66,9 @@ int led_green  = 17;
 int led_yellow = 16;
 int led_red    = 32;
 #elif defined(TEENSY4_1)
-int led_green  = 4;
-int led_yellow = 3;
-int led_red    = 2;
+int led_green  = 7;
+int led_yellow = 6;
+int led_red    = 5;
 #else
 int led_green  = -1;
 int led_yellow = -1;
