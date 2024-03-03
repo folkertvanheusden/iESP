@@ -82,7 +82,7 @@ DynamicJsonDocument cfg(4096);
 #define IESP_CFG_FILE "/cfg-iESP.json"
 
 std::vector<std::pair<std::string, std::string> > wifi_targets;
-int trim_level = 0;
+int trim_level = 1;
 
 #if defined(TEENSY4_1)
 LittleFS_Program myfs;
@@ -108,7 +108,7 @@ uint64_t max_idle_ticks = 1855000;
 #endif
 int cpu_usage = 0;
 int ram_free_kb = 0;
-int eth_wait_seconds = 0;
+int eth_wait_seconds = 10;
 int update_df_interval = 0;
 int percentage_diskspace = 0;
 
@@ -196,11 +196,14 @@ bool load_configuration() {
 	else
 		Serial.printf("Syslog host: %s\r\n", syslog_host.value().c_str());
 
-	trim_level = cfg["trim-level"].as<int>();
+	if (cfg.containsKey("trim-level"))
+		trim_level = cfg["trim-level"].as<int>();
 
-	eth_wait_seconds = cfg["eth-wait-time"].as<int>();
+	if (cfg.containsKey("eth-wait-time"))
+		eth_wait_seconds = cfg["eth-wait-time"].as<int>();
 
-	update_df_interval = cfg["update-df-interval"].as<int>();
+	if (cfg.containsKey("update-df-interval"))
+		update_df_interval = cfg["update-df-interval"].as<int>();
 
 	data_file.close();
 
