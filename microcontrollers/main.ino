@@ -405,6 +405,13 @@ void setup() {
 	Serial.setDebugOutput(true);
 #endif
 
+#if defined(TEENSY4_1)
+	if (CrashReport) {
+		Serial.println(CrashReport);
+		CrashReport.clear();
+	}
+#endif
+
 #if !defined(TEENSY4_1)
 	TM = new TM1637();
 	TM->begin(21, 22, 4);  // TEENSY4.1: pins
