@@ -104,6 +104,7 @@ bool backend_sdcard_teensy41::write(const uint64_t block_nr, const uint32_t n_bl
 
 	bool rc = false;
 	for(int i=0; i<5; i++) {  // 5 is arbitrarily chosen
+		arm_dcache_flush_delete(data, n_bytes_to_write);
 		size_t bytes_written = file.write(data, n_bytes_to_write);
 		rc = bytes_written == n_bytes_to_write;
 		if (rc)
@@ -126,6 +127,7 @@ bool backend_sdcard_teensy41::trim(const uint64_t block_nr, const uint32_t n_blo
 {
 	bool rc = true;
 	uint8_t *data = new uint8_t[get_block_size()];
+	arm_dcache_flush_delete(data, get_block_size() * n_blocks);
 	for(uint32_t i=0; i<n_blocks; i++) {
 		if (write(block_nr + i, 1, data) == false) {
 			errlog("Cannot \"trim\"");
@@ -158,6 +160,7 @@ bool backend_sdcard_teensy41::read(const uint64_t block_nr, const uint32_t n_blo
 
 	bool rc = false;
 	for(int i=0; i<5; i++) {  // 5 is arbitrarily chosen
+		arm_dcache_flush_delete(data, n_bytes_to_read);
 		size_t bytes_read = file.read(data, n_bytes_to_read);
 		rc = bytes_read == n_bytes_to_read;
 		if (rc)
@@ -166,7 +169,6 @@ bool backend_sdcard_teensy41::read(const uint64_t block_nr, const uint32_t n_blo
 		delay((i + 1) * 100); // 100ms is arbitrarily chosen
 		Serial.printf("Retrying read of %" PRIu32 " blocks starting at block number % " PRIu64 "\r\n", n_blocks, block_nr);
 	}
-ok:
 	if (!rc)
 		errlog("Cannot read (%d)", file.getError());
 	write_led(led_read, LOW);
