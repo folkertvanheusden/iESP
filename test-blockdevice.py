@@ -24,6 +24,8 @@ seed = int(time.time())
 fd = os.open(dev, os.O_RDWR | os.O_DIRECT)
 dev_size = os.lseek(fd, 0, os.SEEK_END)
 
+print(f'Device size: {dev_size} bytes or {dev_size // 1024 // 1024 // 1024} GB')
+
 n_blocks = dev_size // blocksize
 seen = [ None ] * n_blocks
 
