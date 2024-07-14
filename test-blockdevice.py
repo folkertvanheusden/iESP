@@ -9,7 +9,7 @@ import time
 ##### DO NOT RUN THIS ON A DEVICE WITH DATA! IT GETS ERASED! ######
 
 if len(sys.argv) != 5:
-    print(f'Usage: {sys.argv[0]} dev blocksize maxblockcount')
+    print(f'Usage: {sys.argv[0]} dev blocksize maxblockcount unique-percentage')
     print(' ##### DO NOT RUN THIS ON A DEVICE WITH DATA! IT GETS ERASED! ###### ')
     sys.exit(1)
 
