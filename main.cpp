@@ -76,6 +76,7 @@ void help()
 	printf("-i x    IP-address of adapter to listen on\n");
 	printf("-p x    TCP-port to listen on\n");
 	printf("-T x    trim level (0=disable, 1=normal (default), 2=auto)\n");
+	printf("-S      enable internal SNMP server\n");
 	printf("-h      this help\n");
 }
 
@@ -84,7 +85,7 @@ int main(int argc, char *argv[])
 	signal(SIGPIPE, SIG_IGN);
 	signal(SIGINT,  sigh);
 
-	std::string ip_address = "192.168.64.206";
+	std::string ip_address = "0.0.0.0";
 	int         port       = 3260;
 	std::string dev        = "test.dat";
 	int         trim_level = 1;
