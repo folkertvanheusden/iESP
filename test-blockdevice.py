@@ -98,6 +98,7 @@ verified_d = 0
 w = 0
 read_error_count = 0
 write_error_count = 0
+data_total = 0
 
 lock = threading.Lock()
 ranges = []
@@ -112,6 +113,7 @@ def do(show_stats):
     global write_error_count
     global lock
     global ranges
+    global data_total
 
     n_failed = 0
 
@@ -193,10 +195,13 @@ def do(show_stats):
         n += 1
         total_n += cur_n_blocks
 
+        data_total += cur_n_blocks * blocksize
+
         if show_stats:
             now = time.time()
+            time_diff = now - start
             if now - prev >= 1:
-                print(f'total: {n}, n/s: {int(n / (now - start))}, avg block count per iteration: {total_n / n:.2f}, percent done: {w * 100 / n_blocks:.2f}, n verified: {verified}/{verified_d}, write errors: {write_error_count}')
+                print(f'total: {n}, n/s: {int(n / time_diff)}, avg blocks per it.: {total_n / n:.2f}, percent done: {w * 100 / n_blocks:.2f}, n verified: {verified}/{verified_d}, write errors: {write_error_count}, MB/s: {data_total / time_diff / 1024 / 1024:.2f}')
                 prev = now
 
         lock.acquire()
