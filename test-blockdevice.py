@@ -16,6 +16,7 @@ dev = None
 blocksize = 4096
 max_b = 16
 unique_perc = 51
+trim_perc = 0
 n_threads = 2
 
 def help():
@@ -26,12 +27,13 @@ def help():
     print('-u unique-percentage: for testing de-duplication devices')
     print('-f fast random:       used for generating non-dedupable data')
     print('-n thread count:      number of parallel threads. run this with PYTHON_GIL=0 (python 3.13 and more recent)')
+    print('-t trim-percentage:   how much to apply "trim"')
     print()
     print(' ##### DO NOT RUN THIS ON A DEVICE WITH DATA! IT GETS ERASED! ###### ')
     print()
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], 'd:b:m:u:fn:h')
+    opts, args = getopt.getopt(sys.argv[1:], 'd:b:m:u:fn:t:h')
 except getopt.GetoptError as err:
     print(err)
     help()
@@ -50,6 +52,8 @@ for o, a in opts:
         fast_random = True
     elif o == '-n':
         n_threads = int(a)
+    elif o == '-t':
+        trim_perc = int(a)
     elif o == '-h':
         help()
         sys.exit(0)
@@ -69,6 +73,7 @@ if dev_size % blocksize:
     print(f'Note: disk is not a multiple of {blocksize} in size ({dev_size})!')
 seen = [ None ] * n_blocks
 
+apply_trim = 0xfffffffe
 duplicate = 0xffffffff
 
 random.seed()  # different from random.Random
@@ -76,6 +81,8 @@ random.seed()  # different from random.Random
 def gen_block(size, offset, seed2):
     if seed2 == duplicate:
         seed_data = seed.to_bytes(8, 'big')
+    elif seed2 == apply_trim:
+        seed_data = bytes(size)
     else:
         seed_data = offset.to_bytes(8, 'big') + seed.to_bytes(8, 'big') + seed2.to_bytes(4, 'big')
     if fast_random:
@@ -95,6 +102,7 @@ total_n = 0
 n = 0
 verified = 0
 verified_d = 0
+verified_t = 0
 w = 0
 read_error_count = 0
 write_error_count = 0
@@ -108,6 +116,7 @@ def do(show_stats):
     global n
     global verified
     global verified_d
+    global verified_t
     global w
     global read_error_count
     global write_error_count
@@ -153,6 +162,8 @@ def do(show_stats):
                 b.append(gen_block(blocksize, offset + i * blocksize, seen[nr + i]))
                 if seen[nr + i] == duplicate:
                     verified_d += 1
+                if seen[nr + i] == apply_trim:
+                    verified_t += 1
 
             # read from disk
             try:
@@ -180,13 +191,23 @@ def do(show_stats):
         b = bytearray()
         for i in range(0, cur_n_blocks):
             # choose new seed. if not duplicate (e.g. not de-dubeable), use a random
-            new_seen = duplicate if random.randint(0, 100) > unique_perc else random.randint(0, 65535)
+            perc = random.randint(0, 100)
+            if perc < unique_perc:
+                new_seen = random.randint(0, 65535)
+            elif perc < unique_perc + trim_perc:
+                new_seen = apply_trim
+            else:
+                new_seen = duplicate
             # remember the seed
             seen[nr + i] = new_seen
             # generate & add block of semi(!)-random data
             b += gen_block(blocksize, offset + i * blocksize, seen[nr + i])
         try:
             os.pwrite(fd, b, offset)
+            for i in range(0, cur_n_blocks):
+                if seen[nr + 1] == apply_trim:
+                    os.trim(fd, offset)
+                    pass
             os.fdatasync(fd)
         except OSError as e:
             print(f'Write error: {e} at {offset} ({len(b)} bytes)', offset/blocksize)
@@ -201,7 +222,7 @@ def do(show_stats):
             now = time.time()
             time_diff = now - start
             if now - prev >= 1:
-                print(f'total: {n}, n/s: {int(n / time_diff)}, avg blocks per it.: {total_n / n:.2f}, percent done: {w * 100 / n_blocks:.2f}, n verified: {verified}/{verified_d}, write errors: {write_error_count}, MB/s: {data_total / time_diff / 1024 / 1024:.2f}')
+                print(f'total: {n}, n/s: {int(n / time_diff)}, avg blocks per it.: {total_n / n:.2f}, percent done: {w * 100 / n_blocks:.2f}, n verified: {verified}/{verified_d}/{verified_t}, write errors: {write_error_count}, MB/s: {data_total / time_diff / 1024 / 1024:.2f}')
                 prev = now
 
         lock.acquire()
