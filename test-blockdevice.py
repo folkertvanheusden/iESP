@@ -6,13 +6,7 @@ import random
 import sys
 import time
 
-# no secure hash is required
-try:
-    # apt install python3-xxhash
-    import xxhash
-    hash_algo = xxhash.xxh128
-except Exception as e:
-    hash_algo = hashlib.md5
+hash_algo = hashlib.sha3_512
 
 ##### DO NOT RUN THIS ON A DEVICE WITH DATA! IT GETS ERASED! ######
 
