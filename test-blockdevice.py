@@ -72,7 +72,6 @@ seen = [ None ] * n_blocks
 duplicate = 0xffffffff
 
 random.seed()  # different from random.Random
-rnd = random.Random()
 
 def gen_block(size, offset, seed2):
     if seed2 == duplicate:
@@ -80,6 +79,7 @@ def gen_block(size, offset, seed2):
     else:
         seed_data = offset.to_bytes(8, 'big') + seed.to_bytes(8, 'big') + seed2.to_bytes(4, 'big')
     if fast_random:
+        rnd = random.Random()
         rnd.seed(seed_data)
         out = rnd.randbytes(size)
     else:
@@ -99,6 +99,9 @@ w = 0
 read_error_count = 0
 write_error_count = 0
 
+lock = threading.Lock()
+ranges = []
+
 def do():
     global total_n
     global n
@@ -107,26 +110,43 @@ def do():
     global w
     global read_error_count
     global write_error_count
+    global lock
+    global ranges
+
+    n_failed = 0
 
     prev = start
 
     while True:
-        # pick a number of blocks to work on
-        cur_n_blocks = random.randint(1, max_b)
-        # pick an offset (nr) in the device
-        offset = random.randint(0, dev_size - blocksize * cur_n_blocks) & ~(blocksize - 1)
-        nr = offset // blocksize
+        lock.acquire()
+        while True:
+            # pick a number of blocks to work on
+            cur_n_blocks = random.randint(1, max_b)
+            # pick an offset (nr) in the device
+            offset = random.randint(0, dev_size - blocksize * cur_n_blocks) & ~(blocksize - 1)
+            nr = offset // blocksize
+            # in use?
+            in_use = False
+            cur_range = set(range(nr, nr + cur_n_blocks))
+            for r in ranges:
+                if len(cur_range.intersection(range(r[0], r[1]))) > 0:
+                    in_use = True
+                    break
+            if in_use == False:
+                ranges.append((nr, nr + cur_n_blocks))
+                break
+        lock.release()
 
         # have all 'cur_n_blocks' starting at 'nr' been written to?
         b = []
         has_none = False
         for i in range(0, cur_n_blocks):
-            if seen[nr + i] == None:
+            if seen[nr + i] == None:  # Deze check in de read-from-disk-loop.
                 has_none = True
                 break
 
         if has_none == False:  # yes(!)
-            # verify
+            # verify: generate byterarray containg what should be on disk
             for i in range(0, cur_n_blocks):
                 b.append(gen_block(blocksize, offset + i * blocksize, seen[nr + i]))
                 if seen[nr + i] == duplicate:
@@ -138,8 +158,14 @@ def do():
 
                 for i in range(0, cur_n_blocks):
                     cur_b_offset = i * blocksize 
-                    assert(data[cur_b_offset:cur_b_offset+blocksize] == b[i])
-                    verified += 1
+                    if data[cur_b_offset:cur_b_offset+blocksize] != b[i]:
+                        if n_failed < 3:
+                            print(f'Sector {cur_n_blocks + i} has unexpected data')
+                            n_failed += 1
+                            if n_failed == 3:
+                                print('Stopped outputting errors for this thread')
+                    else:
+                        verified += 1
 
             except OSError as e:
                 print(f'Read error: {e} at {offset} ({len(b)} bytes)', offset/blocksize)
@@ -171,6 +197,13 @@ def do():
         if now - prev >= 1:
             print(f'total: {n}, n/s: {int(n / (now - start))}, avg block count per iteration: {total_n / n:.2f}, percent done: {w * 100 / n_blocks:.2f}, n verified: {verified}/{verified_d}, write errors: {write_error_count}')
             prev = now
+
+        lock.acquire()
+        for i in range(len(ranges)):
+            if ranges[i][0] == nr and ranges[i][1] == nr + cur_n_blocks:
+                del ranges[i]
+                break
+        lock.release()
 
 t = []
 for i in range(n_threads):
