@@ -45,6 +45,7 @@ uint64_t backend_file::get_block_size() const
 
 bool backend_file::sync()
 {
+	n_syncs++;
 	ts_last_acces = get_micros();
 	if (fdatasync(fd) == 0)
 		return true;
@@ -64,6 +65,7 @@ bool backend_file::write(const uint64_t block_nr, const uint32_t n_blocks, const
 	if (rc == -1)
 		DOLOG("backend_file::write: ERROR writing; %s\n", strerror(errno));
 	ts_last_acces = get_micros();
+	bytes_written += n_bytes;
 	return rc == n_bytes;
 }
 
@@ -104,5 +106,6 @@ bool backend_file::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_
 	else if (rc != n_bytes)
 		DOLOG("backend_file::read: short read, requested: %zu, received: %zd\n", n_bytes, rc);
 	ts_last_acces = get_micros();
+	bytes_read += n_bytes;
 	return rc == n_bytes;
 }

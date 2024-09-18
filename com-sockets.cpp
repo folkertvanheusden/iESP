@@ -163,7 +163,6 @@ bool com_client_sockets::recv(uint8_t *const to, const size_t n)
 
 	// ideally the poll-loop should include the read (TODO)
 	auto rc = READ(fd, to, n);
-
 	if (rc == -1)
 		errlog("com_client_sockets::recv: read failed with error %s", strerror(errno));
 
