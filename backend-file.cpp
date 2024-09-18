@@ -46,7 +46,7 @@ uint64_t backend_file::get_block_size() const
 bool backend_file::sync()
 {
 	ts_last_acces = get_micros();
-	if (fsync(fd) == 0)
+	if (fdatasync(fd) == 0)
 		return true;
 
 	DOLOG("backend_file::sync: failed: %s\n", strerror(errno));
