@@ -85,7 +85,7 @@ int main(int argc, char *argv[])
 	signal(SIGPIPE, SIG_IGN);
 	signal(SIGINT,  sigh);
 
-	std::string ip_address = "192.168.64.206";
+	std::string ip_address = "0.0.0.0";
 	int         port       = 3260;
 	std::string dev        = "test.dat";
 	int         trim_level = 1;
