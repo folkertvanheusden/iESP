@@ -40,7 +40,11 @@ uint64_t backend_file::get_size_in_blocks() const
 
 uint64_t backend_file::get_block_size() const
 {
+#if defined(ARDUINO)
 	return 512;
+#else
+	return 4096;
+#endif
 }
 
 bool backend_file::sync()
@@ -79,7 +83,7 @@ bool backend_file::trim(const uint64_t block_nr, const uint32_t n_blocks)
 	int rc = fallocate(fd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, offset, n_bytes);
 #else
 	int rc = 0;
-	uint8_t *zero = new uint8_t[512]();
+	uint8_t *zero = new uint8_t[block_size]();
 	for(uint32_t i=0; i<n_blocks; i++) {
 		if (write(block_nr + i, 1, zero) == false) {
 			rc = -1;

@@ -303,7 +303,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 		reply_to.set(ses, temp.data, temp.n);
 		delete [] temp.data;
 
-	        uint64_t use_pdu_data_size = uint64_t(stream_parameters.n_sectors) * 512;
+	        uint64_t use_pdu_data_size = uint64_t(stream_parameters.n_sectors) * s->get_block_size();
 		if (use_pdu_data_size > reply_to.get_ExpDatLen()) {
 			DOLOG("server::push_response: requested less (%u) than wat is available (%" PRIu64 ")\n", reply_to.get_ExpDatLen(), use_pdu_data_size);
 			use_pdu_data_size = reply_to.get_ExpDatLen();
@@ -333,12 +333,12 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 			buffer.n = 16384;
 #else
 		if (ack_interval.has_value())
-			buffer.n = std::max(uint32_t(512), ack_interval.value());
+			buffer.n = std::max(uint32_t(s->get_block_size()), ack_interval.value());
 #endif
-		if (buffer.n < 512)
-			buffer.n = 512;
+		if (buffer.n < s->get_block_size())
+			buffer.n = s->get_block_size();
 		buffer.data = new uint8_t[buffer.n]();
-		uint32_t block_group_size = buffer.n / 512;
+		uint32_t block_group_size = buffer.n / s->get_block_size();
 
 		uint32_t offset = 0;
 
@@ -346,7 +346,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 
 		for(uint32_t block_nr = 0; block_nr < stream_parameters.n_sectors;) {
 			uint32_t n_left = low_ram ? 1 : std::min(block_group_size, stream_parameters.n_sectors - block_nr);
-			buffer.n = n_left * 512;
+			buffer.n = n_left * s->get_block_size();
 
 			if (offset < use_pdu_data_size)
 				buffer.n = std::min(buffer.n, size_t(use_pdu_data_size - offset));
@@ -370,7 +370,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 			if (out.n == 0) {  // gen_data_in_pdu could not allocate memory
 				low_ram = true;
 				delete [] buffer.data;
-				buffer.n = 512;
+				buffer.n = s->get_block_size();
 				buffer.data = new uint8_t[buffer.n]();
 				errlog("Low on memory: %zu bytes failed", buffer.n);
 			}
@@ -470,6 +470,7 @@ void server::handler()
 			auto     start       = prev_output;
 			unsigned long busy   = 0;
 			const long interval  = 5000;
+			bool     first       = true;
 
 			session *ses = nullptr;
 			bool     ok  = true;
@@ -484,6 +485,11 @@ void server::handler()
 				}
 
 				is->iscsiSsnCmdPDUs++;
+
+				if (first) {
+					first = false;
+					ses->set_block_size(s->get_block_size());
+				}
 
 				auto tx_start = get_micros();
 

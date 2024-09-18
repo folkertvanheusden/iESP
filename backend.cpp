@@ -36,15 +36,16 @@ bool backend::is_idle()
 
 uint8_t backend::get_free_space_percentage()
 {
-	auto     size  = get_size_in_blocks();
-	uint64_t th100 = size / 100;
+	auto     block_size = get_block_size();
+	auto     size       = get_size_in_blocks();
+	uint64_t th100      = size / 100;
 	uint8_t  empty_count = 0;
 
 	if (th100 == 0)
 		return 0;
 
-	uint8_t  *buffer = new uint8_t[512]();
-	uint8_t  *empty  = new uint8_t[512]();
+	uint8_t  *buffer = new uint8_t[block_size]();
+	uint8_t  *empty  = new uint8_t[block_size]();
 
 	for(int i=0; i<100; i++) {
 		uint64_t block_nr = 0;
@@ -57,7 +58,7 @@ uint8_t backend::get_free_space_percentage()
 			break;
 		}
 
-		if (memcmp(buffer, empty, 512) == 0)
+		if (memcmp(buffer, empty, block_size) == 0)
 			empty_count++;
 	}
 
