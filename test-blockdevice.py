@@ -7,6 +7,7 @@ import sys
 import time
 
 hash_algo = hashlib.sha3_512
+fast_random = True
 
 ##### DO NOT RUN THIS ON A DEVICE WITH DATA! IT GETS ERASED! ######
 
@@ -41,13 +42,18 @@ duplicate = 0xffffffff
 
 def gen_block(size, offset, seed2):
     if seed2 == duplicate:
-        m = hash_algo(seed.to_bytes(8, 'big')).digest()
+        seed_data = seed.to_bytes(8, 'big')
     else:
-        m = hash_algo(offset.to_bytes(8, 'big') + seed.to_bytes(8, 'big') + seed2.to_bytes(4, 'big')).digest()
-    out = bytearray()
-    while len(out) < size:
-        out += bytearray(m)
-        m = hash_algo(m).digest()
+        seed_data = offset.to_bytes(8, 'big') + seed.to_bytes(8, 'big') + seed2.to_bytes(4, 'big')
+    if fast_random:
+        random.seed(seed_data)
+        out = random.randbytes(size)
+    else:
+        out = bytearray()
+        m = hash_algo(seed_data).digest()
+        while len(out) < size:
+            out += bytearray(m)
+            m = hash_algo(m).digest()
     return out
 
 total_n = 0
