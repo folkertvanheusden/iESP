@@ -1,31 +1,57 @@
 #! /usr/bin/python3
 
+import getopt
 import hashlib
 import os
 import random
 import sys
 import time
 
-hash_algo = hashlib.sha3_512
-fast_random = True
-
 ##### DO NOT RUN THIS ON A DEVICE WITH DATA! IT GETS ERASED! ######
 
-if len(sys.argv) != 5:
-    print(f'Usage: {sys.argv[0]} dev blocksize maxblockcount unique-percentage')
-    print('dev:               block device')
-    print('blocksize:         e.g. 512 or 4096')
-    print('maxblockcount:     maximum number of blocks to write in one go')
-    print('unique-percentage: for testing de-duplication devices')
+hash_algo = hashlib.sha3_512
+fast_random = False
+dev = None
+blocksize = 4096
+max_b = 16
+unique_perc = 51
+
+def help():
+    print(f'Usage: {sys.argv[0]} ...arguments...')
+    print('-d dev:               block device')
+    print('-b blocksize:         e.g. 512 or 4096')
+    print('-m maxblockcount:     maximum number of blocks to write in one go')
+    print('-u unique-percentage: for testing de-duplication devices')
+    print('-f fast random:       used for generating non-dedupable data')
     print()
     print(' ##### DO NOT RUN THIS ON A DEVICE WITH DATA! IT GETS ERASED! ###### ')
     print()
-    sys.exit(1)
 
-dev = sys.argv[1]  # device file
-blocksize = int(sys.argv[2])  # size of each block (512, 4096, etc)
-max_b = int(sys.argv[3])  # max. number of blocks in one go
-unique_perc = int(sys.argv[4])  # how many of the blocks should be unique, %
+try:
+    opts, args = getopt.getopt(sys.argv[1:], 'd:b:m:u:fh')
+except getopt.GetoptError as err:
+    print(err)
+    help()
+    sys.exit(2)
+
+for o, a in opts:
+    if o == '-d':
+        dev = a
+    elif o == '-b':
+        blocksize = int(a)
+    elif o == '-m':
+        max_b = int(a)
+    elif o == '-u':
+        unique_perc = int(a)
+    elif o == '-f':
+        fast_random = True
+    elif o == '-h':
+        help()
+        sys.exit(0)
+
+if dev == None:
+    help()
+    sys.exit(1)
 
 random.seed()
 
