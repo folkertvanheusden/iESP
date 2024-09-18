@@ -8,6 +8,7 @@ import time
 
 # no secure hash is required
 try:
+    # apt install python3-xxhash
     import xxhash
     hash_algo = xxhash.xxh128
 except Exception as e:
