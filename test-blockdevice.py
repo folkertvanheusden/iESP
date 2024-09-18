@@ -6,6 +6,13 @@ import random
 import sys
 import time
 
+# no secure hash is required
+try:
+    import xxhash
+    hash_algo = xxhash.xxh128
+except Exception as e:
+    hash_algo = hashlib.md5
+
 ##### DO NOT RUN THIS ON A DEVICE WITH DATA! IT GETS ERASED! ######
 
 if len(sys.argv) != 5:
@@ -39,13 +46,13 @@ duplicate = 0xffffffff
 
 def gen_block(size, offset, seed2):
     if seed2 == duplicate:
-        m = hashlib.md5(seed.to_bytes(8, 'big')).digest()
+        m = hash_algo(seed.to_bytes(8, 'big')).digest()
     else:
-        m = hashlib.md5(offset.to_bytes(8, 'big') + seed.to_bytes(8, 'big') + seed2.to_bytes(4, 'big')).digest()
+        m = hash_algo(offset.to_bytes(8, 'big') + seed.to_bytes(8, 'big') + seed2.to_bytes(4, 'big')).digest()
     out = bytearray()
     while len(out) < size:
         out += bytearray(m)
-        m = hashlib.md5(m).digest()
+        m = hash_algo(m).digest()
     return out
 
 total_n = 0
