@@ -40,14 +40,16 @@ seen = [ None ] * n_blocks
 
 duplicate = 0xffffffff
 
+rnd = random.Random()
+
 def gen_block(size, offset, seed2):
     if seed2 == duplicate:
         seed_data = seed.to_bytes(8, 'big')
     else:
         seed_data = offset.to_bytes(8, 'big') + seed.to_bytes(8, 'big') + seed2.to_bytes(4, 'big')
     if fast_random:
-        random.seed(seed_data)
-        out = random.randbytes(size)
+        rnd.seed(seed_data)
+        out = rnd.randbytes(size)
     else:
         out = bytearray()
         m = hash_algo(seed_data).digest()
