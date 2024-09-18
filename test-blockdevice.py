@@ -27,7 +27,7 @@ unique_perc = int(sys.argv[4])  # how many of the blocks should be unique, %
 random.seed()
 
 seed = int(time.time())
-fd = os.open(dev, os.O_RDWR | os.O_DIRECT)
+fd = os.open(dev, os.O_RDWR)
 dev_size = os.lseek(fd, 0, os.SEEK_END)
 
 n_blocks = dev_size // blocksize
@@ -55,6 +55,8 @@ verified_d = 0
 start = time.time()
 prev = start
 w = 0
+read_error_count = 0
+write_error_count = 0
 
 while True:
     # pick a number of blocks to work on
@@ -79,13 +81,17 @@ while True:
                 verified_d += 1
 
         # read from disk
-        data = os.pread(fd, blocksize * cur_n_blocks, offset)
+        try:
+            data = os.pread(fd, blocksize * cur_n_blocks, offset)
 
-        for i in range(0, cur_n_blocks):
-            cur_b_offset = i * blocksize 
-            assert(data[cur_b_offset:cur_b_offset+blocksize] == b[i])
+            for i in range(0, cur_n_blocks):
+                cur_b_offset = i * blocksize 
+                assert(data[cur_b_offset:cur_b_offset+blocksize] == b[i])
+                verified += 1
 
-            verified += 1
+        except OSError as e:
+            print(f'Read error: {e} at {offset} ({len(b)} bytes)', offset/blocksize)
+            read_error_count += 1
 
     else:
         w += cur_n_blocks
@@ -99,13 +105,17 @@ while True:
         seen[nr + i] = new_seen
         # generate & add block of semi(!)-random data
         b += gen_block(blocksize, offset + i * blocksize, seen[nr + i])
-    os.pwrite(fd, b, offset)
-    os.fdatasync(fd)
+    try:
+        os.pwrite(fd, b, offset)
+        os.fdatasync(fd)
+    except OSError as e:
+        print(f'Write error: {e} at {offset} ({len(b)} bytes)', offset/blocksize)
+        write_error_count += 1
 
     n += 1
     total_n += cur_n_blocks
 
     now = time.time()
     if now - prev >= 1:
-        print(f'total: {n}, n/s: {int(n / (now - start))}, avg block count per iteration: {total_n / n:.2f}, percent done: {w * 100 / n_blocks:.2f}, n verified: {verified}/{verified_d}')
+        print(f'total: {n}, n/s: {int(n / (now - start))}, avg block count per iteration: {total_n / n:.2f}, percent done: {w * 100 / n_blocks:.2f}, n verified: {verified}/{verified_d}, write errors: {write_error_count}')
         prev = now
