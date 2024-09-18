@@ -53,7 +53,7 @@ This software has a custom SNMP library.
 
 disclaimer
 ----------
-Things are not stable/reliable yet: it may destroy the contents of your SD-card.
+Things are not stable/reliable yet for microcontrollers: it may destroy the contents of your SD-card.
 
 
 license

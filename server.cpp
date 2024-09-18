@@ -462,14 +462,14 @@ void server::handler()
 
 #if defined(ESP32) || defined(RP2040W) || defined(TEENSY4_1)
 			Serial.printf("new session with %s\r\n", endpoint.c_str());
-			uint32_t pdu_count   = 0;
-			auto     prev_output = millis();
-			auto     start       = prev_output;
-			unsigned long busy   = 0;
-			const long interval  = 5000;
 #else
 			DOLOG("server::handler: new session with %s\n", endpoint.c_str());
 #endif
+			auto     prev_output = get_millis();
+			uint32_t pdu_count   = 0;
+			auto     start       = prev_output;
+			unsigned long busy   = 0;
+			const long interval  = 5000;
 
 			session *ses = nullptr;
 			bool     ok  = true;
@@ -485,9 +485,7 @@ void server::handler()
 
 				is->iscsiSsnCmdPDUs++;
 
-#if defined(ESP32) || defined(RP2040W) || defined(TEENSY4_1)
-				auto tx_start = micros();
-#endif
+				auto tx_start = get_micros();
 
 				if (incoming.second) {  // something wrong with the received PDU?
 					errlog("server::handler: invalid PDU received");
@@ -524,29 +522,31 @@ void server::handler()
 					delete pdu;
 				}
 
-#if defined(ESP32) || defined(RP2040W) || defined(TEENSY4_1)
-				auto tx_end = micros();
+				auto tx_end = get_micros();
 				busy += tx_end - tx_start;
 
 				pdu_count++;
-				auto now = millis();
+				auto now = get_millis();
 				auto took = now - prev_output;
 				if (took >= interval) {
 					prev_output = now;
 					double   dtook = took / 1000.;
-					double   dkb   = dtook * 1024;
+					double   dkB   = dtook * 1024;
 					uint64_t bytes_read    = 0;
 					uint64_t bytes_written = 0;
 					uint64_t n_syncs       = 0;
 					uint64_t n_trims       = 0;
 					s->get_and_reset_stats(&bytes_read, &bytes_written, &n_syncs, &n_trims);
-					Serial.printf("%ld] PDU/s: %.2f, send: %.2f kB/s, recv: %.2f kB/s, written: %.2f kB/s, read: %.2f kB/s, syncs: %.2f/s, unmaps: %.2f/s, load: %.2f%%, mem: %" PRIu32 "\r\n", now, pdu_count / dtook, bytes_send / dkb, bytes_recv / dkb, bytes_written / dkb, bytes_read / dkb, n_syncs / dtook, n_trims / dtook, busy * 0.1 / took, get_free_heap_space());
+#if defined(ARDUINO)
+					Serial.printf("%.3f] PDU/s: %.2f, send: %.2f kB/s, recv: %.2f kB/s, written: %.2f kB/s, read: %.2f kB/s, syncs: %.2f/s, unmaps: %.2f/s, load: %.2f%%, mem: %" PRIu32 "\r\n", now / 1000., pdu_count / dtook, bytes_send / dkB, bytes_recv / dkB, bytes_written / dkB, bytes_read / dkB, n_syncs / dtook, n_trims / dtook, busy * 0.1 / took, get_free_heap_space());
+#else
+					fprintf(stderr, "%.3f] PDU/s: %.2f, send: %.2f kB/s, recv: %.2f kB/s, written: %.2f kB/s, read: %.2f kB/s, syncs: %.2f/s, unmaps: %.2f/s, load: %.2f%%\n", now / 1000., pdu_count / dtook, bytes_send / dkB, bytes_recv / dkB, bytes_written / dkB, bytes_read / dkB, n_syncs / dtook, n_trims / dtook, busy * 0.1 / took);
+#endif
 					pdu_count  = 0;
 					bytes_send = 0;
 					bytes_recv = 0;
 					busy       = 0;
 				}
-#endif
 			}
 			while(ok);
 #if defined(ESP32) || defined(RP2040W)

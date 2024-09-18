@@ -76,7 +76,7 @@ void help()
 	printf("-i x    IP-address of adapter to listen on\n");
 	printf("-p x    TCP-port to listen on\n");
 	printf("-T x    trim level (0=disable, 1=normal (default), 2=auto)\n");
-	printf("-S      enable internal SNMP server\n");
+	printf("-S      enable SNMP agent\n");
 	printf("-h      this help\n");
 }
 
