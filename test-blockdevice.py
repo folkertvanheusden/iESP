@@ -156,7 +156,9 @@ def do(show_stats):
 
             # read from disk
             try:
-                data = os.pread(fd, blocksize * cur_n_blocks, offset)
+                byte_count = blocksize * cur_n_blocks
+                os.posix_fadvise(fd, offset, byte_count, os.POSIX_FADV_DONTNEED)
+                data = os.pread(fd, byte_count, offset)
 
                 for i in range(0, cur_n_blocks):
                     cur_b_offset = i * blocksize 
@@ -188,6 +190,7 @@ def do(show_stats):
         try:
             os.pwrite(fd, b, offset)
             os.fdatasync(fd)
+            os.posix_fadvise(fd, offset, len(b), os.POSIX_FADV_DONTNEED)
         except OSError as e:
             print(f'Write error: {e} at {offset} ({len(b)} bytes)', offset/blocksize)
             write_error_count += 1
