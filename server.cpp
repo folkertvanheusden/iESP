@@ -334,6 +334,8 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 #else
 		if (ack_interval.has_value())
 			buffer.n = std::max(uint32_t(s->get_block_size()), ack_interval.value());
+		else
+			buffer.n = std::max(uint32_t(s->get_block_size()), uint32_t(65536));  // 64 kB, arbitrarily chosen
 #endif
 		if (buffer.n < s->get_block_size())
 			buffer.n = s->get_block_size();
