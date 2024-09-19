@@ -220,4 +220,5 @@ for i in range(n_threads):
     tcur.start()
     t.append(tcur)
 
-t[0].join()
+for th in t:
+    th.join()
