@@ -213,9 +213,9 @@ bool iscsi_pdu_login_request::set(session *const s, const uint8_t *const in, con
 			continue;
 
 		if (parts[0] == "MaxBurstLength")
-			max_burst = std::min(max_burst, uint32_t(std::atoi(parts[1].c_str())));
+			max_burst = std::min(max_burst, uint32_t(std::stoi(parts[1])));
 		if (parts[0] == "FirstBurstLength")
-			max_burst = std::min(max_burst, uint32_t(std::atoi(parts[1].c_str())));
+			max_burst = std::min(max_burst, uint32_t(std::stoi(parts[1])));
 		if (parts[0] == "InitiatorName")
 			initiator = parts[1];
 	}
@@ -289,7 +289,11 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 			"DefaultTime2Wait=2",
 			"DefaultTime2Retain=20",
 			"ErrorRecoveryLevel=0",
+#if defined(Arduino)
 			"MaxRecvDataSegmentLength=4096",
+#else
+			"MaxRecvDataSegmentLength=8388608",  // 8 MB, anything large
+#endif
 		};
 		for(auto & kv : kvs)
 			DOLOG("iscsi_pdu_login_reply::set: send KV \"%s\"\n", kv.c_str());
