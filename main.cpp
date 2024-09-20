@@ -140,6 +140,7 @@ int main(int argc, char *argv[])
 	std::thread *mth = new std::thread(maintenance_thread, &stop, &bf, &percentage_diskspace, &cpu_usage, &ram_free_kb);
 
 	server s(&sd, &c, &is);
+	printf("Go!\n");
 	s.handler();
 
 	delete snmp_;
