@@ -213,9 +213,9 @@ bool iscsi_pdu_login_request::set(session *const s, const uint8_t *const in, con
 			continue;
 
 		if (parts[0] == "MaxBurstLength")
-			max_burst = std::min(max_burst, uint32_t(std::atoi(parts[1].c_str())));
+			max_burst = std::min(max_burst, uint32_t(std::stoi(parts[1])));
 		if (parts[0] == "FirstBurstLength")
-			max_burst = std::min(max_burst, uint32_t(std::atoi(parts[1].c_str())));
+			max_burst = std::min(max_burst, uint32_t(std::stoi(parts[1])));
 		if (parts[0] == "InitiatorName")
 			initiator = parts[1];
 	}
@@ -289,7 +289,11 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 			"DefaultTime2Wait=2",
 			"DefaultTime2Retain=20",
 			"ErrorRecoveryLevel=0",
+#if defined(Arduino)
 			"MaxRecvDataSegmentLength=4096",
+#else
+			"MaxRecvDataSegmentLength=8388608",  // 8 MB, anything large
+#endif
 		};
 		for(auto & kv : kvs)
 			DOLOG("iscsi_pdu_login_reply::set: send KV \"%s\"\n", kv.c_str());
@@ -578,9 +582,10 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get() const
 
 	use_pdu_data_size = std::min(use_pdu_data_size, size_t(reply_to_copy.get_ExpDatLen()));
 
-	size_t n_to_do = (use_pdu_data_size + 511) / 512;
+	auto   block_size = s->get_block_size();
+	size_t n_to_do    = (use_pdu_data_size + block_size - 1) / block_size;
 
-	for(size_t i=0, count=0; i<use_pdu_data_size; i += 512, count++) {  // 4kB blocks
+	for(size_t i=0, count=0; i<use_pdu_data_size; i += block_size, count++) {  // 4kB blocks
 		*pdu_data_in = { };
 		set_bits(&pdu_data_in->b1, 0, 6, o_scsi_data_in);  // 0x25
 		bool last_block = count == n_to_do - 1;
@@ -588,7 +593,7 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get() const
 			set_bits(&pdu_data_in->b2, 7, 1, true);  // F
 			set_bits(&pdu_data_in->b2, 0, 1, true);  // S
 		}
-		size_t cur_len = std::min(use_pdu_data_size - i, size_t(512));
+		size_t cur_len = std::min(use_pdu_data_size - i, size_t(block_size));
 		DOLOG("iscsi_pdu_scsi_data_in::get: block %zu, last_block: %d, cur_len: %zu\n", count, last_block, cur_len);
 		pdu_data_in->datalenH   = cur_len >> 16;
 		pdu_data_in->datalenM   = cur_len >>  8;

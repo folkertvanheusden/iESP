@@ -29,6 +29,6 @@ add_executable(
 	snmp/snmp_elem.cpp
 )
 
-set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE RelWithDebInfo)
 #target_link_libraries(iesp -fsanitize=address)
 #target_link_libraries(iesp -fsanitize=undefined)

@@ -51,9 +51,15 @@ This software has a custom SNMP library.
 * .1.3.6.1.4.1.2021.9.1.9.1     - disk free estimate (will only work when using TRIM/UNMAP/DISCARD)
 
 
+test tools
+----------
+* test-blockdevice.py  tests if what is written, is readable later on. this test overwrites the contents of a device!
+* block-speed-randread.py  measures the bandwidth/iops for random reads. use plot.sh to create png-files of the output.
+
+
 disclaimer
 ----------
-Things are not stable/reliable yet: it may destroy the contents of your SD-card.
+Things are not stable/reliable yet for microcontrollers: it may destroy the contents of your SD-card.
 
 
 license

@@ -40,13 +40,18 @@ uint64_t backend_file::get_size_in_blocks() const
 
 uint64_t backend_file::get_block_size() const
 {
+#if defined(ARDUINO)
 	return 512;
+#else
+	return 4096;
+#endif
 }
 
 bool backend_file::sync()
 {
+	n_syncs++;
 	ts_last_acces = get_micros();
-	if (fsync(fd) == 0)
+	if (fdatasync(fd) == 0)
 		return true;
 
 	DOLOG("backend_file::sync: failed: %s\n", strerror(errno));
@@ -64,6 +69,7 @@ bool backend_file::write(const uint64_t block_nr, const uint32_t n_blocks, const
 	if (rc == -1)
 		DOLOG("backend_file::write: ERROR writing; %s\n", strerror(errno));
 	ts_last_acces = get_micros();
+	bytes_written += n_bytes;
 	return rc == n_bytes;
 }
 
@@ -77,7 +83,7 @@ bool backend_file::trim(const uint64_t block_nr, const uint32_t n_blocks)
 	int rc = fallocate(fd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, offset, n_bytes);
 #else
 	int rc = 0;
-	uint8_t *zero = new uint8_t[512]();
+	uint8_t *zero = new uint8_t[block_size]();
 	for(uint32_t i=0; i<n_blocks; i++) {
 		if (write(block_nr + i, 1, zero) == false) {
 			rc = -1;
@@ -104,5 +110,6 @@ bool backend_file::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_
 	else if (rc != n_bytes)
 		DOLOG("backend_file::read: short read, requested: %zu, received: %zd\n", n_bytes, rc);
 	ts_last_acces = get_micros();
+	bytes_read += n_bytes;
 	return rc == n_bytes;
 }

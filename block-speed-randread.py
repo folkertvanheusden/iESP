@@ -12,7 +12,7 @@ jobs_depth = int(sys.argv[3])
 duration = int(sys.argv[4])
 
 def do_(duration, bs, results, results_index):
-    fd = os.open(dev, os.O_RDONLY | os.O_DIRECT)
+    fd = os.open(dev, os.O_RDONLY)
     dev_size = os.lseek(fd, 0, os.SEEK_END)
     start = time.time()
     iop = 0
@@ -20,6 +20,7 @@ def do_(duration, bs, results, results_index):
     while True:
         offset = random.randint(0, dev_size) & ~(bs - 1)
         os.lseek(fd, offset, os.SEEK_SET)
+        os.posix_fadvise(fd, offset, bs, os.POSIX_FADV_DONTNEED)
         os.read(fd, bs)
 
         iop += 1

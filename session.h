@@ -13,6 +13,7 @@ class session
 private:
 	uint32_t data_sn_itt  { 0 };  // itt == initiator transfer tag
 	uint32_t data_sn      { 0 };
+	uint32_t block_size   { 0 };
 
 	std::optional<uint32_t> ack_interval;
 
@@ -23,6 +24,9 @@ public:
 	virtual ~session();
 
 	uint32_t get_inc_datasn(const uint32_t itt);
+
+	void     set_block_size(const uint32_t block_size_in) { block_size = block_size_in; }
+	uint32_t get_block_size() const { return block_size; }
 
 	void     set_ack_interval(const uint32_t bytes) { ack_interval = bytes; }
 	std::optional<uint32_t> get_ack_interval()      { return ack_interval;  }

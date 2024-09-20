@@ -182,6 +182,21 @@ uint64_t get_micros()
 #endif
 }
 
+uint64_t get_millis()
+{
+#if defined(ARDUINO)
+	return millis();
+#else
+        struct timespec tv { };
+        if (clock_gettime(CLOCK_REALTIME, &tv) == -1) {
+		errlog("get_millis: clock_gettime failed (%s)", strerror(errno));
+		return 0;
+	}
+
+        return uint64_t(tv.tv_sec) * uint64_t(1000) + uint64_t(tv.tv_nsec / 1000000);
+#endif
+}
+
 #if defined(TEENSY4_1)
 void teensyMAC(uint8_t *const mac)
 {

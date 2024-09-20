@@ -303,7 +303,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 		reply_to.set(ses, temp.data, temp.n);
 		delete [] temp.data;
 
-	        uint64_t use_pdu_data_size = uint64_t(stream_parameters.n_sectors) * 512;
+	        uint64_t use_pdu_data_size = uint64_t(stream_parameters.n_sectors) * s->get_block_size();
 		if (use_pdu_data_size > reply_to.get_ExpDatLen()) {
 			DOLOG("server::push_response: requested less (%u) than wat is available (%" PRIu64 ")\n", reply_to.get_ExpDatLen(), use_pdu_data_size);
 			use_pdu_data_size = reply_to.get_ExpDatLen();
@@ -333,12 +333,14 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 			buffer.n = 16384;
 #else
 		if (ack_interval.has_value())
-			buffer.n = std::max(uint32_t(512), ack_interval.value());
+			buffer.n = std::max(uint32_t(s->get_block_size()), ack_interval.value());
+		else
+			buffer.n = std::max(uint32_t(s->get_block_size()), uint32_t(65536));  // 64 kB, arbitrarily chosen
 #endif
-		if (buffer.n < 512)
-			buffer.n = 512;
+		if (buffer.n < s->get_block_size())
+			buffer.n = s->get_block_size();
 		buffer.data = new uint8_t[buffer.n]();
-		uint32_t block_group_size = buffer.n / 512;
+		uint32_t block_group_size = buffer.n / s->get_block_size();
 
 		uint32_t offset = 0;
 
@@ -346,7 +348,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 
 		for(uint32_t block_nr = 0; block_nr < stream_parameters.n_sectors;) {
 			uint32_t n_left = low_ram ? 1 : std::min(block_group_size, stream_parameters.n_sectors - block_nr);
-			buffer.n = n_left * 512;
+			buffer.n = n_left * s->get_block_size();
 
 			if (offset < use_pdu_data_size)
 				buffer.n = std::min(buffer.n, size_t(use_pdu_data_size - offset));
@@ -370,7 +372,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 			if (out.n == 0) {  // gen_data_in_pdu could not allocate memory
 				low_ram = true;
 				delete [] buffer.data;
-				buffer.n = 512;
+				buffer.n = s->get_block_size();
 				buffer.data = new uint8_t[buffer.n]();
 				errlog("Low on memory: %zu bytes failed", buffer.n);
 			}
@@ -462,14 +464,15 @@ void server::handler()
 
 #if defined(ESP32) || defined(RP2040W) || defined(TEENSY4_1)
 			Serial.printf("new session with %s\r\n", endpoint.c_str());
-			uint32_t pdu_count   = 0;
-			auto     prev_output = millis();
-			auto     start       = prev_output;
-			unsigned long busy   = 0;
-			const long interval  = 5000;
 #else
 			DOLOG("server::handler: new session with %s\n", endpoint.c_str());
 #endif
+			auto     prev_output = get_millis();
+			uint32_t pdu_count   = 0;
+			auto     start       = prev_output;
+			unsigned long busy   = 0;
+			const long interval  = 5000;
+			bool     first       = true;
 
 			session *ses = nullptr;
 			bool     ok  = true;
@@ -485,9 +488,12 @@ void server::handler()
 
 				is->iscsiSsnCmdPDUs++;
 
-#if defined(ESP32) || defined(RP2040W) || defined(TEENSY4_1)
-				auto tx_start = micros();
-#endif
+				if (first) {
+					first = false;
+					ses->set_block_size(s->get_block_size());
+				}
+
+				auto tx_start = get_micros();
 
 				if (incoming.second) {  // something wrong with the received PDU?
 					errlog("server::handler: invalid PDU received");
@@ -524,29 +530,31 @@ void server::handler()
 					delete pdu;
 				}
 
-#if defined(ESP32) || defined(RP2040W) || defined(TEENSY4_1)
-				auto tx_end = micros();
+				auto tx_end = get_micros();
 				busy += tx_end - tx_start;
 
 				pdu_count++;
-				auto now = millis();
+				auto now = get_millis();
 				auto took = now - prev_output;
 				if (took >= interval) {
 					prev_output = now;
 					double   dtook = took / 1000.;
-					double   dkb   = dtook * 1024;
+					double   dkB   = dtook * 1024;
 					uint64_t bytes_read    = 0;
 					uint64_t bytes_written = 0;
 					uint64_t n_syncs       = 0;
 					uint64_t n_trims       = 0;
 					s->get_and_reset_stats(&bytes_read, &bytes_written, &n_syncs, &n_trims);
-					Serial.printf("%ld] PDU/s: %.2f, send: %.2f kB/s, recv: %.2f kB/s, written: %.2f kB/s, read: %.2f kB/s, syncs: %.2f/s, unmaps: %.2f/s, load: %.2f%%, mem: %" PRIu32 "\r\n", now, pdu_count / dtook, bytes_send / dkb, bytes_recv / dkb, bytes_written / dkb, bytes_read / dkb, n_syncs / dtook, n_trims / dtook, busy * 0.1 / took, get_free_heap_space());
+#if defined(ARDUINO)
+					Serial.printf("%.3f] PDU/s: %.2f, send: %.2f kB/s, recv: %.2f kB/s, written: %.2f kB/s, read: %.2f kB/s, syncs: %.2f/s, unmaps: %.2f/s, load: %.2f%%, mem: %" PRIu32 "\r\n", now / 1000., pdu_count / dtook, bytes_send / dkB, bytes_recv / dkB, bytes_written / dkB, bytes_read / dkB, n_syncs / dtook, n_trims / dtook, busy * 0.1 / took, get_free_heap_space());
+#else
+					fprintf(stderr, "%.3f] PDU/s: %.2f, send: %.2f kB/s, recv: %.2f kB/s, written: %.2f kB/s, read: %.2f kB/s, syncs: %.2f/s, unmaps: %.2f/s, load: %.2f%%\n", now / 1000., pdu_count / dtook, bytes_send / dkB, bytes_recv / dkB, bytes_written / dkB, bytes_read / dkB, n_syncs / dtook, n_trims / dtook, busy * 0.1 / took);
+#endif
 					pdu_count  = 0;
 					bytes_send = 0;
 					bytes_recv = 0;
 					busy       = 0;
 				}
-#endif
 			}
 			while(ok);
 #if defined(ESP32) || defined(RP2040W)
