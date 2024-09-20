@@ -53,9 +53,7 @@ uint8_t backend::get_free_space_percentage()
 		// random in case a filesystem or whatever places static data at every xth position
 		block_nr = ((uint64_t(my_getrandom()) << 32) | my_getrandom()) % size;
 
-		auto lock_list = lock_range(block_nr, 1);
 		auto rc = read(block_nr, 1, buffer);
-		unlock_range(lock_list);
 		if (rc == false) {
 			empty_count = 0;
 			break;

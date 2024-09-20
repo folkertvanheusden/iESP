@@ -371,7 +371,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			if (received_blocks > 0) {
 				auto rc = write(lba, received_blocks, data.first);
 
-				if (rc == scsi_rw_result::rw_fail_general) {
+				if (rc == scsi_rw_result::rw_fail_rw) {
 					errlog("scsi::send: WRITE_xx, general write error");
 					response.sense_data = error_write_error();
 					ok = false;
@@ -542,42 +542,18 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			response.sense_data = error_compare_and_write_count();
 		}
 		else {
-			scsi_rw_result match = rw_ok;
-			uint8_t *buffer = new uint8_t[block_size]();
-			for(uint32_t i=0; i<block_count; i++) {
-				match = read(lba + i, 1, buffer);
+			auto result = cmpwrite(lba, block_count, &data.first[block_count * block_size], &data.first[0]);
 
-				if (match != rw_ok) {
-					errlog("scsi::send: read from backend error");
-					break;
-				}
-
-				if (memcmp(buffer, &data.first[i * block_size], block_size) != 0) {
-					match = rw_fail_general;
-					errlog("scsi::send: block %u (LBA: %" PRIu64 ") mismatch", i, lba + i);
-					break;
-				}
-
-				// TODO lock device during this read/write compare?
-			}
-			delete [] buffer;
-
-			if (match == rw_ok) {
-				scsi_rw_result write_result = write(lba, block_count, &data.first[block_count * block_size]);
-				if (write_result != rw_ok)
-					errlog("scsi::send: write to backend error");
-
-				if (write_result == rw_ok)
-					response.type = ir_empty_sense;
-				else if (write_result == rw_fail_locked)
-					response.sense_data = error_reserve_6();
-				else
-					response.sense_data = error_write_error();
-			}
-			else if (match == rw_fail_locked)
+			if (result == scsi_rw_result::rw_ok)
+				response.type = ir_empty_sense;
+			else if (result == scsi_rw_result::rw_fail_locked)
 				response.sense_data = error_reserve_6();
-			else {
+			else if (result == scsi_rw_result::rw_fail_mismatch)
 				response.sense_data = error_miscompare();
+			else if (result == scsi_rw_result::rw_fail_rw)
+				response.sense_data = error_write_error();
+			else {
+				DOLOG("scsi::send: unexpected error for COMPARE AND WRITE: %d\n", result);
 			}
 		}
 	}
@@ -772,6 +748,35 @@ scsi::scsi_rw_result scsi::read(const uint64_t block_nr, const uint32_t n_blocks
 		return result ? rw_ok : rw_fail_general;
 	}
 	
+	return rw_fail_locked;
+}
+
+scsi::scsi_rw_result scsi::cmpwrite(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const write_data, const uint8_t *const compare_data)
+{
+	printf("CMPWRITE\n");
+	is->n_reads++;
+	is->n_writes++;
+	is->bytes_read    += n_blocks * b->get_block_size();
+	is->bytes_written += n_blocks * b->get_block_size();
+
+	if (locking_status() != l_locked_other) {
+		auto start  = get_micros();
+		printf("cmpwrite start\n");
+		auto result = b->cmpwrite(block_nr, n_blocks, write_data, compare_data);
+		printf("cmpwrite result: %d\n", result);
+
+		is->io_wait_cur += get_micros() - start;
+
+		if (result == backend::cmpwrite_result_t::CWR_OK)
+			return rw_ok;
+		if (result == backend::cmpwrite_result_t::CWR_MISMATCH)
+			return rw_fail_mismatch;
+		if (result == backend::cmpwrite_result_t::CWR_READ_ERROR || result == backend::cmpwrite_result_t::CWR_WRITE_ERROR)
+			return rw_fail_rw;
+
+		return rw_fail_general;
+	}
+
 	return rw_fail_locked;
 }
 

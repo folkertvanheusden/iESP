@@ -104,8 +104,10 @@ public:
 
 	enum scsi_rw_result {
 		rw_ok,
-		rw_fail_general,
+		rw_fail_rw,
 		rw_fail_locked,
+		rw_fail_general,
+		rw_fail_mismatch
 	};
 
         uint64_t get_size_in_blocks() const;
@@ -118,9 +120,10 @@ public:
 	scsi_lock_status locking_status();
 
 	scsi_rw_result sync();
-	scsi_rw_result write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data);
-	scsi_rw_result trim (const uint64_t block_nr, const uint32_t n_blocks);
-	scsi_rw_result read (const uint64_t block_nr, const uint32_t n_blocks,       uint8_t *const data);
+	scsi_rw_result write   (const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data);
+	scsi_rw_result trim    (const uint64_t block_nr, const uint32_t n_blocks);
+	scsi_rw_result read    (const uint64_t block_nr, const uint32_t n_blocks,       uint8_t *const data);
+	scsi_rw_result cmpwrite(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const write_data, const uint8_t *const compare_data);
 
 	std::optional<scsi_response> send(const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
 };
