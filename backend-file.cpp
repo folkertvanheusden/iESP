@@ -65,7 +65,9 @@ bool backend_file::write(const uint64_t block_nr, const uint32_t n_blocks, const
 	off_t  offset     = block_nr * block_size;
 	size_t n_bytes    = n_blocks * block_size;
 	DOLOG("backend_file::write: block %" PRIu64 " (%lu), %d blocks, block size: %" PRIu64 "\n", block_nr, offset, n_blocks, block_size);
+	auto lock_list = lock_range(block_nr, 1);
 	ssize_t rc = pwrite(fd, data, n_bytes, offset);
+	unlock_range(lock_list);
 	if (rc == -1)
 		DOLOG("backend_file::write: ERROR writing; %s\n", strerror(errno));
 	ts_last_acces = get_micros();
@@ -82,6 +84,7 @@ bool backend_file::trim(const uint64_t block_nr, const uint32_t n_blocks)
 #ifdef linux
 	int rc = fallocate(fd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, offset, n_bytes);
 #else
+	auto lock_list = lock_range(block_nr, n_blocks);
 	int rc = 0;
 	uint8_t *zero = new uint8_t[block_size]();
 	for(uint32_t i=0; i<n_blocks; i++) {
@@ -90,6 +93,7 @@ bool backend_file::trim(const uint64_t block_nr, const uint32_t n_blocks)
 			break;
 		}
 	}
+	unlock_range(lock_list);
 #endif
 	if (rc == -1)
 		DOLOG("backend_file::trim: ERROR unmaping; %s\n", strerror(errno));
@@ -104,7 +108,9 @@ bool backend_file::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_
 	off_t  offset     = block_nr * block_size;
 	size_t n_bytes    = n_blocks * block_size;
 	DOLOG("backend_file::read: block %" PRIu64 " (%lu), %d blocks (%zu), block size: %" PRIu64 "\n", block_nr, offset, n_blocks, n_bytes, block_size);
+	auto lock_list = lock_range(block_nr, n_blocks);
 	ssize_t rc = pread(fd, data, n_bytes, offset);
+	unlock_range(lock_list);
 	if (rc == -1)
 		DOLOG("backend_file::read: ERROR reading; %s\n", strerror(errno));
 	else if (rc != n_bytes)

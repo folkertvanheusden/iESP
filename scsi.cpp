@@ -557,20 +557,15 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 					errlog("scsi::send: block %u (LBA: %" PRIu64 ") mismatch", i, lba + i);
 					break;
 				}
+
+				// TODO lock device during this read/write compare?
 			}
 			delete [] buffer;
 
 			if (match == rw_ok) {
-				scsi_rw_result write_result = rw_ok;
-
-				for(uint32_t i=0; i<block_count; i++) {
-					write_result = write(lba + i, 1, &data.first[i * block_size + block_count * block_size]);
-
-					if (write_result != rw_ok) {
-						errlog("scsi::send: write to backend error");
-						break;
-					}
-				}
+				scsi_rw_result write_result = write(lba, block_count, &data.first[block_count * block_size]);
+				if (write_result != rw_ok)
+					errlog("scsi::send: write to backend error");
 
 				if (write_result == rw_ok)
 					response.type = ir_empty_sense;
