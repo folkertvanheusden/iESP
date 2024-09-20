@@ -8,8 +8,11 @@ from pyscsi.pyscsi.scsi_enum_command import sbc
 from pyscsi.pyscsi.scsi import SCSI
 from pyscsi.utils import init_device
 
+# THIS TEST OVERWRITES THE CONTENTS!!
+
 # device = init_device('iscsi://192.168.2.25/test/1')
-device = init_device('iscsi://192.168.64.206/test/1')
+#device = init_device('iscsi://192.168.64.206/test/1')
+device = init_device('iscsi://127.0.0.1/test/1')
 # device = init_device('iscsi://192.168.65.245/test/1')
 # device = init_device('iscsi://192.168.65.238/target1/1')
 bs = 512
