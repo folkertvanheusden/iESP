@@ -753,7 +753,6 @@ scsi::scsi_rw_result scsi::read(const uint64_t block_nr, const uint32_t n_blocks
 
 scsi::scsi_rw_result scsi::cmpwrite(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const write_data, const uint8_t *const compare_data)
 {
-	printf("CMPWRITE\n");
 	is->n_reads++;
 	is->n_writes++;
 	is->bytes_read    += n_blocks * b->get_block_size();
@@ -761,9 +760,7 @@ scsi::scsi_rw_result scsi::cmpwrite(const uint64_t block_nr, const uint32_t n_bl
 
 	if (locking_status() != l_locked_other) {
 		auto start  = get_micros();
-		printf("cmpwrite start\n");
 		auto result = b->cmpwrite(block_nr, n_blocks, write_data, compare_data);
-		printf("cmpwrite result: %d\n", result);
 
 		is->io_wait_cur += get_micros() - start;
 
