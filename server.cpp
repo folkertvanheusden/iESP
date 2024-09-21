@@ -519,7 +519,7 @@ void server::handler()
 				else {
 					auto parameters = select_parameters(pdu, ses, s);
 					if (parameters) {
-						push_response(cc, ses, pdu, parameters);
+						ok = push_response(cc, ses, pdu, parameters);
 						delete parameters;
 					}
 					else {
