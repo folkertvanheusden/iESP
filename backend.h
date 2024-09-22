@@ -16,7 +16,9 @@ protected:
 	uint64_t n_trims       { 0 };
 	uint64_t ts_last_acces { 0 };
 
+#if !defined(Arduino)
 	std::array<std::mutex, N_BACKEND_LOCKS> locks;
+#endif
 
 	std::vector<size_t> lock_range  (const uint64_t block_nr, const uint32_t block_n);
 	void                unlock_range(const std::vector<size_t> & locked_locks);
