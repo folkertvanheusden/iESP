@@ -71,7 +71,7 @@ uint8_t backend::get_free_space_percentage()
 
 std::vector<size_t> backend::lock_range(const uint64_t block_nr, const uint32_t block_n)
 {
-#if !defined(Arduino)
+#if !defined(Arduino) || defined(ESP32)
 	std::vector<size_t> indexes;
 
 	for(uint64_t i=block_nr; i<block_nr + block_n; i++)
@@ -88,7 +88,7 @@ std::vector<size_t> backend::lock_range(const uint64_t block_nr, const uint32_t 
 
 void backend::unlock_range(const std::vector<size_t> & locked_locks)
 {
-#if !defined(Arduino)
+#if !defined(Arduino) || defined(ESP32)
 	for(auto nr: locked_locks)
 		locks[nr].unlock();
 #endif

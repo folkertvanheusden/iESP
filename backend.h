@@ -1,11 +1,17 @@
 #pragma once
-#include <array>
 #include <cstdint>
+#if !defined(Arduino) || defined(ESP32)
+#include <array>
 #include <mutex>
 #include <vector>
+#endif
 
 
+#if defined(ESP32)
+#define N_BACKEND_LOCKS 4
+#else
 #define N_BACKEND_LOCKS 131
+#endif
 
 class backend
 {
@@ -16,7 +22,7 @@ protected:
 	uint64_t n_trims       { 0 };
 	uint64_t ts_last_acces { 0 };
 
-#if !defined(Arduino)
+#if !defined(Arduino) || defined(ESP32)
 	std::array<std::mutex, N_BACKEND_LOCKS> locks;
 #endif
 
