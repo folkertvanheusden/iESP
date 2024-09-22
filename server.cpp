@@ -52,7 +52,7 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 		return { nullptr, false };
 	}
 
-	bytes_recv += sizeof pdu;
+	(*s)->add_bytes_rx(sizeof pdu);
 	is->iscsiSsnRxDataOctets += sizeof pdu;
 
 	iscsi_pdu_bhs bhs;
@@ -145,7 +145,7 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 			}
 			delete [] ahs_temp;
 
-			bytes_recv += ahs_len;
+			(*s)->add_bytes_rx(ahs_len);
 			is->iscsiSsnRxDataOctets += ahs_len;
 		}
 
@@ -165,7 +165,7 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 			}
 			delete [] data_temp;
 
-			bytes_recv += padded_data_length;
+			(*s)->add_bytes_rx(padded_data_length);
 			is->iscsiSsnRxDataOctets += padded_data_length;
 		}
 		
@@ -282,7 +282,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 				ok = cc->send(blobs.data, blobs.n);
 				if (!ok)
 					errlog("server::push_response: sending PDU to peer failed (%s)", strerror(errno));
-				bytes_send += blobs.n;
+				ses->add_bytes_tx(blobs.n);
 				is->iscsiSsnTxDataOctets += blobs.n;
 			}
 
@@ -386,7 +386,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 
 				delete [] out.data;
 
-				bytes_send += out.n;
+				ses->add_bytes_tx(out.n);
 				offset += buffer.n;
 				block_nr += n_left;
 				is->iscsiSsnTxDataOctets += out.n;
@@ -546,13 +546,13 @@ void server::handler()
 					uint64_t n_trims       = 0;
 					s->get_and_reset_stats(&bytes_read, &bytes_written, &n_syncs, &n_trims);
 #if defined(ARDUINO)
-					Serial.printf("%.3f] PDU/s: %.2f, send: %.2f kB/s, recv: %.2f kB/s, written: %.2f kB/s, read: %.2f kB/s, syncs: %.2f/s, unmaps: %.2f/s, load: %.2f%%, mem: %" PRIu32 "\r\n", now / 1000., pdu_count / dtook, bytes_send / dkB, bytes_recv / dkB, bytes_written / dkB, bytes_read / dkB, n_syncs / dtook, n_trims / dtook, busy * 0.1 / took, get_free_heap_space());
+					Serial.printf("%.3f] PDU/s: %.2f, send: %.2f kB/s, recv: %.2f kB/s, written: %.2f kB/s, read: %.2f kB/s, syncs: %.2f/s, unmaps: %.2f/s, load: %.2f%%, mem: %" PRIu32 "\r\n", now / 1000., pdu_count / dtook, ses->get_bytes_tx() / dkB, ses->get_bytes_rx() / dkB, bytes_written / dkB, bytes_read / dkB, n_syncs / dtook, n_trims / dtook, busy * 0.1 / took, get_free_heap_space());
 #else
-					fprintf(stderr, "%.3f] PDU/s: %.2f, send: %.2f kB/s, recv: %.2f kB/s, written: %.2f kB/s, read: %.2f kB/s, syncs: %.2f/s, unmaps: %.2f/s, load: %.2f%%\n", now / 1000., pdu_count / dtook, bytes_send / dkB, bytes_recv / dkB, bytes_written / dkB, bytes_read / dkB, n_syncs / dtook, n_trims / dtook, busy * 0.1 / took);
+					fprintf(stderr, "%.3f] PDU/s: %.2f, send: %.2f kB/s, recv: %.2f kB/s, written: %.2f kB/s, read: %.2f kB/s, syncs: %.2f/s, unmaps: %.2f/s, load: %.2f%%\n", now / 1000., pdu_count / dtook, ses->get_bytes_tx() / dkB, ses->get_bytes_rx() / dkB, bytes_written / dkB, bytes_read / dkB, n_syncs / dtook, n_trims / dtook, busy * 0.1 / took);
 #endif
 					pdu_count  = 0;
-					bytes_send = 0;
-					bytes_recv = 0;
+					ses->reset_bytes_rx();
+					ses->reset_bytes_tx();
 					busy       = 0;
 				}
 			}

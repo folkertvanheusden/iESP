@@ -23,8 +23,6 @@ private:
 	scsi          *const s          { nullptr };
 	com           *const c          { nullptr };
 	iscsi_stats_t *const is         { nullptr };
-	uint64_t             bytes_recv { 0       };
-	uint64_t             bytes_send { 0       };
 
 	std::pair<iscsi_pdu_bhs *, bool> receive_pdu  (com_client *const cc, session **const s);
 	bool                             push_response(com_client *const cc, session *const s, iscsi_pdu_bhs *const pdu, iscsi_response_parameters *const parameters);

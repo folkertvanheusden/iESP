@@ -17,6 +17,9 @@ private:
 	uint32_t          data_sn      { 0       };
 	uint32_t          block_size   { 0       };
 
+	uint64_t          bytes_rx     { 0       };
+	uint64_t          bytes_tx     { 0       };
+
 	std::optional<uint32_t> ack_interval;
 
 	std::map<uint32_t, r2t_session *> r2t_sessions; // r2t sessions
@@ -26,6 +29,13 @@ public:
 	virtual ~session();
 
 	std::string get_local_address() const { return connected_to->get_local_address(); }
+
+	void     add_bytes_rx(const uint64_t n) { bytes_rx += n; }
+	uint64_t get_bytes_rx() const { return bytes_rx; }
+	void     reset_bytes_rx() { bytes_rx = 0; }
+	void     add_bytes_tx(const uint64_t n) { bytes_tx += n; }
+	uint64_t get_bytes_tx() const { return bytes_tx; }
+	void     reset_bytes_tx() { bytes_tx = 0; }
 
 	uint32_t get_inc_datasn(const uint32_t itt);
 
