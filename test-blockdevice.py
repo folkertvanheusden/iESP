@@ -17,6 +17,7 @@ blocksize = 4096
 max_b = 16
 unique_perc = 51
 n_threads = 2
+stop_at_100 = False
 
 def help():
     print(f'Usage: {sys.argv[0]} ...arguments...')
@@ -26,12 +27,13 @@ def help():
     print('-u unique-percentage: for testing de-duplication devices')
     print('-f fast random:       used for generating non-dedupable data')
     print('-n thread count:      number of parallel threads. run this with PYTHON_GIL=0 (python 3.13 and more recent)')
+    print('-t                    terminate when aproximately 100% (at least) is tested')
     print()
     print(' ##### DO NOT RUN THIS ON A DEVICE WITH DATA! IT GETS ERASED! ###### ')
     print()
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], 'd:b:m:u:fn:h')
+    opts, args = getopt.getopt(sys.argv[1:], 'd:b:m:u:fn:th')
 except getopt.GetoptError as err:
     print(err)
     help()
@@ -50,6 +52,8 @@ for o, a in opts:
         fast_random = True
     elif o == '-n':
         n_threads = int(a)
+    elif o == '-t':
+        stop_at_100 = True
     elif o == '-h':
         help()
         sys.exit(0)
@@ -213,6 +217,9 @@ def do(show_stats):
                 del ranges[i]
                 break
         lock.release()
+
+        if w >= n_blocks and stop_at_100:
+            break
 
 t = []
 for i in range(n_threads):
