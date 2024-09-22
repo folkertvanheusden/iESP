@@ -10,6 +10,7 @@ public:
 	com_client_sockets(const int fd, std::atomic_bool *const stop);
 	virtual ~com_client_sockets();
 
+	std::string get_local_address() const override;
 	std::string get_endpoint_name() const override;
 
 	bool recv(uint8_t *const to, const size_t n)         override;
@@ -28,8 +29,6 @@ public:
 	virtual ~com_sockets();
 
 	bool begin() override;
-
-	std::string get_local_address() override;
 
 	com_client *accept() override;
 };

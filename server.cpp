@@ -44,7 +44,7 @@ server::~server()
 std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, session **const s)
 {
 	if (*s == nullptr)
-		*s = new session();
+		*s = new session(cc);
 
 	uint8_t pdu[48] { 0 };
 	if (cc->recv(pdu, sizeof pdu) == false) {
@@ -414,7 +414,7 @@ iscsi_response_parameters *server::select_parameters(iscsi_pdu_bhs *const pdu, s
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_nop_out:
 			return new iscsi_response_parameters_nop_out(ses);
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_text_req:
-			return new iscsi_response_parameters_text_req(ses, c->get_local_address());
+			return new iscsi_response_parameters_text_req(ses);
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_logout_req:
 			return new iscsi_response_parameters_logout_req(ses);
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_r2t:

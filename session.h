@@ -3,6 +3,7 @@
 #include <map>
 #include <optional>
 
+#include "com.h"
 #include "iscsi.h"
 
 
@@ -11,17 +12,20 @@ class iscsi_pdu_scsi_cmd;
 class session
 {
 private:
-	uint32_t data_sn_itt  { 0 };  // itt == initiator transfer tag
-	uint32_t data_sn      { 0 };
-	uint32_t block_size   { 0 };
+	com_client *const connected_to { nullptr };  // e.g. for retrieving the local address
+	uint32_t          data_sn_itt  { 0       };  // itt == initiator transfer tag
+	uint32_t          data_sn      { 0       };
+	uint32_t          block_size   { 0       };
 
 	std::optional<uint32_t> ack_interval;
 
 	std::map<uint32_t, r2t_session *> r2t_sessions; // r2t sessions
 
 public:
-	session();
+	session(com_client *const connected_to);
 	virtual ~session();
+
+	std::string get_local_address() const { return connected_to->get_local_address(); }
 
 	uint32_t get_inc_datasn(const uint32_t itt);
 

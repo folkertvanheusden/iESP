@@ -79,11 +79,6 @@ com_sockets::~com_sockets()
 	close(listen_fd);
 }
 
-std::string com_sockets::get_local_address()
-{
-	return listen_ip + myformat(":%d", listen_port);
-}
-
 com_client *com_sockets::accept()
 {
 	struct pollfd fds[] { { listen_fd, POLLIN, 0 } };
@@ -191,5 +186,30 @@ std::string com_client_sockets::get_endpoint_name() const
 #else
 	getnameinfo(reinterpret_cast<sockaddr *>(&addr), addr_len, host, sizeof(host), serv, sizeof(serv), NI_NUMERICHOST | NI_NUMERICSERV);
 	return myformat("[%s]:%s", host, serv);
+#endif
+}
+
+std::string com_client_sockets::get_local_address() const
+{
+        char host[256];
+#ifdef ESP32
+        sockaddr_in addr { };
+#else
+        char         serv[16];
+        sockaddr_in6 addr { };
+#endif
+        socklen_t addr_len = sizeof addr;
+
+        if (getsockname(fd, reinterpret_cast<sockaddr *>(&addr), &addr_len) == -1) {
+                errlog("get_local_address: failed to find local name of fd %d", fd);
+		return "?:?";
+	}
+
+#ifdef ESP32
+	inet_ntop(addr.sin_family, &addr.sin_addr.s_addr, host, sizeof host);
+	return host + myformat(":%d", addr.sin_port);
+#else
+	getnameinfo(reinterpret_cast<sockaddr *>(&addr), addr_len, host, sizeof(host), serv, sizeof(serv), NI_NUMERICHOST | NI_NUMERICSERV);
+	return myformat("%s:%s", host, serv);
 #endif
 }

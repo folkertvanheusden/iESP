@@ -4,7 +4,8 @@
 #include "session.h"
 
 
-session::session()
+session::session(com_client *const connected_to):
+	connected_to(connected_to)
 {
 }
 
