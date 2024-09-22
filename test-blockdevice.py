@@ -68,6 +68,8 @@ seed = int(time.time())
 fd = os.open(dev, os.O_RDWR)
 dev_size = os.lseek(fd, 0, os.SEEK_END)
 
+print(f'Device size: {dev_size} bytes or {dev_size // 1024 // 1024 // 1024} GB')
+
 n_blocks = dev_size // blocksize
 if dev_size % blocksize:
     print(f'Note: disk is not a multiple of {blocksize} in size ({dev_size})!')
