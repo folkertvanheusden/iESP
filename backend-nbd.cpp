@@ -16,6 +16,11 @@
 #include "utils.h"
 
 
+#define NBD_CMD_READ              0
+#define NBD_CMD_WRITE             1
+#define NBD_CMD_FLUSH             3
+#define NBD_CMD_TRIM              4
+
 backend_nbd::backend_nbd(const std::string & host, const int port):
 	host(host), port(port),
 	fd(-1)
@@ -142,7 +147,7 @@ bool backend_nbd::sync()
 		} nbd_request { };
 
 		nbd_request.magic  = ntohl(0x25609513);
-		nbd_request.type   = 3;  // 'flush'
+		nbd_request.type   = htonl(NBD_CMD_FLUSH);
 		nbd_request.offset = 0;
 		nbd_request.length = 0;
 
@@ -211,7 +216,7 @@ bool backend_nbd::write(const uint64_t block_nr, const uint32_t n_blocks, const 
 		} nbd_request { };
 
 		nbd_request.magic  = ntohl(0x25609513);
-		nbd_request.type   = htonl(1);  // WRITE
+		nbd_request.type   = htonl(NBD_CMD_WRITE);  // WRITE
 		nbd_request.offset = HTONLL(uint64_t(offset));
 		nbd_request.length = htonl(n_bytes);
 
@@ -293,7 +298,7 @@ bool backend_nbd::trim(const uint64_t block_nr, const uint32_t n_blocks)
 		} nbd_request { };
 
 		nbd_request.magic  = ntohl(0x25609513);
-		nbd_request.type   = htonl(4);  // TRIM
+		nbd_request.type   = htonl(NBD_CMD_TRIM);
 		nbd_request.offset = HTONLL(uint64_t(offset));
 		nbd_request.length = htonl(n_bytes);
 
@@ -370,7 +375,7 @@ bool backend_nbd::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_t
 		} nbd_request { };
 
 		nbd_request.magic  = ntohl(0x25609513);
-		nbd_request.type   = 0;  // READ
+		nbd_request.type   = htonl(NBD_CMD_READ);
 		nbd_request.offset = HTONLL(uint64_t(offset));
 		nbd_request.length = htonl(n_bytes);
 
