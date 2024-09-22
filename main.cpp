@@ -1,11 +1,13 @@
 #include <atomic>
 #include <csignal>
 #include <cstdio>
+#include <cstring>
 #include <getopt.h>
 #include <unistd.h>
 #include <sys/resource.h>
 
 #include "backend-file.h"
+#include "backend-nbd.h"
 #include "com-sockets.h"
 #include "log.h"
 #include "server.h"
@@ -72,7 +74,8 @@ void maintenance_thread(std::atomic_bool *const stop, backend *const bf, int *co
 
 void help()
 {
-	printf("-d x    device/file to serve\n");
+	printf("-b x    backend type: file (default) or nbd (e.g. iscsi -> nbd proxy)\n");
+	printf("-d x    device/file/host:port to serve (device/file: -b file, host:port: -b nbd)\n");
 	printf("-i x    IP-address of adapter to listen on\n");
 	printf("-p x    TCP-port to listen on\n");
 	printf("-T x    trim level (0=disable, 1=normal (default), 2=auto)\n");
@@ -85,14 +88,29 @@ int main(int argc, char *argv[])
 	signal(SIGPIPE, SIG_IGN);
 	signal(SIGINT,  sigh);
 
-	std::string ip_address = "0.0.0.0";
-	int         port       = 3260;
-	std::string dev        = "test.dat";
-	int         trim_level = 1;
-	bool        use_snmp   = false;
+	enum backend_type_t { BT_FILE, BT_NBD };
+
+	std::string    ip_address = "0.0.0.0";
+	int            port       = 3260;
+	std::string    dev        = "test.dat";
+	int            trim_level = 1;
+	bool           use_snmp   = false;
+	backend_type_t bt         = backend_type_t::BT_FILE;
 	int o = -1;
-	while((o = getopt(argc, argv, "Sd:i:p:T:h")) != -1) {
-		if (o == 'd')
+	while((o = getopt(argc, argv, "Sb:d:i:p:T:h")) != -1) {
+		if (o == 'S')
+			use_snmp = true;
+		else if (o == 'b') {
+			if (strcasecmp(optarg, "file") == 0)
+				bt = backend_type_t::BT_FILE;
+			else if (strcasecmp(optarg, "nbd") == 0)
+				bt = backend_type_t::BT_NBD;
+			else {
+				fprintf(stderr, "-b expects either \"file\" or \"nbd\"\n");
+				return 1;
+			}
+		}
+		else if (o == 'd')
 			dev = optarg;
 		else if (o == 'i')
 			ip_address = optarg;
@@ -100,8 +118,6 @@ int main(int argc, char *argv[])
 			port = atoi(optarg);
 		else if (o == 'T')
 			trim_level = atoi(optarg);
-		else if (o == 'S')
-			use_snmp = true;
 		else {
 			help();
 			return o != 'h';
@@ -124,12 +140,25 @@ int main(int argc, char *argv[])
 	if (use_snmp)
 		init_snmp(&snmp_, &snmp_data_, &ios, &is, &percentage_diskspace, &cpu_usage, &ram_free_kb, &stop);
 
-	backend_file bf(dev);
-	if (bf.begin() == false) {
+	backend *b = nullptr;
+
+	if (bt == backend_type_t::BT_FILE)
+		b = new backend_file(dev);
+	else if (bt == backend_type_t::BT_NBD) {
+		std::string::size_type colon = dev.find(":");
+		if (colon == std::string::npos) {
+			fprintf(stderr, "NBD: port missing\n");
+			return 1;
+		}
+
+		b = new backend_nbd(dev.substr(0, colon), std::stoi(dev.substr(colon + 1)));
+	}
+
+	if (b->begin() == false) {
 		fprintf(stderr, "Failed to initialize storage backend\n");
 		return 1;
 	}
-	scsi sd(&bf, trim_level, &ios);
+	scsi sd(b, trim_level, &ios);
 
 	com_sockets c(ip_address, port, &stop);
 	if (c.begin() == false) {
@@ -137,7 +166,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	std::thread *mth = new std::thread(maintenance_thread, &stop, &bf, &percentage_diskspace, &cpu_usage, &ram_free_kb);
+	std::thread *mth = new std::thread(maintenance_thread, &stop, b, &percentage_diskspace, &cpu_usage, &ram_free_kb);
 
 	server s(&sd, &c, &is);
 	printf("Go!\n");
@@ -147,6 +176,8 @@ int main(int argc, char *argv[])
 
 	mth->join();
 	delete mth;
+
+	delete b;
 
 	return 0;
 }

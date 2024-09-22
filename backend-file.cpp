@@ -15,7 +15,8 @@ backend_file::backend_file(const std::string & filename): filename(filename), fd
 
 backend_file::~backend_file()
 {
-	close(fd);
+	if (fd != -1)
+		close(fd);
 }
 
 bool backend_file::begin()

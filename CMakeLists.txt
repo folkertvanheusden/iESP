@@ -12,6 +12,7 @@ add_executable(
 	iesp
 	backend.cpp
 	backend-file.cpp
+	backend-nbd.cpp
 	com.cpp
 	com-sockets.cpp
 	iscsi.cpp
@@ -30,5 +31,6 @@ add_executable(
 )
 
 set(CMAKE_BUILD_TYPE RelWithDebInfo)
+#set(CMAKE_BUILD_TYPE Debug)
 #target_link_libraries(iesp -fsanitize=address)
 #target_link_libraries(iesp -fsanitize=undefined)
