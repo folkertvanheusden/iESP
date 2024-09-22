@@ -60,7 +60,6 @@ test tools
 disclaimer
 ----------
 Things are not stable/reliable yet for microcontrollers: it may destroy the contents of your SD-card.
-Also for Teensy4.1, please use git revision 26b03fccfba661c60569432f9b3baf1045662a10 as later versions currently (2024/9/22) do not compile yet.
 
 
 license

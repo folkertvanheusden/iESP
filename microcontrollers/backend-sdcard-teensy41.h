@@ -27,4 +27,5 @@ public:
 	bool write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data) override;
 	bool trim (const uint64_t block_nr, const uint32_t n_blocks                           ) override;
 	bool read (const uint64_t block_nr, const uint32_t n_blocks,       uint8_t *const data) override;
+	backend::cmpwrite_result_t cmpwrite(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data_write, const uint8_t *const data_compare);
 };

@@ -165,13 +165,74 @@ bool backend_sdcard_teensy41::read(const uint64_t block_nr, const uint32_t n_blo
 		rc = bytes_read == n_bytes_to_read;
 		if (rc)
 			break;
-		Serial.printf("Read %zu bytes instead of %zu\r\n", bytes_read, n_bytes_to_read);
+		errlog("Read %zu bytes instead of %zu", bytes_read, n_bytes_to_read);
 		delay((i + 1) * 100); // 100ms is arbitrarily chosen
-		Serial.printf("Retrying read of %" PRIu32 " blocks starting at block number % " PRIu64 "\r\n", n_blocks, block_nr);
+		errlog("Retrying read of %" PRIu32 " blocks starting at block number % " PRIu64, n_blocks, block_nr);
 	}
 	if (!rc)
 		errlog("Cannot read (%d)", file.getError());
 	write_led(led_read, LOW);
 	ts_last_acces = get_micros();
 	return rc;
+}
+
+backend::cmpwrite_result_t backend_sdcard_teensy41::cmpwrite(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data_write, const uint8_t *const data_compare)
+{
+	write_led(led_read, HIGH);
+
+	auto lock_list  = lock_range(block_nr, n_blocks);
+	auto block_size = get_block_size();
+
+	cmpwrite_result_t result = cmpwrite_result_t::CWR_OK;
+	uint8_t          *buffer = new uint8_t[block_size]();
+
+	// DO
+	for(uint32_t i=0; i<n_blocks; i++) {
+		off_t   offset = (block_nr + i) * block_size;
+
+		if (file.seekSet(offset) == false) {
+			errlog("Cannot seek to position");
+			result = cmpwrite_result_t::CWR_READ_ERROR;
+			break;
+		}
+
+		// read
+		ssize_t rc     = file.read(buffer, block_size);
+		if (rc != block_size) {
+			result = cmpwrite_result_t::CWR_READ_ERROR;
+			break;
+		}
+		bytes_read += block_size;
+
+		// compare
+		if (memcmp(buffer, &data_compare[i * block_size], block_size) != 0) {
+			result = cmpwrite_result_t::CWR_MISMATCH;
+			break;
+		}
+
+		// write
+		if (file.seekSet(offset) == false) {
+			errlog("Cannot seek to position");
+			result = cmpwrite_result_t::CWR_READ_ERROR;
+			break;
+		}
+
+		ssize_t rc2 = file.write(&data_write[i * block_size], block_size);
+		if (rc2 != block_size) {
+			result = cmpwrite_result_t::CWR_WRITE_ERROR;
+			break;
+		}
+
+		bytes_written += block_size;
+
+		ts_last_acces = get_micros();
+	}
+
+	delete [] buffer;
+
+	unlock_range(lock_list);
+
+	write_led(led_read, LOW);
+
+	return result;
 }
