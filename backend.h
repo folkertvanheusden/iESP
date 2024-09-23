@@ -4,7 +4,7 @@
 #include <array>
 #include <mutex>
 #endif
-#include <vector>
+#include <set>
 
 
 #if defined(ESP32)
@@ -26,8 +26,8 @@ protected:
 	std::array<std::mutex, N_BACKEND_LOCKS> locks;
 #endif
 
-	std::vector<size_t> lock_range  (const uint64_t block_nr, const uint32_t block_n);
-	void                unlock_range(const std::vector<size_t> & locked_locks);
+	std::set<size_t> lock_range  (const uint64_t block_nr, const uint32_t block_n);
+	void             unlock_range(const std::set<size_t> & locked_locks);
 
 public:
 	backend();

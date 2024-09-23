@@ -69,15 +69,15 @@ uint8_t backend::get_free_space_percentage()
 	return empty_count;
 }
 
-std::vector<size_t> backend::lock_range(const uint64_t block_nr, const uint32_t block_n)
+std::set<size_t> backend::lock_range(const uint64_t block_nr, const uint32_t block_n)
 {
 #if defined(Arduino) || defined(TEENSY4_1)
 	return { };  // no-op
 #else
-	std::vector<size_t> indexes;
+	std::set<size_t> indexes;
 
 	for(uint64_t i=block_nr; i<block_nr + block_n; i++)
-		indexes.push_back(size_t(i % N_BACKEND_LOCKS));
+		indexes.insert(size_t(i % N_BACKEND_LOCKS));
 
 	for(auto nr: indexes)
 		locks[nr].lock();
@@ -86,7 +86,7 @@ std::vector<size_t> backend::lock_range(const uint64_t block_nr, const uint32_t 
 #endif
 }
 
-void backend::unlock_range(const std::vector<size_t> & locked_locks)
+void backend::unlock_range(const std::set<size_t> & locked_locks)
 {
 #if defined(Arduino) || defined(TEENSY4_1)
 	// no-op
