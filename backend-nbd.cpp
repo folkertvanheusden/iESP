@@ -273,6 +273,51 @@ bool backend_nbd::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_t
 
 backend::cmpwrite_result_t backend_nbd::cmpwrite(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data_write, const uint8_t *const data_compare)
 {
-	assert(0);
-	// TODO
+	auto lock_list  = lock_range(block_nr, n_blocks);
+	auto block_size = get_block_size();
+
+	DOLOG("backend_nbd::cmpwrite: block %" PRIu64 " (%lu), %d blocks (%zu), block size: %" PRIu64 "\n", block_nr, block_nr * block_size, n_blocks, n_blocks * block_size, block_size);
+
+	cmpwrite_result_t result = cmpwrite_result_t::CWR_OK;
+	uint8_t          *buffer = new uint8_t[block_size]();
+
+	// DO
+	for(uint32_t i=0; i<n_blocks; i++) {
+		// read
+		off_t offset = (block_nr + i) * block_size;
+		bool  rc     = invoke_nbd(NBD_CMD_READ, offset, block_size, buffer);
+		if (rc == false) {
+			DOLOG("backend_nbd::cmpwrite: ERROR reading\n");
+			result = cmpwrite_result_t::CWR_READ_ERROR;
+			break;
+		}
+		bytes_read += block_size;
+
+		// compare
+		if (memcmp(buffer, &data_compare[i * block_size], block_size) != 0) {
+			DOLOG("backend_nbd::cmpwrite: data mismatch\n");
+			result = cmpwrite_result_t::CWR_MISMATCH;
+			break;
+		}
+	}
+
+	delete [] buffer;
+
+	if (result == cmpwrite_result_t::CWR_OK) {
+		// write
+		bool rc = invoke_nbd(NBD_CMD_WRITE, block_nr * block_size, n_blocks * block_size, const_cast<uint8_t *>(data_write));
+		if (rc == false) {
+			DOLOG("backend_nbd::cmpwrite: ERROR writing\n");
+			result = cmpwrite_result_t::CWR_WRITE_ERROR;
+		}
+		else {
+			bytes_written += block_size;
+
+			ts_last_acces = get_micros();
+		}
+	}
+
+	unlock_range(lock_list);
+
+	return result;
 }

@@ -73,7 +73,7 @@ bool backend_file::write(const uint64_t block_nr, const uint32_t n_blocks, const
 		DOLOG("backend_file::write: ERROR writing; %s\n", strerror(errno));
 	ts_last_acces = get_micros();
 	bytes_written += n_bytes;
-	return rc == n_bytes;
+	return rc == ssize_t(n_bytes);
 }
 
 bool backend_file::trim(const uint64_t block_nr, const uint32_t n_blocks)
@@ -114,11 +114,11 @@ bool backend_file::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_
 	unlock_range(lock_list);
 	if (rc == -1)
 		DOLOG("backend_file::read: ERROR reading; %s\n", strerror(errno));
-	else if (rc != n_bytes)
+	else if (rc != ssize_t(n_bytes))
 		DOLOG("backend_file::read: short read, requested: %zu, received: %zd\n", n_bytes, rc);
 	ts_last_acces = get_micros();
 	bytes_read += n_bytes;
-	return rc == n_bytes;
+	return rc == ssize_t(n_bytes);
 }
 
 backend::cmpwrite_result_t backend_file::cmpwrite(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data_write, const uint8_t *const data_compare)
@@ -136,7 +136,7 @@ backend::cmpwrite_result_t backend_file::cmpwrite(const uint64_t block_nr, const
 		// read
 		off_t   offset = (block_nr + i) * block_size;
 		ssize_t rc     = pread(fd, buffer, block_size, offset);
-		if (rc != block_size) {
+		if (rc != ssize_t(block_size)) {
 			if (rc == -1)
 				DOLOG("backend_file::cmpwrite: ERROR reading; %s\n", strerror(errno));
 			else
@@ -152,21 +152,23 @@ backend::cmpwrite_result_t backend_file::cmpwrite(const uint64_t block_nr, const
 			result = cmpwrite_result_t::CWR_MISMATCH;
 			break;
 		}
+	}
 
+	if (result == cmpwrite_result_t::CWR_OK) {
 		// write
-		ssize_t rc2 = pwrite(fd, &data_write[i * block_size], block_size, offset);
-		if (rc2 != block_size) {
-			if (rc2 == -1)
+		ssize_t rc = pwrite(fd, data_write, n_blocks * block_size, block_nr * block_size);
+		if (rc != ssize_t(n_blocks * block_size)) {
+			if (rc == -1)
 				DOLOG("backend_file::cmpwrite: ERROR writing; %s\n", strerror(errno));
 			else
-				DOLOG("backend_file::cmpwrite: short write, sent: %zu, written: %zd\n", block_size, rc);
+				DOLOG("backend_file::cmpwrite: short write, sent: %zu, written: %zd\n", n_blocks * block_size, rc);
 			result = cmpwrite_result_t::CWR_WRITE_ERROR;
-			break;
 		}
+		else {
+			bytes_written += block_size;
 
-		bytes_written += block_size;
-
-		ts_last_acces = get_micros();
+			ts_last_acces = get_micros();
+		}
 	}
 
 	delete [] buffer;
