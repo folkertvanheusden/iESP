@@ -131,37 +131,45 @@ bool com_client_sockets::send(const uint8_t *const from, const size_t n)
 	auto rc = WRITE(fd, from, n);
 	if (rc == -1)
 		errlog("com_client_sockets::send: write failed with error %s", strerror(errno));
-	return rc == n;
+	return rc == ssize_t(n);
 }
 
 bool com_client_sockets::recv(uint8_t *const to, const size_t n)
 {
-#ifndef ESP32
 	pollfd fds[] { { fd, POLLIN, 0 } };
+	size_t offset = 0;
+	size_t todo   = n;
 
-	for(;;) {
+	while(todo > 0) {
 		int rc = poll(fds, 1, 100);
 		if (rc == -1) {
 			DOLOG("com_client_sockets::recv: poll failed with error %s\n", strerror(errno));
-			return false;
+			break;
 		}
 
 		if (*stop == true) {
 			DOLOG("com_client_sockets::recv: abort due external stop\n");
-			return false;
+			break;
 		}
 
-		if (rc >= 1)
-			break;
+		if (rc >= 1) {
+			int n_read = read(fd, &to[offset], todo);
+			if (n_read == -1) {
+				DOLOG("com_client_sockets::recv: read failed with error %s\n", strerror(errno));
+				break;
+			}
+
+			if (n_read == 0) {
+				DOLOG("com_client_sockets::recv: socket closed\n");
+				break;
+			}
+
+			offset += n_read;
+			todo   -= n_read;
+		}
 	}
-#endif
 
-	// ideally the poll-loop should include the read (TODO)
-	auto rc = READ(fd, to, n);
-	if (rc == -1)
-		errlog("com_client_sockets::recv: read failed with error %s", strerror(errno));
-
-	return rc == n;
+	return todo == 0;
 }
 
 std::string com_client_sockets::get_endpoint_name() const
