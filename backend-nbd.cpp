@@ -21,6 +21,15 @@
 #define NBD_CMD_FLUSH             3
 #define NBD_CMD_TRIM              4
 
+#define NBD_EPERM		  1  // Operation not permitted.
+#define NBD_EIO		          5  // Input/output error.
+#define NBD_ENOMEM		  12  // Cannot allocate memory.
+#define NBD_EINVAL		  22  // Invalid argument.
+#define NBD_ENOSPC		  28  // No space left on device.
+#define NBD_EOVERFLOW		  75  // Value too large.
+#define NBD_ENOTSUP		  95  // Operation not supported.
+#define NBD_ESHUTDOWN		  108  // Server is in the
+
 backend_nbd::backend_nbd(const std::string & host, const int port):
 	host(host), port(port),
 	fd(-1)
@@ -190,7 +199,27 @@ bool backend_nbd::invoke_nbd(const uint32_t command, const uint64_t offset, cons
 
 		int error = ntohl(nbd_reply.error);
 		if (error) {
-			DOLOG("backend_nbd::invoke_nbd: NBD server indicated error: %d", error);
+			std::string error_str;
+			if (error == NBD_EPERM)
+				error_str = "NBD_EPERM";
+			else if (error == NBD_EIO)
+				error_str = "NBD_EIO";
+			else if (error == NBD_ENOMEM)
+				error_str = "NBD_ENOMEM";
+			else if (error == NBD_ENOSPC)
+				error_str = "NBD_EINVAL";
+			else if (error == NBD_EINVAL)
+				error_str = "NBD_ENOSPC";
+			else if (error == NBD_EOVERFLOW)
+				error_str = "NBD_EOVERFLOW";
+			else if (error == NBD_ENOTSUP)
+				error_str = "NBD_ENOTSUP";
+			else if (error == NBD_ESHUTDOWN)
+				error_str = "NBD_ESHUTDOWN";
+			else
+				error_str = myformat("%d", error);
+
+			DOLOG("backend_nbd::invoke_nbd: NBD server indicated error: %s", error_str.c_str());
 			return false;
 		}
 
