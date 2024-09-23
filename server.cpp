@@ -548,4 +548,14 @@ void server::handler()
 		Serial.printf("Heap space: %u\r\n", get_free_heap_space());
 #endif
 	}
+
+#if !defined(TEENSY4_1)
+	for(auto &e: threads) {
+		if (e.second) {
+			e.first->join();
+			delete e.first;
+			delete e.second;
+		}
+	}
+#endif
 }
