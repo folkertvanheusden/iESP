@@ -16,6 +16,8 @@ uint64_t get_millis();
 void teensyMAC(uint8_t *const mac);
 void encode_lun(uint8_t *const target, const uint64_t lun_nr);
 
+uint8_t * duplicate_new(const void *const in, const size_t n);
+
 #if !defined(ARDUINO)
 std::string to_hex(const uint8_t *const in, const size_t n);
 #endif

@@ -250,3 +250,10 @@ uint32_t NTOHL(const uint32_t x)
 {
 	return HTONL(x);
 }
+
+uint8_t * duplicate_new(const void *const in, const size_t n)
+{
+	uint8_t *out = new uint8_t[n];
+	memcpy(out, in, n);
+	return out;
+}
