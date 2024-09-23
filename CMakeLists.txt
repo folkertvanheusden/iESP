@@ -1,7 +1,7 @@
 project(iesp)
 cmake_minimum_required(VERSION 3.9)
 
-add_compile_options(-Wall -pedantic)  # -Wextra -fanalyzer
+add_compile_options(-Wall -pedantic -D_FILE_OFFSET_BITS=64)  # -Wextra -fanalyzer
 #add_compile_options(-fsanitize=address -O0 -fno-inline)
 #add_compile_options(-fsanitize=undefined -O0 -fno-inline)
 
