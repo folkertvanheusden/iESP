@@ -2,7 +2,6 @@
 #include <cstring>
 #include <fcntl.h>
 #include <unistd.h>
-#include <sys/stat.h>
 
 #include "backend-file.h"
 #include "log.h"
@@ -32,11 +31,11 @@ bool backend_file::begin()
 
 uint64_t backend_file::get_size_in_blocks() const
 {
-	struct stat st { };
-	if (fstat(fd, &st) == -1)
-		DOLOG("backend_file::get_size_in_blocks: fstat failed: %s\n", strerror(errno));
+	auto rc = lseek(fd, 0, SEEK_END);
+	if (rc == -1)
+		DOLOG("backend_file::get_size_in_blocks: lseek failed: %s\n", strerror(errno));
 
-	return st.st_size / get_block_size();
+	return rc / get_block_size();
 }
 
 uint64_t backend_file::get_block_size() const
