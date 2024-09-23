@@ -11,7 +11,8 @@ private:
 	int               fd       { -1 };
 	uint64_t          dev_size { 0  };
 
-	bool connect(const bool retry);
+	bool connect   (const bool retry);
+	bool invoke_nbd(const uint32_t command, const uint64_t offset, const uint32_t n_bytes, uint8_t *const data);
 
 public:
 	backend_nbd(const std::string & host, const int port);

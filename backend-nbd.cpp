@@ -126,14 +126,11 @@ uint64_t backend_nbd::get_block_size() const
 	return 4096;
 }
 
-bool backend_nbd::sync()
+bool backend_nbd::invoke_nbd(const uint32_t command, const uint64_t offset, const uint32_t n_bytes, uint8_t *const data)
 {
-	n_syncs++;
-	ts_last_acces = get_micros();
-
 	do {
-		if (fd == -1 && !connect(true)) {
-			DOLOG("backend_nbd::sync: (re-)connect");
+		if (!connect(true)) {
+			DOLOG("backend_nbd::invoke_nbd: (re-)connect");
 			sleep(1);
 			continue;
 		}
@@ -147,16 +144,26 @@ bool backend_nbd::sync()
 		} nbd_request { };
 
 		nbd_request.magic  = ntohl(0x25609513);
-		nbd_request.type   = htonl(NBD_CMD_FLUSH);
-		nbd_request.offset = 0;
-		nbd_request.length = 0;
+		nbd_request.type   = htonl(command);
+		nbd_request.offset = HTONLL(offset);
+		nbd_request.length = htonl(n_bytes);
 
 		if (WRITE(fd, reinterpret_cast<const uint8_t *>(&nbd_request), sizeof nbd_request) != sizeof nbd_request) {
-			DOLOG("backend_nbd::sync: problem sending request");
+			DOLOG("backend_nbd::invoke_nbd: problem sending request");
 			close(fd);
 			fd = -1;
 			sleep(1);
 			continue;
+		}
+
+		if (command == NBD_CMD_WRITE) {
+			if (WRITE(fd, reinterpret_cast<const uint8_t *>(data), n_bytes) != ssize_t(n_bytes)) {
+				DOLOG("backend_nbd::invoke_nbd: problem sending payload");
+				close(fd);
+				fd = -1;
+				sleep(1);
+				continue;
+			}
 		}
 
 		struct __attribute__ ((packed)) {
@@ -166,7 +173,7 @@ bool backend_nbd::sync()
 		} nbd_reply;
 
 		if (READ(fd, reinterpret_cast<uint8_t *>(&nbd_reply), sizeof nbd_reply) != sizeof nbd_reply) {
-			DOLOG("backend_nbd::sync: problem receiving reply header");
+			DOLOG("backend_nbd::invoke_nbd: problem receiving reply header");
 			close(fd);
 			fd = -1;
 			sleep(1);
@@ -174,7 +181,7 @@ bool backend_nbd::sync()
 		}
 
 		if (ntohl(nbd_reply.magic) != 0x67446698) {
-			DOLOG("backend_nbd::sync: bad reply header %08x", nbd_reply.magic);
+			DOLOG("backend_nbd::invoke_nbd: bad reply header %08x", nbd_reply.magic);
 			close(fd);
 			fd = -1;
 			sleep(1);
@@ -183,13 +190,31 @@ bool backend_nbd::sync()
 
 		int error = ntohl(nbd_reply.error);
 		if (error) {
-			DOLOG("backend_nbd::sync: NBD server indicated error: %d", error);
+			DOLOG("backend_nbd::invoke_nbd: NBD server indicated error: %d", error);
 			return false;
+		}
+
+		if (command == NBD_CMD_READ) {
+			if (READ(fd, data, n_bytes) != ssize_t(n_bytes)) {
+				DOLOG("backend_nbd::invoke_nbd: problem receiving payload");
+				close(fd);
+				fd = -1;
+				sleep(1);
+				continue;
+			}
 		}
 	}
 	while(fd == -1);
 
-	return true;
+	return fd != -1;
+}
+
+bool backend_nbd::sync()
+{
+	n_syncs++;
+	ts_last_acces = get_micros();
+
+	return invoke_nbd(NBD_CMD_FLUSH, 0, 0, nullptr);
 }
 
 bool backend_nbd::write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data)
@@ -200,78 +225,14 @@ bool backend_nbd::write(const uint64_t block_nr, const uint32_t n_blocks, const 
 	DOLOG("backend_nbd::write: block %" PRIu64 " (%lu), %d blocks, block size: %" PRIu64 "\n", block_nr, offset, n_blocks, block_size);
 	auto   lock_list  = lock_range(block_nr, n_blocks);
 
-	do {
-		if (!connect(true)) {
-			DOLOG("backend_nbd::write: (re-)connect");
-			sleep(1);
-			continue;
-		}
-
-		struct __attribute__ ((packed)) {
-			uint32_t magic;
-			uint32_t type;
-			uint64_t handle;
-			uint64_t offset;
-			uint32_t length;
-		} nbd_request { };
-
-		nbd_request.magic  = ntohl(0x25609513);
-		nbd_request.type   = htonl(NBD_CMD_WRITE);  // WRITE
-		nbd_request.offset = HTONLL(uint64_t(offset));
-		nbd_request.length = htonl(n_bytes);
-
-		if (WRITE(fd, reinterpret_cast<const uint8_t *>(&nbd_request), sizeof nbd_request) != sizeof nbd_request) {
-			DOLOG("backend_nbd::write: problem sending request");
-			close(fd);
-			fd = -1;
-			sleep(1);
-			continue;
-		}
-
-		if (WRITE(fd, reinterpret_cast<const uint8_t *>(data), n_bytes) != ssize_t(n_bytes)) {
-			DOLOG("backend_nbd::write: problem sending payload");
-			close(fd);
-			fd = -1;
-			sleep(1);
-			continue;
-		}
-
-		struct __attribute__ ((packed)) {
-			uint32_t magic;
-			uint32_t error;
-			uint64_t handle;
-		} nbd_reply;
-
-		if (READ(fd, reinterpret_cast<uint8_t *>(&nbd_reply), sizeof nbd_reply) != sizeof nbd_reply) {
-			DOLOG("backend_nbd::write: problem receiving reply header");
-			close(fd);
-			fd = -1;
-			sleep(1);
-			continue;
-		}
-
-		if (ntohl(nbd_reply.magic) != 0x67446698) {
-			DOLOG("backend_nbd::write: bad reply header %08x", nbd_reply.magic);
-			close(fd);
-			fd = -1;
-			sleep(1);
-			continue;
-		}
-
-		int error = ntohl(nbd_reply.error);
-		if (error) {
-			DOLOG("backend_nbd::write: NBD server indicated error: %d", error);
-			return false;
-		}
-	}
-	while(fd == -1);
+	bool rc = invoke_nbd(NBD_CMD_WRITE, offset, n_bytes, const_cast<uint8_t *>(data));
 
 	unlock_range(lock_list);
 
 	ts_last_acces = get_micros();
 	bytes_written += n_bytes;
 
-	return true;
+	return rc;
 }
 
 bool backend_nbd::trim(const uint64_t block_nr, const uint32_t n_blocks)
@@ -282,70 +243,14 @@ bool backend_nbd::trim(const uint64_t block_nr, const uint32_t n_blocks)
 	DOLOG("backend_nbd::trim: block %" PRIu64 " (%lu), %d blocks, block size: %" PRIu64 "\n", block_nr, offset, n_blocks, block_size);
 	auto   lock_list  = lock_range(block_nr, n_blocks);
 
-	do {
-		if (!connect(true)) {
-			DOLOG("backend_nbd::write: (re-)connect");
-			sleep(1);
-			continue;
-		}
-
-		struct __attribute__ ((packed)) {
-			uint32_t magic;
-			uint32_t type;
-			uint64_t handle;
-			uint64_t offset;
-			uint32_t length;
-		} nbd_request { };
-
-		nbd_request.magic  = ntohl(0x25609513);
-		nbd_request.type   = htonl(NBD_CMD_TRIM);
-		nbd_request.offset = HTONLL(uint64_t(offset));
-		nbd_request.length = htonl(n_bytes);
-
-		if (WRITE(fd, reinterpret_cast<const uint8_t *>(&nbd_request), sizeof nbd_request) != sizeof nbd_request) {
-			DOLOG("backend_nbd::write: problem sending request");
-			close(fd);
-			fd = -1;
-			sleep(1);
-			continue;
-		}
-
-		struct __attribute__ ((packed)) {
-			uint32_t magic;
-			uint32_t error;
-			uint64_t handle;
-		} nbd_reply;
-
-		if (READ(fd, reinterpret_cast<uint8_t *>(&nbd_reply), sizeof nbd_reply) != sizeof nbd_reply) {
-			DOLOG("backend_nbd::write: problem receiving reply header");
-			close(fd);
-			fd = -1;
-			sleep(1);
-			continue;
-		}
-
-		if (ntohl(nbd_reply.magic) != 0x67446698) {
-			DOLOG("backend_nbd::write: bad reply header %08x", nbd_reply.magic);
-			close(fd);
-			fd = -1;
-			sleep(1);
-			continue;
-		}
-
-		int error = ntohl(nbd_reply.error);
-		if (error) {
-			DOLOG("backend_nbd::write: NBD server indicated error: %d", error);
-			return false;
-		}
-	}
-	while(fd == -1);
+	bool rc = invoke_nbd(NBD_CMD_TRIM, offset, n_bytes, nullptr);
 
 	unlock_range(lock_list);
 
 	ts_last_acces = get_micros();
 	bytes_written += n_bytes;
 
-	return true;
+	return rc;
 }
 
 bool backend_nbd::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_t *const data)
@@ -354,85 +259,16 @@ bool backend_nbd::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_t
 	off_t  offset_in  = block_nr * block_size;
 	off_t  offset     = offset_in;
 	size_t n_bytes    = n_blocks * block_size;
-
 	auto   lock_list  = lock_range(block_nr, n_blocks);
 
-	size_t o          = 0;
-
-	while(offset < offset_in + off_t(n_bytes)) {
-		if (fd == -1 && !connect(true)) {
-			DOLOG("backend_nbd::read: (re-)connect");
-			sleep(1);
-			continue;
-		}
-
-		struct __attribute__ ((packed)) {
-			uint32_t magic;
-			uint32_t type;
-			uint64_t handle;
-			uint64_t offset;
-			uint32_t length;
-		} nbd_request { };
-
-		nbd_request.magic  = ntohl(0x25609513);
-		nbd_request.type   = htonl(NBD_CMD_READ);
-		nbd_request.offset = HTONLL(uint64_t(offset));
-		nbd_request.length = htonl(n_bytes);
-
-		if (WRITE(fd, reinterpret_cast<const uint8_t *>(&nbd_request), sizeof nbd_request) != sizeof nbd_request) {
-			DOLOG("backend_nbd::read: problem sending request");
-			close(fd);
-			fd = -1;
-			sleep(1);
-			continue;
-		}
-
-		struct __attribute__ ((packed)) {
-			uint32_t magic;
-			uint32_t error;
-			uint64_t handle;
-		} nbd_reply;
-
-		if (READ(fd, reinterpret_cast<uint8_t *>(&nbd_reply), sizeof nbd_reply) != sizeof nbd_reply) {
-			DOLOG("backend_nbd::read: problem receiving reply header");
-			close(fd);
-			fd = -1;
-			sleep(1);
-			continue;
-		}
-
-		if (ntohl(nbd_reply.magic) != 0x67446698) {
-			DOLOG("backend_nbd::read: bad reply header %08x", nbd_reply.magic);
-			close(fd);
-			fd = -1;
-			sleep(1);
-			continue;
-		}
-
-		int error = ntohl(nbd_reply.error);
-		if (error) {
-			DOLOG("backend_nbd::read: NBD server indicated error: %d", error);
-			return false;
-		}
-
-		if (READ(fd, &data[o], n_bytes) != ssize_t(n_bytes)) {
-			DOLOG("backend_nbd::read: problem receiving payload");
-			close(fd);
-			fd = -1;
-			sleep(1);
-			continue;
-		}
-
-		offset += n_bytes;
-		o      += n_bytes;
-	}
+	bool rc = invoke_nbd(NBD_CMD_READ, offset, n_bytes, data);
 
 	unlock_range(lock_list);
 
 	ts_last_acces = get_micros();
 	bytes_read += n_bytes;
 
-	return true;
+	return rc;
 }
 
 backend::cmpwrite_result_t backend_nbd::cmpwrite(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data_write, const uint8_t *const data_compare)
