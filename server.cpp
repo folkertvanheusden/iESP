@@ -180,7 +180,7 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 	return { pdu_obj, pdu_error };
 }
 
-bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_bhs *const pdu, iscsi_response_parameters *const parameters)
+bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_bhs *const pdu, scsi *const sd)
 {
 	bool ok = true;
 
@@ -236,7 +236,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 				errlog("server::push_response: response.set failed");
 				return false;
 			}
-			response_set = response.get_response(ses, parameters, session->bytes_left);
+			response_set = response.get_response(ses, sd, session->bytes_left);
 
 			if (session->bytes_left == 0) {
 				DOLOG("server::push_response: end of task\n");
@@ -261,7 +261,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 		}
 	}
 	else {
-		response_set = pdu->get_response(ses, parameters);
+		response_set = pdu->get_response(ses, sd);
 	}
 
 	if (response_set.has_value() == false) {
@@ -404,33 +404,6 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 	return ok;
 }
 
-iscsi_response_parameters *server::select_parameters(iscsi_pdu_bhs *const pdu, session *const ses, scsi *const sd)
-{
-	switch(pdu->get_opcode()) {
-		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_login_req:
-			return new iscsi_response_parameters_login_req(ses);
-		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_cmd:
-			return new iscsi_response_parameters_scsi_cmd(ses, sd);
-		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_nop_out:
-			return new iscsi_response_parameters_nop_out(ses);
-		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_text_req:
-			return new iscsi_response_parameters_text_req(ses);
-		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_logout_req:
-			return new iscsi_response_parameters_logout_req(ses);
-		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_r2t:
-			return new iscsi_response_parameters_r2t(ses);
-		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_taskman:
-			return new iscsi_response_parameters_taskman(ses);
-		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_data_out:
-			return new iscsi_response_parameters_data_out(ses);
-		default:
-			errlog("server::select_parameters: opcode %02xh not implemented", pdu->get_opcode());
-			break;
-	}
-
-	return nullptr;
-}
-
 void server::handler()
 {
 	std::vector<std::pair<std::thread *, std::atomic_bool *> > threads;
@@ -517,15 +490,9 @@ void server::handler()
 					DOLOG("server::handler: transmitted reject PDU\n");
 				}
 				else {
-					auto parameters = select_parameters(pdu, ses, s);
-					if (parameters) {
-						ok = push_response(cc, ses, pdu, parameters);
-						delete parameters;
-					}
-					else {
-						ok = false;
+					ok = push_response(cc, ses, pdu, s);
+					if (!ok)
 						is->iscsiInstSsnFailures++;
-					}
 
 					delete pdu;
 				}

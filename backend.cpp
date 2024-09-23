@@ -36,9 +36,9 @@ bool backend::is_idle()
 
 uint8_t backend::get_free_space_percentage()
 {
-	auto     block_size = get_block_size();
-	auto     size       = get_size_in_blocks();
-	uint64_t th100      = size / 100;
+	auto     block_size  = get_block_size();
+	auto     size        = get_size_in_blocks();
+	uint64_t th100       = size / 100;
 	uint8_t  empty_count = 0;
 
 	if (th100 == 0)

@@ -126,7 +126,7 @@ backend::cmpwrite_result_t backend_file::cmpwrite(const uint64_t block_nr, const
 	auto lock_list  = lock_range(block_nr, n_blocks);
 	auto block_size = get_block_size();
 
-	DOLOG("backend_file::cmpwrite: block %" PRIu64 " (%lu), %d blocks (%zu), block size: %" PRIu64 "\n", block_nr, offset, n_blocks, n_blocks * block_size, block_size);
+	DOLOG("backend_file::cmpwrite: block %" PRIu64 " (%lu), %d blocks (%zu), block size: %" PRIu64 "\n", block_nr, block_nr * block_size, n_blocks, n_blocks * block_size, block_size);
 
 	cmpwrite_result_t result = cmpwrite_result_t::CWR_OK;
 	uint8_t          *buffer = new uint8_t[block_size]();
