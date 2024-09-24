@@ -349,7 +349,7 @@ public:
 	std::vector<blob_t> get() const override;
         uint32_t get_TTT() const { return pdu_data_in->TTT; }
 
-	static blob_t gen_data_in_pdu(session *const ses, const iscsi_pdu_scsi_cmd & reply_to, const blob_t & pdu_data_in_data, const size_t use_pdu_data_size, const size_t offset_in_data);
+	static std::pair<blob_t, uint8_t *> gen_data_in_pdu(session *const ses, const iscsi_pdu_scsi_cmd & reply_to, const size_t use_pdu_data_size, const size_t offset_in_data, const size_t data_is_n_bytes);
 };
 
 class iscsi_pdu_scsi_data_out : public iscsi_pdu_bhs  // 0x05

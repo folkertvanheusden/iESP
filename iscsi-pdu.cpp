@@ -626,14 +626,14 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get() const
 	return v_out;
 }
 
-blob_t iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *const ses, const iscsi_pdu_scsi_cmd & reply_to, const blob_t & pdu_data_in_data, const size_t use_pdu_data_size, const size_t offset_in_data)
+std::pair<blob_t, uint8_t *> iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *const ses, const iscsi_pdu_scsi_cmd & reply_to, const size_t use_pdu_data_size, const size_t offset_in_data, const size_t data_is_n_bytes)
 {
-	bool last_block = (offset_in_data + pdu_data_in_data.n) == use_pdu_data_size;
+	bool last_block = (offset_in_data + data_is_n_bytes) == use_pdu_data_size;
 
 	if (last_block)
 		DOLOG("iscsi_pdu_scsi_data_in::gen_data_in_pdu: last block\n");
 	else
-		DOLOG("iscsi_pdu_scsi_data_in::gen_data_in_pdu: offset %zu + %zu != %zu\n", offset_in_data, pdu_data_in_data.n, use_pdu_data_size);
+		DOLOG("iscsi_pdu_scsi_data_in::gen_data_in_pdu: offset %zu + %zu != %zu\n", offset_in_data, data_is_n_bytes, use_pdu_data_size);
 
 	__pdu_data_in__ pdu_data_in { };
 
@@ -642,9 +642,9 @@ blob_t iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *const ses, const iscsi_p
 		set_bits(&pdu_data_in.b2, 7, 1, true);  // F
 		set_bits(&pdu_data_in.b2, 0, 1, true);  // S
 	}
-	pdu_data_in.datalenH   = pdu_data_in_data.n >> 16;
-	pdu_data_in.datalenM   = pdu_data_in_data.n >>  8;
-	pdu_data_in.datalenL   = pdu_data_in_data.n      ;
+	pdu_data_in.datalenH   = data_is_n_bytes >> 16;
+	pdu_data_in.datalenM   = data_is_n_bytes >>  8;
+	pdu_data_in.datalenL   = data_is_n_bytes      ;
 	memcpy(pdu_data_in.LUN, reply_to.get_LUN(), sizeof pdu_data_in.LUN);
 	pdu_data_in.Itasktag   = reply_to.get_Itasktag();
 	pdu_data_in.StatSN     = HTONL(reply_to.get_ExpStatSN());
@@ -654,20 +654,16 @@ blob_t iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *const ses, const iscsi_p
 	pdu_data_in.bufferoff  = HTONL(offset_in_data);
 	pdu_data_in.ResidualCt = 0;
 
-	size_t out_size = sizeof(pdu_data_in) + pdu_data_in_data.n;
+	size_t out_size = sizeof(pdu_data_in) + data_is_n_bytes;
 	out_size = (out_size + 3) & ~3;
 
 	uint8_t *out = new (std::nothrow) uint8_t[out_size]();
-	if (out) {
-		memcpy(out, &pdu_data_in, sizeof pdu_data_in);
-		if (pdu_data_in_data.n)
-			memcpy(&out[sizeof(pdu_data_in)], pdu_data_in_data.data, pdu_data_in_data.n);
-	}
-	else {
+	if (out)
+		memcpy(out, &pdu_data_in, sizeof pdu_data_in);  // data is filled by caller! (to reduce memcpy's)
+	else
 		out_size = 0;
-	}
 
-	return { out, out_size };
+	return { { out, out_size }, &out[sizeof(pdu_data_in)] };
 }
 
 /*--------------------------------------------------------------------------*/

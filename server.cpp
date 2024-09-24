@@ -319,7 +319,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 			use_pdu_data_size = reply_to.get_ExpDatLen();
 		}
 
-		blob_t buffer       { nullptr, 0 };
+		size_t buffer_n     = 0;
 		auto   ack_interval = ses->get_ack_interval();
 #ifdef ESP32
 		size_t heap_free = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
@@ -327,86 +327,80 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 			size_t heap_allowed = (heap_free - 2048) / 4;
 
 			if (ack_interval.has_value())
-				buffer.n = std::min(heap_allowed, size_t(ack_interval.value()));
+				buffer_n = std::min(heap_allowed, size_t(ack_interval.value()));
 			else
-				buffer.n = heap_allowed;
+				buffer_n = heap_allowed;
 		}
 #elif defined(RP2040W)
 		if (ack_interval.has_value())
-			buffer.n = std::min(uint32_t(4096), ack_interval.value());
+			buffer_n = std::min(uint32_t(4096), ack_interval.value());
 		else
-			buffer.n = 4096;
+			buffer_n = 4096;
 #elif defined(TEENSY4_1)
 		if (ack_interval.has_value())
-			buffer.n = std::min(uint32_t(16384), ack_interval.value());
+			buffer_n = std::min(uint32_t(16384), ack_interval.value());
 		else
-			buffer.n = 16384;
+			buffer_n = 16384;
 #else
 		if (ack_interval.has_value())
-			buffer.n = std::max(uint32_t(s->get_block_size()), ack_interval.value());
+			buffer_n = std::max(uint32_t(s->get_block_size()), ack_interval.value());
 		else
-			buffer.n = std::max(uint32_t(s->get_block_size()), uint32_t(65536));  // 64 kB, arbitrarily chosen
+			buffer_n = std::max(uint32_t(s->get_block_size()), uint32_t(65536));  // 64 kB, arbitrarily chosen
 #endif
-		if (buffer.n < s->get_block_size())
-			buffer.n = s->get_block_size();
-		buffer.data = new uint8_t[buffer.n]();
-		uint32_t block_group_size = buffer.n / s->get_block_size();
+		if (buffer_n < s->get_block_size())
+			buffer_n = s->get_block_size();
 
-		uint32_t offset = 0;
-
-		bool low_ram = false;
+		uint32_t block_group_size = buffer_n / s->get_block_size();
+		uint32_t offset           = 0;
+		bool     low_ram          = false;
 
 		for(uint32_t block_nr = 0; block_nr < stream_parameters.n_sectors;) {
 			uint32_t n_left = low_ram ? 1 : std::min(block_group_size, stream_parameters.n_sectors - block_nr);
-			buffer.n = n_left * s->get_block_size();
+			buffer_n = n_left * s->get_block_size();
 
 			if (offset < use_pdu_data_size)
-				buffer.n = std::min(buffer.n, size_t(use_pdu_data_size - offset));
+				buffer_n = std::min(buffer_n, size_t(use_pdu_data_size - offset));
 			else
-				buffer.n = 0;
+				buffer_n = 0;
+
+			auto [ out, data_pointer ] = iscsi_pdu_scsi_data_in::gen_data_in_pdu(ses, reply_to, use_pdu_data_size, offset, buffer_n);
 
 			uint64_t cur_block_nr = block_nr + stream_parameters.lba;
 			DOLOG("server::push_response: reading %u block(s) nr %zu from backend\n", n_left, size_t(cur_block_nr));
-			if (buffer.n > 0) {
-				auto rc = s->read(cur_block_nr, n_left, buffer.data);
+			if (buffer_n > 0) {
+				auto rc = s->read(cur_block_nr, n_left, data_pointer);
 
 				if (rc != scsi::rw_ok) {
+					delete [] out.data;
 					errlog("server::push_response: reading %u block(s) %zu from backend failed (%d)", n_left, size_t(cur_block_nr), rc);
 					ok = false;
 					break;
 				}
 			}
 
-			blob_t out = iscsi_pdu_scsi_data_in::gen_data_in_pdu(ses, reply_to, buffer, use_pdu_data_size, offset);
-
 			if (out.n == 0) {  // gen_data_in_pdu could not allocate memory
-				low_ram = true;
-				delete [] buffer.data;
-				buffer.n = s->get_block_size();
-				buffer.data = new uint8_t[buffer.n]();
-				errlog("Low on memory: %zu bytes failed", buffer.n);
+				errlog("Low on memory: %zu bytes failed", buffer_n);
+				low_ram  = true;
+				buffer_n = s->get_block_size();
 			}
 			else {
-				if (cc->send(out.data, out.n) == false) {
-					delete [] out.data;
+				bool rc = cc->send(out.data, out.n);
+				delete [] out.data;
+				if (rc == false) {
 					errlog("server::push_response: problem sending block %zu to initiator", size_t(cur_block_nr));
 					ok = false;
 					break;
 				}
 
-				delete [] out.data;
-
 				ses->add_bytes_tx(out.n);
-				offset += buffer.n;
+				offset   += buffer_n;
 				block_nr += n_left;
 				is->iscsiSsnTxDataOctets += out.n;
 			}
 
-			if (buffer.n == 0)
+			if (buffer_n == 0)
 				break;
 		}
-
-		delete [] buffer.data;
 	}
 
 	DOLOG(" ---\n");
