@@ -691,9 +691,9 @@ scsi::scsi_rw_result scsi::write(const uint64_t block_nr, const uint32_t n_block
 		bool result = false;
 		auto start = get_micros();
 		if (trim_level == 2) {
-			bool is_zero = true;
-			auto bs = get_block_size();
-			uint8_t *zero = new uint8_t[bs]();
+			bool     is_zero = true;
+			auto     bs      = get_block_size();
+			uint8_t *zero    = new uint8_t[bs]();
 			for(uint32_t i=0; i<n_blocks; i++) {
 				if (memcmp(&data[i * bs], zero, bs) != 0) {
 					is_zero = false;
@@ -712,6 +712,7 @@ scsi::scsi_rw_result scsi::write(const uint64_t block_nr, const uint32_t n_block
 		}
 
 		is->io_wait_cur += get_micros() - start;
+
 		return result ? rw_ok : rw_fail_general;
 	}
 
@@ -723,8 +724,8 @@ scsi::scsi_rw_result scsi::trim(const uint64_t block_nr, const uint32_t n_blocks
 	if (locking_status() != l_locked_other) {  // locked by myself or not locked?
 		auto start = get_micros();
 		if (trim_level == 0) {  // 0 = do not trim/unmap
-			scsi::scsi_rw_result rc = rw_ok;
-			uint8_t *zero = new uint8_t[get_block_size()]();
+			scsi::scsi_rw_result rc   = rw_ok;
+			uint8_t             *zero = new uint8_t[get_block_size()]();
 			for(uint32_t i=0; i<n_blocks; i++) {
 				rc = write(block_nr + i, 1, zero);
 				if (rc != rw_ok)
@@ -755,7 +756,7 @@ scsi::scsi_rw_result scsi::read(const uint64_t block_nr, const uint32_t n_blocks
 	is->bytes_read += n_blocks * b->get_block_size();
 
 	if (locking_status() != l_locked_other) {  // locked by myself or not locked?
-		auto start = get_micros();
+		auto start  = get_micros();
 		bool result = b->read(block_nr, n_blocks, data);
 		is->io_wait_cur += get_micros() - start;
 		return result ? rw_ok : rw_fail_general;
