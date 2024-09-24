@@ -1,6 +1,7 @@
 #include <cstring>
 
 #include "backend.h"
+#include "log.h"
 #include "random.h"
 #include "utils.h"
 
@@ -51,7 +52,12 @@ uint8_t backend::get_free_space_percentage()
 		uint64_t block_nr = 0;
 
 		// random in case a filesystem or whatever places static data at every xth position
-		block_nr = ((uint64_t(my_getrandom()) << 32) | my_getrandom()) % size;
+		uint64_t rnd = 0;
+		if (my_getrandom(&rnd, sizeof rnd) == false) {
+			DOLOG("Random generator returned an error");
+			return 0;
+		}
+		block_nr = rnd % size;
 
 		auto rc = read(block_nr, 1, buffer);
 		if (rc == false) {

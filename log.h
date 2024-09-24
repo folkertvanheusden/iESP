@@ -1,3 +1,5 @@
+#include <string>
+
 #if !defined(ARDUINO)
 #ifndef NDEBUG
 #include <cstdio>

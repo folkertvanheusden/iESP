@@ -312,7 +312,10 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 	memcpy(login_reply->ISID, reply_to.get_ISID(), 6);
 	if (!discovery) {
 		do {
-			my_getrandom(&login_reply->TSIH, sizeof login_reply->TSIH);
+			if (my_getrandom(&login_reply->TSIH, sizeof login_reply->TSIH) == false) {
+				DOLOG("Random generator returned an error");
+				return false;
+			}
 		}
 		while(login_reply->TSIH == 0);
 	}
