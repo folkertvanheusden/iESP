@@ -457,6 +457,8 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 	else if (opcode == o_sync_cache_10) {  // 0x35
 		DOLOG("scsi::send: SYNC CACHE 10\n");
 
+		this->sync();
+
 		response.type = ir_empty_sense;
 	}
 	else if (opcode == o_report_luns) {  // 0xa0
