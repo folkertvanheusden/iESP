@@ -384,9 +384,6 @@ public:
 	__pdu_data_out__ *pdu_data_out __attribute__((packed)) { reinterpret_cast<__pdu_data_out__ *>(pdu_bytes) };
 	std::pair<uint8_t *, size_t> pdu_data_out_data { nullptr, 0 };
 
-private:
-	iscsi_pdu_scsi_cmd *reply_to_copy { nullptr };
-
 public:
 	iscsi_pdu_scsi_data_out(session *const ses);
 	virtual ~iscsi_pdu_scsi_data_out();

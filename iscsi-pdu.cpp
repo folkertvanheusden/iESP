@@ -560,6 +560,7 @@ bool iscsi_pdu_scsi_data_in::set(const iscsi_pdu_scsi_cmd & reply_to, const std:
 	DOLOG("iscsi_pdu_scsi_data_in::set: with %zu payload bytes, has_sense: %d\n", scsi_reply_data.second, has_sense);
 
 	auto temp = reply_to.get_raw();
+	reply_to_copy = new iscsi_pdu_scsi_cmd(ses);
 	reply_to_copy->set(temp.data, temp.n);
 	delete [] temp.data;
 
@@ -679,7 +680,6 @@ iscsi_pdu_scsi_data_out::iscsi_pdu_scsi_data_out(session *const ses): iscsi_pdu_
 iscsi_pdu_scsi_data_out::~iscsi_pdu_scsi_data_out()
 {
 	delete [] pdu_data_out_data.first;
-	delete reply_to_copy;
 }
 
 bool iscsi_pdu_scsi_data_out::set(const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data)
