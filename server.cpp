@@ -61,7 +61,7 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 	is->iscsiSsnRxDataOctets += sizeof pdu;
 
 	iscsi_pdu_bhs bhs(*ses);
-	if (bhs.set(*ses, pdu, sizeof pdu) == false) {
+	if (bhs.set(pdu, sizeof pdu) == false) {
 		errlog("server::receive_pdu: BHS validation error");
 		return { nullptr, false, tx_start };
 	}
@@ -113,7 +113,7 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 	if (pdu_obj) {
 		bool ok = true;
 
-		if (pdu_obj->set(*ses, pdu, sizeof pdu) == false) {
+		if (pdu_obj->set(pdu, sizeof pdu) == false) {
 			ok = false;
 			errlog("server::receive_pdu: initialize PDU: validation failed");
 		}
@@ -242,11 +242,11 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 			DOLOG("server::push_response: end of batch\n");
 
 			iscsi_pdu_scsi_cmd response(ses);
-			if (response.set(ses, session->PDU_initiator.data, session->PDU_initiator.n) == false) {
+			if (response.set(session->PDU_initiator.data, session->PDU_initiator.n) == false) {
 				errlog("server::push_response: response.set failed");
 				return false;
 			}
-			response_set = response.get_response(ses, sd, session->bytes_left);
+			response_set = response.get_response(sd, session->bytes_left);
 
 			if (session->bytes_left == 0) {
 				DOLOG("server::push_response: end of task\n");
@@ -257,10 +257,10 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 				DOLOG("server::push_response: ask for more (%u bytes left)\n", session->bytes_left);
 				// send 0x31 for range
 				iscsi_pdu_scsi_cmd temp(ses);
-				temp.set(ses, session->PDU_initiator.data, session->PDU_initiator.n);
+				temp.set(session->PDU_initiator.data, session->PDU_initiator.n);
 
 				auto *response = new iscsi_pdu_scsi_r2t(ses) /* 0x31 */;
-				if (response->set(ses, temp, TTT, session->bytes_done, session->bytes_left) == false) {
+				if (response->set(temp, TTT, session->bytes_done, session->bytes_left) == false) {
 					errlog("server::push_response: response->set failed");
 					delete response;
 					return false;
@@ -271,7 +271,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 		}
 	}
 	else {
-		response_set = pdu->get_response(ses, sd);
+		response_set = pdu->get_response(sd);
 	}
 
 	if (response_set.has_value() == false) {
@@ -310,7 +310,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 
 		iscsi_pdu_scsi_cmd reply_to(ses);
 		auto temp = pdu->get_raw();
-		reply_to.set(ses, temp.data, temp.n);
+		reply_to.set(temp.data, temp.n);
 		delete [] temp.data;
 
 	        uint64_t use_pdu_data_size = uint64_t(stream_parameters.n_sectors) * s->get_block_size();
