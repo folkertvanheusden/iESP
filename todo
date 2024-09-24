@@ -6,5 +6,3 @@
 - use serial of SD-card as an iscsi serial!
 
 - https://stackoverflow.com/questions/15944254/physical-disk-block-size-on-posix-using-c-c
-
-- R2T write with FUA
