@@ -1,7 +1,6 @@
 #include <string>
 
-#if !defined(ARDUINO)
-#ifndef NDEBUG
+#if !defined(ARDUINO) && !defined(NDEBUG)
 #include <cstdio>
 #include <ctime>
 #include <sys/time.h>
@@ -20,9 +19,6 @@
 		}                           \
                 printf(fmt, ##__VA_ARGS__); \
         } while(0)
-#else
-#define DOLOG(fmt, ...) do { } while(0)
-#endif
 #else
 #define DOLOG(fmt, ...) do { } while(0)
 #endif

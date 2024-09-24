@@ -76,6 +76,7 @@ void help()
 {
 	printf("-b x    backend type: file (default) or nbd (e.g. iscsi -> nbd proxy)\n");
 	printf("-d x    device/file/host:port to serve (device/file: -b file, host:port: -b nbd)\n");
+	printf("-t x    target name\n");
 	printf("-i x    IP-address of adapter to listen on\n");
 	printf("-p x    TCP-port to listen on\n");
 	printf("-T x    trim level (0=disable, 1=normal (default), 2=auto)\n");
@@ -93,11 +94,12 @@ int main(int argc, char *argv[])
 	std::string    ip_address = "0.0.0.0";
 	int            port       = 3260;
 	std::string    dev        = "test.dat";
+	std::string    target_name= "test";
 	int            trim_level = 1;
 	bool           use_snmp   = false;
 	backend_type_t bt         = backend_type_t::BT_FILE;
 	int o = -1;
-	while((o = getopt(argc, argv, "Sb:d:i:p:T:h")) != -1) {
+	while((o = getopt(argc, argv, "Sb:d:i:p:T:t:h")) != -1) {
 		if (o == 'S')
 			use_snmp = true;
 		else if (o == 'b') {
@@ -118,6 +120,8 @@ int main(int argc, char *argv[])
 			port = atoi(optarg);
 		else if (o == 'T')
 			trim_level = atoi(optarg);
+		else if (o == 't')
+			target_name = optarg;
 		else {
 			help();
 			return o != 'h';
@@ -168,7 +172,7 @@ int main(int argc, char *argv[])
 
 	std::thread *mth = new std::thread(maintenance_thread, &stop, b, &percentage_diskspace, &cpu_usage, &ram_free_kb);
 
-	server s(&sd, &c, &is);
+	server s(&sd, &c, &is, target_name);
 	printf("Go!\n");
 	s.handler();
 

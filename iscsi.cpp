@@ -12,6 +12,7 @@ std::vector<std::string> data_to_text_array(const uint8_t *const data, const siz
 	for(size_t i=0; i<n; i++) {
 		if (data[i] == 0x00) {
 			out.push_back(pair);
+			printf("%s\n", pair.c_str());
 			pair.clear();
 		}
 		else {
@@ -19,8 +20,10 @@ std::vector<std::string> data_to_text_array(const uint8_t *const data, const siz
 		}
 	}
 
-	if (pair.empty() == false)
+	if (pair.empty() == false) {
 		out.push_back(pair);
+			printf("%s\n", pair.c_str());
+	}
 
 	return out;
 }

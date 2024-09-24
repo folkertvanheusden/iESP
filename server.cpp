@@ -30,10 +30,11 @@
 
 extern std::atomic_bool stop;
 
-server::server(scsi *const s, com *const c, iscsi_stats_t *is):
+server::server(scsi *const s, com *const c, iscsi_stats_t *is, const std::string & target_name):
 	s(s),
 	c(c),
-	is(is)
+	is(is),
+	target_name(target_name)
 {
 }
 
@@ -44,7 +45,7 @@ server::~server()
 std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *const cc, session **const ses)
 {
 	if (*ses == nullptr) {
-		*ses = new session(cc);
+		*ses = new session(cc, target_name);
 		(*ses)->set_block_size(s->get_block_size());
 	}
 
@@ -59,7 +60,7 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 	(*ses)->add_bytes_rx(sizeof pdu);
 	is->iscsiSsnRxDataOctets += sizeof pdu;
 
-	iscsi_pdu_bhs bhs;
+	iscsi_pdu_bhs bhs(*ses);
 	if (bhs.set(*ses, pdu, sizeof pdu) == false) {
 		errlog("server::receive_pdu: BHS validation error");
 		return { nullptr, false, tx_start };
@@ -79,32 +80,32 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 
 	switch(bhs.get_opcode()) {
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_login_req:
-			pdu_obj = new iscsi_pdu_login_request();
+			pdu_obj = new iscsi_pdu_login_request(*ses);
 			break;
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_cmd:
-			pdu_obj = new iscsi_pdu_scsi_cmd();
+			pdu_obj = new iscsi_pdu_scsi_cmd(*ses);
 			break;
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_nop_out:
-			pdu_obj = new iscsi_pdu_nop_out();
+			pdu_obj = new iscsi_pdu_nop_out(*ses);
 			break;
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_text_req:
-			pdu_obj = new iscsi_pdu_text_request();
+			pdu_obj = new iscsi_pdu_text_request(*ses);
 			break;
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_logout_req:
-			pdu_obj = new iscsi_pdu_logout_request();
+			pdu_obj = new iscsi_pdu_logout_request(*ses);
 			break;
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_r2t:
-			pdu_obj = new iscsi_pdu_scsi_r2t();
+			pdu_obj = new iscsi_pdu_scsi_r2t(*ses);
 			break;
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_taskman:
-			pdu_obj = new iscsi_pdu_taskman_request();
+			pdu_obj = new iscsi_pdu_taskman_request(*ses);
 			break;
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_data_out:
-			pdu_obj = new iscsi_pdu_scsi_data_out();
+			pdu_obj = new iscsi_pdu_scsi_data_out(*ses);
 			break;
 		default:
 			errlog("server::receive_pdu: opcode %02xh not implemented", bhs.get_opcode());
-			pdu_obj = new iscsi_pdu_bhs();
+			pdu_obj = new iscsi_pdu_bhs(*ses);
 			pdu_error = true;
 			break;
 	}
@@ -119,7 +120,6 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 
 		if (bhs.get_opcode() == iscsi_pdu_bhs::iscsi_bhs_opcode::o_login_req) {
 			is->iscsiTgtLoginAccepts++;
-#if defined(ESP32) || !defined(NDEBUG)
 			auto initiator = reinterpret_cast<iscsi_pdu_login_request *>(pdu_obj)->get_initiator();
 			if (initiator.has_value()) {
 #ifdef ESP32
@@ -129,7 +129,6 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 				DOLOG("server::receive_pdu: initiator: %s\n", initiator.value().c_str());
 #endif
 			}
-#endif
 		}
 
 		if (bhs.get_opcode() == iscsi_pdu_bhs::iscsi_bhs_opcode::o_logout_req)
@@ -242,7 +241,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 		if (F) {
 			DOLOG("server::push_response: end of batch\n");
 
-			iscsi_pdu_scsi_cmd response;
+			iscsi_pdu_scsi_cmd response(ses);
 			if (response.set(ses, session->PDU_initiator.data, session->PDU_initiator.n) == false) {
 				errlog("server::push_response: response.set failed");
 				return false;
@@ -257,10 +256,10 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 			else {
 				DOLOG("server::push_response: ask for more (%u bytes left)\n", session->bytes_left);
 				// send 0x31 for range
-				iscsi_pdu_scsi_cmd temp;
+				iscsi_pdu_scsi_cmd temp(ses);
 				temp.set(ses, session->PDU_initiator.data, session->PDU_initiator.n);
 
-				auto *response = new iscsi_pdu_scsi_r2t() /* 0x31 */;
+				auto *response = new iscsi_pdu_scsi_r2t(ses) /* 0x31 */;
 				if (response->set(ses, temp, TTT, session->bytes_done, session->bytes_left) == false) {
 					errlog("server::push_response: response->set failed");
 					delete response;
@@ -309,7 +308,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 
 		DOLOG("server::push_response: stream %u sectors, LBA: %zu\n", stream_parameters.n_sectors, size_t(stream_parameters.lba));
 
-		iscsi_pdu_scsi_cmd reply_to;
+		iscsi_pdu_scsi_cmd reply_to(ses);
 		auto temp = pdu->get_raw();
 		reply_to.set(ses, temp.data, temp.n);
 		delete [] temp.data;

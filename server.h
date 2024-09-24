@@ -23,13 +23,14 @@ private:
 	scsi          *const s          { nullptr };
 	com           *const c          { nullptr };
 	iscsi_stats_t *const is         { nullptr };
+	const std::string target_name;
 
 	std::tuple<iscsi_pdu_bhs *, bool, uint64_t>
 		receive_pdu  (com_client *const cc, session **const s);
 	bool    push_response(com_client *const cc, session *const s, iscsi_pdu_bhs *const pdu, scsi *const sd);
 
 public:
-	server(scsi *const s, com *const c, iscsi_stats_t *is);
+	server(scsi *const s, com *const c, iscsi_stats_t *is, const std::string & target_name);
 	virtual ~server();
 
 	bool begin();

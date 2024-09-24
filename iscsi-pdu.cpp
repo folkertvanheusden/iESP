@@ -39,7 +39,7 @@ std::string pdu_opcode_to_string(const iscsi_pdu_bhs::iscsi_bhs_opcode opcode)
 /*--------------------------------------------------------------------------*/
 // BHS
 
-iscsi_pdu_bhs::iscsi_pdu_bhs()
+iscsi_pdu_bhs::iscsi_pdu_bhs(session *const ses): ses(ses)
 {
 	assert(sizeof(*bhs) == 48);
 
@@ -102,7 +102,6 @@ bool iscsi_pdu_bhs::set_data(std::pair<const uint8_t *, std::size_t> data_in)
 		return false;
 
 	data.second = data_in.second;
-
 	data.first  = duplicate_new(data_in.first, data_in.second);
 
 	return true;
@@ -180,7 +179,7 @@ blob_t iscsi_pdu_ahs::get()
 
 /*--------------------------------------------------------------------------*/
 
-iscsi_pdu_login_request::iscsi_pdu_login_request()
+iscsi_pdu_login_request::iscsi_pdu_login_request(session *const ses): iscsi_pdu_bhs(ses)
 {
 	assert(sizeof(*login_req) == 48);
 
@@ -191,15 +190,16 @@ iscsi_pdu_login_request::~iscsi_pdu_login_request()
 {
 }
 
-bool iscsi_pdu_login_request::set(session *const s, const uint8_t *const in, const size_t n)
+bool iscsi_pdu_login_request::set_data(std::pair<const uint8_t *, std::size_t> data_in)
 {
-	if (iscsi_pdu_bhs::set(s, in, n) == false) {
-		DOLOG("iscsi_pdu_login_request::set: iscsi_pdu_bhs::set returned false\n");
+	if (iscsi_pdu_bhs::set_data(data_in) == false) {
+		DOLOG("iscsi_pdu_login_request::set_data: iscsi_pdu_bhs::set_data returned false\n");
 		return false;
 	}
 
-	auto kvs_in = data_to_text_array(data.first, data.second);
-	uint32_t max_burst = ~0;
+	auto        kvs_in      = data_to_text_array(data.first, data.second);
+	uint32_t    max_burst   = ~0;
+	std::string target_name;
 	for(auto & kv: kvs_in) {
 		DOLOG("iscsi_pdu_login_request::get_response: kv %s\n", kv.c_str());
 
@@ -209,15 +209,22 @@ bool iscsi_pdu_login_request::set(session *const s, const uint8_t *const in, con
 
 		if (parts[0] == "MaxBurstLength")
 			max_burst = std::min(max_burst, uint32_t(std::stoi(parts[1])));
-		if (parts[0] == "FirstBurstLength")
+		else if (parts[0] == "FirstBurstLength")
 			max_burst = std::min(max_burst, uint32_t(std::stoi(parts[1])));
-		if (parts[0] == "InitiatorName")
+		else if (parts[0] == "InitiatorName")
 			initiator = parts[1];
+		else if (parts[0] == "TargetName")
+			target_name = parts[1];
 	}
 
 	if (max_burst < uint32_t(~0)) {
 		DOLOG("iscsi_pdu_login_request::get_response: set max-burst to %u\n", max_burst);
-		s->set_ack_interval(max_burst);
+		ses->set_ack_interval(max_burst);
+	}
+
+	if (target_name != ses->get_target_name()) {
+		printf("iscsi_pdu_login_request::get_response: invalid target name \"%s\", expecting \"%s\"\n", target_name.c_str(), ses->get_target_name().c_str());
+		return false;
 	}
 
 	return true;
@@ -233,7 +240,7 @@ std::vector<blob_t> iscsi_pdu_login_request::get() const
 std::optional<iscsi_response_set> iscsi_pdu_login_request::get_response(session *const s, scsi *const sd)
 {
 	iscsi_response_set response;
-	auto reply_pdu = new iscsi_pdu_login_reply();
+	auto reply_pdu = new iscsi_pdu_login_reply(ses);
 	if (reply_pdu->set(*this) == false) {
 		delete reply_pdu;
 		return { };
@@ -245,7 +252,7 @@ std::optional<iscsi_response_set> iscsi_pdu_login_request::get_response(session 
 
 /*--------------------------------------------------------------------------*/
 
-iscsi_pdu_login_reply::iscsi_pdu_login_reply()
+iscsi_pdu_login_reply::iscsi_pdu_login_reply(session *const ses): iscsi_pdu_bhs(ses)
 {
 	assert(sizeof(*login_reply) == 48);
 }
@@ -266,8 +273,10 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 			"TargetPortalGroupTag=1",
 			"AuthMethod=None",
 		};
+#if !defined(NDEBUG)
 		for(auto & kv : kvs)
 			DOLOG("iscsi_pdu_login_reply::set: send KV \"%s\"\n", kv.c_str());
+#endif
 		auto temp = text_array_to_data(kvs);
 		login_reply_reply_data.first  = temp.first;
 		login_reply_reply_data.second = temp.second;
@@ -281,14 +290,16 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 			"DefaultTime2Wait=2",
 			"DefaultTime2Retain=20",
 			"ErrorRecoveryLevel=0",
-#if defined(Arduino)
+#if defined(ARDUINO)
 			"MaxRecvDataSegmentLength=4096",
 #else
 			"MaxRecvDataSegmentLength=8388608",  // 8 MB, anything large
 #endif
 		};
+#if !defined(NDEBUG)
 		for(auto & kv : kvs)
 			DOLOG("iscsi_pdu_login_reply::set: send KV \"%s\"\n", kv.c_str());
+#endif
 		auto temp = text_array_to_data(kvs);
 		login_reply_reply_data.first  = temp.first;
 		login_reply_reply_data.second = temp.second;
@@ -343,7 +354,7 @@ std::vector<blob_t> iscsi_pdu_login_reply::get() const
 
 /*--------------------------------------------------------------------------*/
 
-iscsi_pdu_scsi_cmd::iscsi_pdu_scsi_cmd()
+iscsi_pdu_scsi_cmd::iscsi_pdu_scsi_cmd(session *const ses): iscsi_pdu_bhs(ses)
 {
 	assert(sizeof(*cdb_pdu_req) == 48);
 	assert(offsetof(__cdb_pdu_req__, Itasktag ) == 16);
@@ -380,7 +391,7 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *cons
 	// TODO: handle errors (see 'status')
 	iscsi_response_set response;
 
-	auto *pdu_scsi_response = new iscsi_pdu_scsi_response() /* 0x21 */;
+	auto *pdu_scsi_response = new iscsi_pdu_scsi_response(ses) /* 0x21 */;
 	if (pdu_scsi_response->set(*this, { }, { }) == false) {
 		DOLOG("iscsi_pdu_scsi_cmd::get_response: iscsi_pdu_scsi_response::set returned error\n");
 
@@ -407,7 +418,7 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *cons
 	bool               ok       { true };
 
 	if (scsi_reply.value().io.is_inline) {
-		auto pdu_data_in = new iscsi_pdu_scsi_data_in();  // 0x25
+		auto pdu_data_in = new iscsi_pdu_scsi_data_in(ses);  // 0x25
 		DOLOG("iscsi_pdu_scsi_cmd::get_response: sending SCSI DATA-IN with %zu payload bytes, is meta: %d\n", scsi_reply.value().io.what.data.second, scsi_reply.value().data_is_meta);
 		if (pdu_data_in->set(s, *this, scsi_reply.value().io.what.data, scsi_reply.value().data_is_meta) == false) {
 			ok = false;
@@ -423,7 +434,7 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *cons
 	iscsi_pdu_bhs *pdu_scsi_response = nullptr;
 	if (scsi_reply.value().type == ir_as_is || scsi_reply.value().type == ir_empty_sense) {
 		if (scsi_reply.value().sense_data.empty() == false || scsi_reply.value().type == ir_empty_sense) {
-			auto *temp = new iscsi_pdu_scsi_response() /* 0x21 */;
+			auto *temp = new iscsi_pdu_scsi_response(ses) /* 0x21 */;
 			DOLOG("iscsi_pdu_scsi_cmd::get_response: sending SCSI response with %zu sense bytes\n", scsi_reply.value().sense_data.size());
 
 			if (temp->set(*this, scsi_reply.value().sense_data, { }) == false) {
@@ -434,7 +445,7 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *cons
 		}
 	}
 	else if (scsi_reply.value().type == ir_r2t) {
-		auto *temp = new iscsi_pdu_scsi_r2t() /* 0x31 */;
+		auto *temp = new iscsi_pdu_scsi_r2t(ses) /* 0x31 */;
 		DOLOG("iscsi_pdu_scsi_cmd::get_response: sending R2T with %zu sense bytes\n", scsi_reply.value().sense_data.size());
 		uint32_t TTT = s->init_r2t_session(scsi_reply.value().r2t, scsi_reply.value().fua, this);
 		DOLOG("iscsi_pdu_scsi_cmd::get_response: TTT is %08x\n", TTT);
@@ -467,7 +478,7 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *cons
 
 /*--------------------------------------------------------------------------*/
 
-iscsi_pdu_scsi_response::iscsi_pdu_scsi_response()
+iscsi_pdu_scsi_response::iscsi_pdu_scsi_response(session *const ses): iscsi_pdu_bhs(ses)
 {
 	assert(sizeof(*pdu_response) == 48);
 }
@@ -533,7 +544,7 @@ std::vector<blob_t> iscsi_pdu_scsi_response::get() const
 
 /*--------------------------------------------------------------------------*/
 
-iscsi_pdu_scsi_data_in::iscsi_pdu_scsi_data_in()
+iscsi_pdu_scsi_data_in::iscsi_pdu_scsi_data_in(session *const ses): iscsi_pdu_bhs(ses)
 {
 	assert(sizeof(*pdu_data_in) == 48);
 }
@@ -541,6 +552,7 @@ iscsi_pdu_scsi_data_in::iscsi_pdu_scsi_data_in()
 iscsi_pdu_scsi_data_in::~iscsi_pdu_scsi_data_in()
 {
 	delete [] pdu_data_in_data.first;
+	delete reply_to_copy;
 }
 
 bool iscsi_pdu_scsi_data_in::set(session *const s, const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data, const bool has_sense)
@@ -550,7 +562,7 @@ bool iscsi_pdu_scsi_data_in::set(session *const s, const iscsi_pdu_scsi_cmd & re
 	this->s = s;
 
 	auto temp = reply_to.get_raw();
-	reply_to_copy.set(s, temp.data, temp.n);
+	reply_to_copy->set(s, temp.data, temp.n);
 	delete [] temp.data;
 
 	pdu_data_in_data.second = scsi_reply_data.second;
@@ -568,12 +580,12 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get() const
 	// resize to limit
 	auto use_pdu_data_size = pdu_data_in_data.second;
 
-	if (use_pdu_data_size > size_t(reply_to_copy.get_ExpDatLen()))
-		DOLOG("iscsi_pdu_scsi_data_in: requested less (%zu) than wat is available (%zu)\n", size_t(reply_to_copy.get_ExpDatLen()), use_pdu_data_size);
+	if (use_pdu_data_size > size_t(reply_to_copy->get_ExpDatLen()))
+		DOLOG("iscsi_pdu_scsi_data_in: requested less (%zu) than wat is available (%zu)\n", size_t(reply_to_copy->get_ExpDatLen()), use_pdu_data_size);
 	else if (use_pdu_data_size == 0)
 		DOLOG("iscsi_pdu_scsi_data_in: trying to send DATA-IN without data\n");
 
-	use_pdu_data_size = std::min(use_pdu_data_size, size_t(reply_to_copy.get_ExpDatLen()));
+	use_pdu_data_size = std::min(use_pdu_data_size, size_t(reply_to_copy->get_ExpDatLen()));
 
 	auto   block_size = s->get_block_size();
 	size_t n_to_do    = (use_pdu_data_size + block_size - 1) / block_size;
@@ -591,12 +603,12 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get() const
 		pdu_data_in->datalenH   = cur_len >> 16;
 		pdu_data_in->datalenM   = cur_len >>  8;
 		pdu_data_in->datalenL   = cur_len      ;
-		memcpy(pdu_data_in->LUN, reply_to_copy.get_LUN(), sizeof pdu_data_in->LUN);
-		pdu_data_in->Itasktag   = reply_to_copy.get_Itasktag();
-		pdu_data_in->StatSN     = HTONL(reply_to_copy.get_ExpStatSN());
-		pdu_data_in->ExpCmdSN   = HTONL(reply_to_copy.get_CmdSN() + 1);  // TODO?
-		pdu_data_in->MaxCmdSN   = HTONL(reply_to_copy.get_CmdSN() + 128);  // TODO?
-		pdu_data_in->DataSN     = HTONL(s->get_inc_datasn(reply_to_copy.get_Itasktag()));
+		memcpy(pdu_data_in->LUN, reply_to_copy->get_LUN(), sizeof pdu_data_in->LUN);
+		pdu_data_in->Itasktag   = reply_to_copy->get_Itasktag();
+		pdu_data_in->StatSN     = HTONL(reply_to_copy->get_ExpStatSN());
+		pdu_data_in->ExpCmdSN   = HTONL(reply_to_copy->get_CmdSN() + 1);  // TODO?
+		pdu_data_in->MaxCmdSN   = HTONL(reply_to_copy->get_CmdSN() + 128);  // TODO?
+		pdu_data_in->DataSN     = HTONL(s->get_inc_datasn(reply_to_copy->get_Itasktag()));
 		pdu_data_in->bufferoff  = HTONL(i);
 
 		size_t out_size = sizeof(*pdu_data_in) + cur_len;
@@ -661,7 +673,7 @@ blob_t iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *const s, const iscsi_pdu
 
 /*--------------------------------------------------------------------------*/
 
-iscsi_pdu_scsi_data_out::iscsi_pdu_scsi_data_out()
+iscsi_pdu_scsi_data_out::iscsi_pdu_scsi_data_out(session *const ses): iscsi_pdu_bhs(ses)
 {
 	assert(sizeof(*pdu_data_out) == 48);
 }
@@ -669,6 +681,7 @@ iscsi_pdu_scsi_data_out::iscsi_pdu_scsi_data_out()
 iscsi_pdu_scsi_data_out::~iscsi_pdu_scsi_data_out()
 {
 	delete [] pdu_data_out_data.first;
+	delete reply_to_copy;
 }
 
 bool iscsi_pdu_scsi_data_out::set(session *const s, const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data)
@@ -693,7 +706,7 @@ std::vector<blob_t> iscsi_pdu_scsi_data_out::get() const
 
 /*--------------------------------------------------------------------------*/
 
-iscsi_pdu_nop_out::iscsi_pdu_nop_out()
+iscsi_pdu_nop_out::iscsi_pdu_nop_out(session *const ses): iscsi_pdu_bhs(ses)
 {
 	assert(sizeof(*nop_out) == 48);
 }
@@ -707,7 +720,7 @@ std::optional<iscsi_response_set> iscsi_pdu_nop_out::get_response(session *const
 	DOLOG("invoking iscsi_pdu_nop_out::get_response\n");
 
 	iscsi_response_set response;
-	auto reply_pdu = new iscsi_pdu_nop_in();
+	auto reply_pdu = new iscsi_pdu_nop_in(ses);
 	if (reply_pdu->set(*this) == false) {
 		delete reply_pdu;
 		return { };
@@ -719,7 +732,7 @@ std::optional<iscsi_response_set> iscsi_pdu_nop_out::get_response(session *const
 
 /*--------------------------------------------------------------------------*/
 
-iscsi_pdu_nop_in::iscsi_pdu_nop_in()
+iscsi_pdu_nop_in::iscsi_pdu_nop_in(session *const ses): iscsi_pdu_bhs(ses)
 {
 	assert(sizeof(*nop_in) == 48);
 }
@@ -756,7 +769,7 @@ std::vector<blob_t> iscsi_pdu_nop_in::get() const
 
 /*--------------------------------------------------------------------------*/
 
-iscsi_pdu_scsi_r2t::iscsi_pdu_scsi_r2t()
+iscsi_pdu_scsi_r2t::iscsi_pdu_scsi_r2t(session *const ses): iscsi_pdu_bhs(ses)
 {
 	assert(sizeof(*pdu_scsi_r2t) == 48);
 }
@@ -793,7 +806,7 @@ std::vector<blob_t> iscsi_pdu_scsi_r2t::get() const
 
 /*--------------------------------------------------------------------------*/
 
-iscsi_pdu_text_request::iscsi_pdu_text_request()
+iscsi_pdu_text_request::iscsi_pdu_text_request(session *const ses): iscsi_pdu_bhs(ses)
 {
 	assert(sizeof(*text_req) == 48);
 
@@ -825,7 +838,7 @@ std::vector<blob_t> iscsi_pdu_text_request::get() const
 std::optional<iscsi_response_set> iscsi_pdu_text_request::get_response(session *const s, scsi *const sd)
 {
 	iscsi_response_set response;
-	auto reply_pdu = new iscsi_pdu_text_reply();
+	auto reply_pdu = new iscsi_pdu_text_reply(ses);
 	if (reply_pdu->set(*this, sd, s) == false) {
 		delete reply_pdu;
 		return { };
@@ -837,7 +850,7 @@ std::optional<iscsi_response_set> iscsi_pdu_text_request::get_response(session *
 
 /*--------------------------------------------------------------------------*/
 
-iscsi_pdu_text_reply::iscsi_pdu_text_reply()
+iscsi_pdu_text_reply::iscsi_pdu_text_reply(session *const ses): iscsi_pdu_bhs(ses)
 {
 	assert(sizeof(*text_reply) == 48);
 }
@@ -869,7 +882,7 @@ bool iscsi_pdu_text_reply::set(const iscsi_pdu_text_request & reply_to, scsi *co
 
 	if (send_targets) {
 		const std::vector<std::string> kvs {
-			"TargetName=test",
+			"TargetName=" + ses->get_target_name(),
 			"TargetAddress=" + ses->get_local_address() + ",1",
 		};
 		auto temp = text_array_to_data(kvs);
@@ -910,7 +923,7 @@ std::vector<blob_t> iscsi_pdu_text_reply::get() const
 
 /*--------------------------------------------------------------------------*/
 
-iscsi_pdu_logout_request::iscsi_pdu_logout_request()
+iscsi_pdu_logout_request::iscsi_pdu_logout_request(session *const ses): iscsi_pdu_bhs(ses)
 {
 	assert(sizeof(*logout_req) == 48);
 
@@ -942,7 +955,7 @@ std::vector<blob_t> iscsi_pdu_logout_request::get() const
 std::optional<iscsi_response_set> iscsi_pdu_logout_request::get_response(session *const s, scsi *const sd)
 {
 	iscsi_response_set response;
-	auto reply_pdu = new iscsi_pdu_logout_reply();
+	auto reply_pdu = new iscsi_pdu_logout_reply(ses);
 	if (reply_pdu->set(*this) == false) {
 		delete reply_pdu;
 		return { };
@@ -954,7 +967,7 @@ std::optional<iscsi_response_set> iscsi_pdu_logout_request::get_response(session
 
 /*--------------------------------------------------------------------------*/
 
-iscsi_pdu_logout_reply::iscsi_pdu_logout_reply()
+iscsi_pdu_logout_reply::iscsi_pdu_logout_reply(session *const ses): iscsi_pdu_bhs(ses)
 {
 	assert(sizeof(*logout_reply) == 48);
 }
@@ -987,7 +1000,7 @@ std::vector<blob_t> iscsi_pdu_logout_reply::get() const
 
 /*--------------------------------------------------------------------------*/
 
-iscsi_pdu_taskman_request::iscsi_pdu_taskman_request()
+iscsi_pdu_taskman_request::iscsi_pdu_taskman_request(session *const ses): iscsi_pdu_bhs(ses)
 {
 	assert(sizeof(*taskman_req) == 48);
 
@@ -1019,7 +1032,7 @@ std::vector<blob_t> iscsi_pdu_taskman_request::get() const
 std::optional<iscsi_response_set> iscsi_pdu_taskman_request::get_response(session *const s, scsi *const sd)
 {
 	iscsi_response_set response;
-	auto reply_pdu = new iscsi_pdu_taskman_reply();
+	auto reply_pdu = new iscsi_pdu_taskman_reply(ses);
 	if (reply_pdu->set(*this) == false) {
 		delete reply_pdu;
 		return { };
@@ -1031,7 +1044,7 @@ std::optional<iscsi_response_set> iscsi_pdu_taskman_request::get_response(sessio
 
 /*--------------------------------------------------------------------------*/
 
-iscsi_pdu_taskman_reply::iscsi_pdu_taskman_reply()
+iscsi_pdu_taskman_reply::iscsi_pdu_taskman_reply(session *const ses): iscsi_pdu_bhs(ses)
 {
 	assert(sizeof(*taskman_reply) == 48);
 }

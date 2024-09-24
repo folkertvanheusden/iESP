@@ -4,8 +4,9 @@
 #include "session.h"
 
 
-session::session(com_client *const connected_to):
-	connected_to(connected_to)
+session::session(com_client *const connected_to, const std::string & target_name):
+	connected_to(connected_to),
+	target_name(target_name)
 {
 }
 

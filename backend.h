@@ -1,6 +1,6 @@
 #pragma once
 #include <cstdint>
-#if !(defined(Arduino) || defined(TEENSY4_1))
+#if !(defined(ARDUINO) || defined(TEENSY4_1))
 #include <array>
 #include <mutex>
 #endif
@@ -22,7 +22,7 @@ protected:
 	uint64_t n_trims       { 0 };
 	uint64_t ts_last_acces { 0 };
 
-#if !(defined(Arduino) || defined(TEENSY4_1))
+#if !(defined(ARDUINO) || defined(TEENSY4_1))
 	std::array<std::mutex, N_BACKEND_LOCKS> locks;
 #endif
 
