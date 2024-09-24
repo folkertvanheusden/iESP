@@ -233,12 +233,20 @@ void encode_lun(uint8_t *const target, const uint64_t lun_nr)
 
 uint16_t HTONS(const uint16_t x)
 {
-	return (x << 8) | (x >> 8);
+	constexpr const uint16_t e = 1;
+	if (*reinterpret_cast<const uint8_t *>(&e))  // system is little endian
+		return (x << 8) | (x >> 8);
+
+	return x;
 }
 
 uint32_t HTONL(const uint32_t x)
 {
-	return (HTONS(x) << 16) | HTONS(x >> 16);
+	constexpr const uint16_t e = 1;
+	if (*reinterpret_cast<const uint8_t *>(&e))  // system is little endian
+		return (HTONS(x) << 16) | HTONS(x >> 16);
+
+	return x;
 }
 
 uint16_t NTOHS(const uint16_t x)
