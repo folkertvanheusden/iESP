@@ -48,11 +48,11 @@ public:
 
 class snmp_data_type_stats : public snmp_data_type
 {
-private:
-	uint64_t *const counter;
-
 protected:
 	const snmp_integer::snmp_integer_type type;
+
+private:
+	uint64_t *const counter;
 
 public:
 	snmp_data_type_stats(const snmp_integer::snmp_integer_type type, uint64_t *const counter);
