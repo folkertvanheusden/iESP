@@ -44,6 +44,8 @@ const std::map<scsi::scsi_opcode, scsi_opcode_details> scsi_a3_data {
 	{ scsi::scsi_opcode::o_rep_sup_oper,	{ { 0xff, 0x1f, 0x87, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 }, 12 } },
 };
 
+#define DEFAULT_SERIAL "12345678"
+
 constexpr const uint8_t max_compare_and_write_block_count = 1;
 
 scsi::scsi(backend *const b, const int trim_level, io_stats_t *const is) : b(b), trim_level(trim_level), is(is)
@@ -59,7 +61,8 @@ scsi::scsi(backend *const b, const int trim_level, io_stats_t *const is) : b(b),
 	FILE *fh = fopen("/var/lib/dbus/machine-id", "r");
 	if (fh) {
 		char buffer[128] { 0 };
-		fgets(buffer, sizeof buffer, fh);
+		if (fgets(buffer, sizeof buffer, fh) == nullptr)
+			serial = DEFAULT_SERIAL;
 		fclose(fh);
 		char *lf = strchr(buffer, '\n');
 		if (lf)
@@ -67,7 +70,7 @@ scsi::scsi(backend *const b, const int trim_level, io_stats_t *const is) : b(b),
 		serial = buffer;
 	}
 	else {
-		serial = "12345678";
+		serial = DEFAULT_SERIAL;
 	}
 #endif
 }
@@ -140,7 +143,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				response.io.what.data.first[7] = 0;
 				memcpy(&response.io.what.data.first[8],  "vnHeusdn", 8);
 				memcpy(&response.io.what.data.first[16], "iESP", 4);
-				memcpy(&response.io.what.data.first[32], "1.0", 3);  // TODO
+				memcpy(&response.io.what.data.first[32], VERSION, 3);
 				memset(&response.io.what.data.first[36], '0', 8);
 				memcpy(&response.io.what.data.first[36], serial.c_str(), std::min(serial.size(), size_t(8)));
 				response.io.what.data.first[58] = 0x06;  // SBC-4
