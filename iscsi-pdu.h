@@ -124,7 +124,7 @@ public:
 	iscsi_bhs_opcode get_opcode()      const { return iscsi_bhs_opcode(get_bits(bhs->b1, 0, 6));                    }
 	blob_t           get_raw()         const;
 	size_t           get_data_length() const { return (bhs->datalenH << 16) | (bhs->datalenM << 8) | bhs->datalenL; }
-	std::optional<std::pair<uint8_t *, size_t> > get_data() const;
+	std::optional<std::pair<const uint8_t *, size_t> > get_data() const;
 	virtual bool     set_data(std::pair<const uint8_t *, std::size_t> data_in);
 
 	virtual std::optional<iscsi_response_set> get_response(scsi *const sd);

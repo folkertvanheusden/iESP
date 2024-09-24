@@ -203,8 +203,6 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 
 		if (session == nullptr) {
 			DOLOG("server::push_response: DATA-OUT PDU references unknown TTT (%08x)", TTT);
-			if (data.has_value())
-				delete [] data.value().first;
 			return false;
 		}
 		else if (data.has_value() && data.value().second > 0) {
@@ -215,8 +213,6 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 			assert((data.value().second % block_size) == 0);
 
 			auto rc = s->write(session->buffer_lba + offset / block_size, data.value().second / block_size, data.value().first);
-			delete [] data.value().first;
-
 			if (rc != scsi::rw_ok) {
 				errlog("server::push_response: DATA-OUT problem writing to backend (%d)", rc);
 				return false;

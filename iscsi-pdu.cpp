@@ -107,14 +107,12 @@ bool iscsi_pdu_bhs::set_data(std::pair<const uint8_t *, std::size_t> data_in)
 	return true;
 }
 
-std::optional<std::pair<uint8_t *, size_t> > iscsi_pdu_bhs::get_data() const
+std::optional<std::pair<const uint8_t *, size_t> > iscsi_pdu_bhs::get_data() const
 {
 	if (data.second == 0)
 		return { };
 
-	uint8_t *out = duplicate_new(data.first, data.second);
-
-	return { { out, data.second } };
+	return { { data.first, data.second } };
 }
 
 std::vector<blob_t> iscsi_pdu_bhs::get() const
