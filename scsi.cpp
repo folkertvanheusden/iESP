@@ -600,11 +600,11 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		const uint8_t *const pd = data.first;
 		scsi_rw_result rc = rw_ok;
 		for(size_t i=8; i<data.second; i+= 16) {
-			uint64_t lba            = get_uint64_t(&pd[i]);
+			uint64_t lba             = get_uint64_t(&pd[i]);
 			uint32_t transfer_length = get_uint32_t(&pd[i + 8]);
 
 			auto vr = validate_request(lba, transfer_length);
-			if (vr.has_value() || transfer_length > MAX_UNMAP_BLOCKS * get_block_size()) {
+			if (vr.has_value() || transfer_length > MAX_UNMAP_BLOCKS) {
 				errlog("scsi::send: UNMAP parameters invalid");
 				if (vr.has_value())
 					response.sense_data = vr.value();
