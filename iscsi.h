@@ -16,6 +16,7 @@ struct r2t_session {
 	uint32_t bytes_left;
 	uint32_t bytes_done;
 	blob_t   PDU_initiator;
+	bool     fua;
 };
 
 typedef enum

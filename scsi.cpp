@@ -355,6 +355,8 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			transfer_length = get_uint32_t(&CDB[10]);
 		}
 
+		response.fua = CDB[1] & 8;
+
 		DOLOG("scsi::send: WRITE_1%c, offset %" PRIu64 ", %u sectors\n", opcode == o_write_10 ? '0' : '6', lba, transfer_length);
 
 		auto vr = validate_request(lba, transfer_length);
@@ -386,6 +388,9 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 					response.sense_data = error_reserve_6();
 					ok = false;
 				}
+
+				if (response.fua)
+					this->sync();
 			}
 
 			if (ok) {

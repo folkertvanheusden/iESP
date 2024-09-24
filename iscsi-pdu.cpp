@@ -436,7 +436,7 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(session *cons
 	else if (scsi_reply.value().type == ir_r2t) {
 		auto *temp = new iscsi_pdu_scsi_r2t() /* 0x31 */;
 		DOLOG("iscsi_pdu_scsi_cmd::get_response: sending R2T with %zu sense bytes\n", scsi_reply.value().sense_data.size());
-		uint32_t TTT = s->init_r2t_session(scsi_reply.value().r2t, this);
+		uint32_t TTT = s->init_r2t_session(scsi_reply.value().r2t, scsi_reply.value().fua, this);
 		DOLOG("iscsi_pdu_scsi_cmd::get_response: TTT is %08x\n", TTT);
 		if (temp->set(s, *this, TTT, scsi_reply.value().r2t.bytes_done, scsi_reply.value().r2t.bytes_left) == false) {
 			ok = false;

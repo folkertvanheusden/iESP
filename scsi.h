@@ -29,6 +29,7 @@ struct scsi_response
 	iscsi_reacion_t              type;
 	std::vector<uint8_t>         sense_data;  // error data
 	bool                         data_is_meta;  // scsi command reply data
+	bool                         fua;  // force unit access
 
 	struct {
 		bool is_inline;  // if true, then next is valid

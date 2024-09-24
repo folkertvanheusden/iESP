@@ -219,6 +219,13 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 				return false;
 			}
 
+			if (session->fua) {
+				if (s->sync() == false) {
+					errlog("server::push_response: DATA-OUT problem syncing data to backend");
+					return false;
+				}
+			}
+
 			session->bytes_done += data.value().second;
 			session->bytes_left -= data.value().second;
 		}
