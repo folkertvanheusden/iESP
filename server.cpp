@@ -41,10 +41,12 @@ server::~server()
 {
 }
 
-std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, session **const s)
+std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, session **const ses)
 {
-	if (*s == nullptr)
-		*s = new session(cc);
+	if (*ses == nullptr) {
+		*ses = new session(cc);
+		(*ses)->set_block_size(s->get_block_size());
+	}
 
 	uint8_t pdu[48] { 0 };
 	if (cc->recv(pdu, sizeof pdu) == false) {
@@ -52,11 +54,11 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 		return { nullptr, false };
 	}
 
-	(*s)->add_bytes_rx(sizeof pdu);
+	(*ses)->add_bytes_rx(sizeof pdu);
 	is->iscsiSsnRxDataOctets += sizeof pdu;
 
 	iscsi_pdu_bhs bhs;
-	if (bhs.set(*s, pdu, sizeof pdu) == false) {
+	if (bhs.set(*ses, pdu, sizeof pdu) == false) {
 		errlog("server::receive_pdu: BHS validation error");
 		return { nullptr, false };
 	}
@@ -108,7 +110,7 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 	if (pdu_obj) {
 		bool ok = true;
 
-		if (pdu_obj->set(*s, pdu, sizeof pdu) == false) {
+		if (pdu_obj->set(*ses, pdu, sizeof pdu) == false) {
 			ok = false;
 			errlog("server::receive_pdu: initialize PDU: validation failed");
 		}
@@ -145,7 +147,7 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 			}
 			delete [] ahs_temp;
 
-			(*s)->add_bytes_rx(ahs_len);
+			(*ses)->add_bytes_rx(ahs_len);
 			is->iscsiSsnRxDataOctets += ahs_len;
 		}
 
@@ -165,7 +167,7 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 			}
 			delete [] data_temp;
 
-			(*s)->add_bytes_rx(padded_data_length);
+			(*ses)->add_bytes_rx(padded_data_length);
 			is->iscsiSsnRxDataOctets += padded_data_length;
 		}
 		
@@ -452,7 +454,6 @@ void server::handler()
 			auto     start       = prev_output;
 			unsigned long busy   = 0;
 			const long interval  = 5000;
-			bool     first       = true;
 
 			session *ses = nullptr;
 			bool     ok  = true;
@@ -467,11 +468,6 @@ void server::handler()
 				}
 
 				is->iscsiSsnCmdPDUs++;
-
-				if (first) {
-					first = false;
-					ses->set_block_size(s->get_block_size());
-				}
 
 				auto tx_start = get_micros();
 
