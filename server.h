@@ -24,8 +24,9 @@ private:
 	com           *const c          { nullptr };
 	iscsi_stats_t *const is         { nullptr };
 
-	std::pair<iscsi_pdu_bhs *, bool> receive_pdu  (com_client *const cc, session **const s);
-	bool                             push_response(com_client *const cc, session *const s, iscsi_pdu_bhs *const pdu, scsi *const sd);
+	std::tuple<iscsi_pdu_bhs *, bool, uint64_t>
+		receive_pdu  (com_client *const cc, session **const s);
+	bool    push_response(com_client *const cc, session *const s, iscsi_pdu_bhs *const pdu, scsi *const sd);
 
 public:
 	server(scsi *const s, com *const c, iscsi_stats_t *is);

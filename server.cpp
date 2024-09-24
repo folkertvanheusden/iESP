@@ -41,7 +41,7 @@ server::~server()
 {
 }
 
-std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, session **const ses)
+std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *const cc, session **const ses)
 {
 	if (*ses == nullptr) {
 		*ses = new session(cc);
@@ -51,8 +51,10 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 	uint8_t pdu[48] { 0 };
 	if (cc->recv(pdu, sizeof pdu) == false) {
 		errlog("server::receive_pdu: PDU receive error");
-		return { nullptr, false };
+		return { nullptr, false, 0 };
 	}
+
+	uint64_t tx_start = get_micros();
 
 	(*ses)->add_bytes_rx(sizeof pdu);
 	is->iscsiSsnRxDataOctets += sizeof pdu;
@@ -60,7 +62,7 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 	iscsi_pdu_bhs bhs;
 	if (bhs.set(*ses, pdu, sizeof pdu) == false) {
 		errlog("server::receive_pdu: BHS validation error");
-		return { nullptr, false };
+		return { nullptr, false, tx_start };
 	}
 
 #if defined(ESP32) || defined(RP2040W)
@@ -179,7 +181,7 @@ std::pair<iscsi_pdu_bhs *, bool> server::receive_pdu(com_client *const cc, sessi
 	}
 
 
-	return { pdu_obj, pdu_error };
+	return { pdu_obj, pdu_error, tx_start };
 }
 
 bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_bhs *const pdu, scsi *const sd)
@@ -460,7 +462,7 @@ void server::handler()
 
 			do {
 				auto incoming = receive_pdu(cc, &ses);
-				iscsi_pdu_bhs *pdu = incoming.first;
+				iscsi_pdu_bhs *pdu = std::get<0>(incoming);
 				if (!pdu) {
 					DOLOG("server::handler: no PDU received, aborting socket connection\n");
 					is->iscsiInstSsnFailures++;
@@ -469,9 +471,7 @@ void server::handler()
 
 				is->iscsiSsnCmdPDUs++;
 
-				auto tx_start = get_micros();
-
-				if (incoming.second) {  // something wrong with the received PDU?
+				if (std::get<1>(incoming)) {  // something wrong with the received PDU?
 					errlog("server::handler: invalid PDU received");
 
 					is->iscsiInstSsnFormatErrors++;
@@ -500,11 +500,13 @@ void server::handler()
 					delete pdu;
 				}
 
-				auto tx_end = get_micros();
+				pdu_count++;
+
+				auto tx_start = std::get<2>(incoming);
+				auto tx_end   = get_micros();
 				busy += tx_end - tx_start;
 
-				pdu_count++;
-				auto now = get_millis();
+				auto now  = get_millis();
 				auto took = now - prev_output;
 				if (took >= interval) {
 					prev_output = now;
