@@ -399,8 +399,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 					DOLOG("scsi::send: received_size == expected_size\n");
 				}
 				else {  // allow R2T packets to come in
-					response.type = ir_r2t;
-
+					response.type                = ir_r2t;
 					response.r2t.buffer_lba      = lba;
 					response.r2t.bytes_left      = (transfer_length - received_blocks) * backend_block_size;
 					response.r2t.bytes_done      = received_blocks * backend_block_size;
@@ -455,8 +454,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			response.io.what.location.lba       = lba;
 			response.io.what.location.n_sectors = transfer_length;
 			response.io.what.data.first         = nullptr;
-
-			response.data_is_meta = false;
+			response.data_is_meta               = false;
 		}
 	}
 	else if (opcode == o_sync_cache_10) {  // 0x35
@@ -539,7 +537,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		uint32_t block_count = CDB[13];
 		DOLOG("scsi::send: COMPARE AND WRITE: LBA %" PRIu64 ", transfer length: %u\n", lba, block_count);
 
-		auto block_size = b->get_block_size();
+		auto block_size         = b->get_block_size();
 		auto expected_data_size = block_size * block_count * 2;
 		if (expected_data_size != data.second)
 			DOLOG("scsi::send: COMPARE AND WRITE: data count mismatch (%zu versus %zu)\n", size_t(expected_data_size), data.second);
@@ -608,7 +606,10 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			auto vr = validate_request(lba, transfer_length);
 			if (vr.has_value() || transfer_length > MAX_UNMAP_BLOCKS * get_block_size()) {
 				errlog("scsi::send: UNMAP parameters invalid");
-				response.sense_data = vr.value();
+				if (vr.has_value())
+					response.sense_data = vr.value();
+				else
+					response.sense_data = error_out_of_range();
 				rc = rw_fail_general;
 			}
 			else {
