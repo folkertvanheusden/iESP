@@ -624,7 +624,7 @@ blob_t iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *const s, const iscsi_pdu
 	else
 		DOLOG("iscsi_pdu_scsi_data_in::gen_data_in_pdu: offset %zu + %zu != %zu\n", offset_in_data, pdu_data_in_data.n, use_pdu_data_size);
 
-	__pdu_data_in__ pdu_data_in __attribute__((packed)) { };
+	__pdu_data_in__ pdu_data_in { };
 
 	set_bits(&pdu_data_in.b1, 0, 6, o_scsi_data_in);  // 0x25
 	if (last_block) {

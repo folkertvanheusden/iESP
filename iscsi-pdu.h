@@ -332,7 +332,7 @@ public:
 		uint32_t DataSN    : 32;
 		uint32_t bufferoff : 32;
 		uint32_t ResidualCt: 32;  // residual count or reserved
-	};
+	} __attribute__((packed));
 
 	__pdu_data_in__ *pdu_data_in __attribute__((packed)) { reinterpret_cast<__pdu_data_in__ *>(pdu_bytes) };
 	std::pair<uint8_t *, size_t> pdu_data_in_data { nullptr, 0 };
