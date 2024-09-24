@@ -206,8 +206,10 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				response.io.what.data.first[7] = 0;
 #ifdef ESP32
 				response.io.what.data.first[22] = 1;  // 'MAXIMUM UNMAP LBA COUNT': 256 blocks
+#define MAX_UNMAP_BLOCKS 256
 #else
 				response.io.what.data.first[22] = 32;  // 'MAXIMUM UNMAP LBA COUNT': 8192 blocks
+#define MAX_UNMAP_BLOCKS 8192
 #endif
 				response.io.what.data.first[23] = 00;  // LSB of 'MAXIMUM UNMAP LBA COUNT'
 				response.io.what.data.first[27] = 8;  // LSB of 'MAXIMUM UNMAP BLOCK DESCRIPTOR COUNT'
@@ -597,7 +599,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			uint32_t transfer_length = get_uint32_t(&pd[i + 8]);
 
 			auto vr = validate_request(lba, transfer_length);
-			if (vr.has_value() || transfer_length > 8192) {  // sanity check TODO hardcoded limit
+			if (vr.has_value() || transfer_length > MAX_UNMAP_BLOCKS * get_block_size()) {
 				errlog("scsi::send: UNMAP parameters invalid");
 				response.sense_data = vr.value();
 				rc = rw_fail_general;
