@@ -101,6 +101,7 @@ bool iscsi_pdu_bhs::set_data(std::pair<const uint8_t *, std::size_t> data_in)
 	if (data_in.second == 0 || data_in.second > 16777215)
 		return false;
 
+	delete [] data.first;
 	data.second = data_in.second;
 	data.first  = duplicate_new(data_in.first, data_in.second);
 
@@ -856,7 +857,6 @@ bool iscsi_pdu_text_reply::set(const iscsi_pdu_text_request & reply_to, scsi *co
 	if (data.has_value() == false)
 		return false;
 	auto kvs_in = data_to_text_array(data.value().first, data.value().second);
-	delete [] data.value().first;
 	bool send_targets = false;
 
 	for(auto & kv: kvs_in) {

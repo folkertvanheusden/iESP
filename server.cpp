@@ -179,7 +179,6 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 		}
 	}
 
-
 	return { pdu_obj, pdu_error, tx_start };
 }
 
@@ -485,9 +484,9 @@ void server::handler()
 					ok = push_response(cc, ses, pdu, s);
 					if (!ok)
 						is->iscsiInstSsnFailures++;
-
-					delete pdu;
 				}
+
+				delete pdu;
 
 				pdu_count++;
 
