@@ -55,7 +55,8 @@ uint8_t backend::get_free_space_percentage()
 		uint64_t rnd = 0;
 		if (my_getrandom(&rnd, sizeof rnd) == false) {
 			DOLOG("Random generator returned an error");
-			return 0;
+			empty_count = 0;
+			break;
 		}
 		block_nr = rnd % size;
 
