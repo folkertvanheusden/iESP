@@ -1112,6 +1112,8 @@ std::optional<blob_t> generate_reject_pdu(const iscsi_pdu_bhs & about)
 
 	reject->reason = 0x09;  // (invalid PDU field)
 
-	blob_t out { reinterpret_cast<uint8_t *>(reject), sizeof *reject };
+	size_t s = sizeof *reject;
+	blob_t out { duplicate_new(reinterpret_cast<uint8_t *>(reject), s), s };
+	delete reject;
 	return out;
 }
