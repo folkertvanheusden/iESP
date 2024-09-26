@@ -557,6 +557,8 @@ public:
 	std::vector<blob_t> get() const override;
 
 	uint32_t get_TTT() const { return pdu_scsi_r2t->TTT; }
+
+	std::optional<iscsi_response_set> get_response(scsi *const sd) override { return { }; }
 };
 
 class iscsi_pdu_text_request : public iscsi_pdu_bhs  // text request 0x04
