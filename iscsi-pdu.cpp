@@ -222,7 +222,7 @@ bool iscsi_pdu_login_request::set_data(std::pair<const uint8_t *, std::size_t> d
 	}
 
 	if (target_name != ses->get_target_name()) {
-		printf("iscsi_pdu_login_request::get_response: invalid target name \"%s\", expecting \"%s\"\n", target_name.c_str(), ses->get_target_name().c_str());
+		DOLOG("iscsi_pdu_login_request::get_response: invalid target name \"%s\", expecting \"%s\"\n", target_name.c_str(), ses->get_target_name().c_str());
 		return false;
 	}
 
