@@ -18,9 +18,7 @@ void encode_lun(uint8_t *const target, const uint64_t lun_nr);
 
 uint8_t * duplicate_new(const void *const in, const size_t n);
 
-#if !defined(ARDUINO)
 std::string to_hex(const uint8_t *const in, const size_t n);
-#endif
 
 uint32_t NTOHL(const uint32_t x);
 uint16_t NTOHS(const uint16_t x);

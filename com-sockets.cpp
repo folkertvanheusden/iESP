@@ -103,7 +103,7 @@ com_client *com_sockets::accept()
 
 	int fd = ::accept(listen_fd, nullptr, nullptr);
 	if (fd == -1) {
-		errlog("com_sockets::accept: accept failed: %s", strerror(errno));
+		DOLOG(logging::ll_error, "com_sockets::accept", get_local_address(), "accept failed: %s", strerror(errno));
 		return nullptr;
 	}
 
@@ -130,7 +130,7 @@ bool com_client_sockets::send(const uint8_t *const from, const size_t n)
 {
 	auto rc = WRITE(fd, from, n);
 	if (rc == -1)
-		errlog("com_client_sockets::send: write failed with error %s", strerror(errno));
+		DOLOG(logging::ll_error, "com_client_sockets::send", get_endpoint_name(), "write failed with error %s", strerror(errno));
 	return rc == ssize_t(n);
 }
 
@@ -184,7 +184,7 @@ std::string com_client_sockets::get_endpoint_name() const
         socklen_t addr_len = sizeof addr;
 
         if (getpeername(fd, reinterpret_cast<sockaddr *>(&addr), &addr_len) == -1) {
-                errlog("get_endpoint_name: failed to find name of fd %d", fd);
+                DOLOG(logging::ll_error, "get_endpoint_name", get_endpoint_name(), "failed to find name of fd %d", fd);
 		return "?:?";
 	}
 
@@ -209,7 +209,7 @@ std::string com_client_sockets::get_local_address() const
         socklen_t addr_len = sizeof addr;
 
         if (getsockname(fd, reinterpret_cast<sockaddr *>(&addr), &addr_len) == -1) {
-                errlog("get_local_address: failed to find local name of fd %d", fd);
+                DOLOG(logging::ll_error, "get_local_address", get_endpoint_name(), "failed to find local name of fd %d", fd);
 		return "?:?";
 	}
 

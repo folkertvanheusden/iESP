@@ -63,7 +63,7 @@ void session::remove_r2t_session(const uint32_t ttt)
 	auto it = r2t_sessions.find(ttt);
 
 	if (it == r2t_sessions.end())
-		errlog("session::remove_r2t_session: unexpected TTT (%x)", ttt);
+		DOLOG(logging::ll_error, "session::remove_r2t_session", get_endpoint_name(), "unexpected TTT (%x)", ttt);
 	else {
 		DOLOG(logging::ll_debug, "session::remove_r2t_session", get_endpoint_name(), "removing TTT %x", ttt);
 		delete [] it->second->PDU_initiator.data;

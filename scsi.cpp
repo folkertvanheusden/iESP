@@ -241,7 +241,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				// TODO
 			}
 			else {
-				errlog("scsi::send: INQUIRY page code %02xh not implemented", CDB[2]);
+				DOLOG(logging::ll_warning, "scsi::send", lun_identifier, "INQUIRY page code %02xh not implemented", CDB[2]);
 				ok = false;
 			}
 		}
@@ -317,7 +317,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 
 			auto vr = validate_request(lba, transfer_length);
 			if (vr.has_value()) {
-				errlog("scsi::send: GET LBA STATUS parameters invalid");
+				DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "GET LBA STATUS parameters invalid");
 				response.sense_data = vr.value();
 			}
 			else {
@@ -333,7 +333,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			}
 		}
 		else {
-			errlog("scsi::send: GET LBA STATUS service action %02xh not implemented", service_action);
+			DOLOG(logging::ll_warning, "scsi::send", lun_identifier, "GET LBA STATUS service action %02xh not implemented", service_action);
 			response.sense_data = error_not_implemented();
 		}
 	}
@@ -363,7 +363,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 
 		auto vr = validate_request(lba, transfer_length);
 		if (vr.has_value()) {
-			errlog("scsi::send: WRITE_1x parameters invalid");
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE_1x parameters invalid");
 			response.sense_data = vr.value();
 		}
 		else if (data.first) {
@@ -381,12 +381,12 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				auto rc = write(lba, received_blocks, data.first);
 
 				if (rc == scsi_rw_result::rw_fail_rw) {
-					errlog("scsi::send: WRITE_xx, general write error");
+					DOLOG(logging::ll_error, "scsi::send", lun_identifier, "WRITE_xx, general write error");
 					response.sense_data = error_write_error();
 					ok = false;
 				}
 				else if (rc == rw_fail_locked) {
-					errlog("scsi::send: WRITE_xx, failed writing due to reservations");
+					DOLOG(logging::ll_error, "scsi::send", lun_identifier, "WRITE_xx, failed writing due to reservations");
 					response.sense_data = error_reserve_6();
 					ok = false;
 				}
@@ -416,7 +416,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				response.type = ir_r2t;  // allow R2T packets to come in
 			else {
 				response.type = ir_empty_sense;
-				DOLOG(logging::ll_warning, "scsi::send", lun_identifier, "WRITE with 0 transfer_length");
+				DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE with 0 transfer_length");
 			}
 		}
 	}
@@ -444,11 +444,11 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 
 		auto vr = validate_request(lba, transfer_length);
 		if (vr.has_value()) {
-			errlog("scsi::send: READ_1x parameters invalid");
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "READ_1x parameters invalid");
 			response.sense_data = vr.value();
 		}
 		else if (transfer_length == 0) {
-			DOLOG(logging::ll_warning, "scsi::send", lun_identifier, "READ_1x 0-read");
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "READ_1x 0-read");
 			response.type = ir_empty_sense;
 		}
 		else {
@@ -520,15 +520,15 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 					ok = true;
 				}
 				else {
-					errlog("scsi::send: 0xa3 for opcode %02x not implemented", req_operation_code);
+					DOLOG(logging::ll_warning, "scsi::send", lun_identifier, "0xa3 for opcode %02x not implemented", req_operation_code);
 				}
 			}
 			else {
-				errlog("scsi::send: 0xa3 reporting option %d not implemented", reporting_options);
+				DOLOG(logging::ll_warning, "scsi::send", lun_identifier, "0xa3 reporting option %d not implemented", reporting_options);
 			}
 		}
 		else {
-			errlog("scsi::send: 0xa3 service action %02x not implemented", service_action);
+			DOLOG(logging::ll_warning, "scsi::send", lun_identifier, "0xa3 service action %02x not implemented", service_action);
 		}
 
 		if (!ok)
@@ -546,11 +546,11 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 
 		auto vr = validate_request(lba, block_count);
 		if (vr.has_value()) {
-			DOLOG(logging::ll_warning, "scsi::send", lun_identifier, "COMPARE AND WRITE parameters invalid");
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "COMPARE AND WRITE parameters invalid");
 			response.sense_data = vr.value();
 		}
 		else if (block_count > max_compare_and_write_block_count) {
-			DOLOG(logging::ll_warning, "scsi::send", lun_identifier, "COMPARE AND WRITE: too many blocks in one go (%u versus %u)", block_count, max_compare_and_write_block_count);
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "COMPARE AND WRITE: too many blocks in one go (%u versus %u)", block_count, max_compare_and_write_block_count);
 			response.sense_data = error_compare_and_write_count();
 		}
 		else {
@@ -565,7 +565,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			else if (result == scsi_rw_result::rw_fail_rw)
 				response.sense_data = error_write_error();
 			else {
-				DOLOG(logging::ll_warning, "scsi::send", lun_identifier, "unexpected error for COMPARE AND WRITE: %d", result);
+				DOLOG(logging::ll_error, "scsi::send", lun_identifier, "unexpected error for COMPARE AND WRITE: %d", result);
 			}
 		}
 	}
@@ -602,7 +602,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 
 			auto vr = validate_request(lba, transfer_length);
 			if (vr.has_value() || transfer_length > MAX_UNMAP_BLOCKS) {
-				errlog("scsi::send: UNMAP parameters invalid");
+				DOLOG(logging::ll_debug, "scsi::send", lun_identifier,"UNMAP parameters invalid");
 				if (vr.has_value())
 					response.sense_data = vr.value();
 				else
@@ -614,7 +614,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 
 				rc = trim(lba, transfer_length);
 				if (rc != rw_ok) {
-					errlog("scsi::send: UNMAP trim failed");
+					DOLOG(logging::ll_error, "scsi::send", lun_identifier, "UNMAP trim failed");
 					break;
 				}
 			}
@@ -632,7 +632,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		}
 	}
 	else {
-		errlog("scsi::send: opcode %02xh not implemented", opcode);
+		DOLOG(logging::ll_warning, "scsi::send", lun_identifier, "opcode %02xh not implemented", opcode);
 		response.sense_data = error_not_implemented();
 	}
 
@@ -815,7 +815,7 @@ bool scsi::unlock_device()
 	std::unique_lock lck(locked_by_lock);
 
 	if (locked_by.has_value() == false) {
-		errlog("scsi::unlock_device: device was NOT locked!");
+		DOLOG(logging::ll_error, "scsi::unlock_device", "-", "device was NOT locked!");
 		return false;
 	}
 
@@ -824,7 +824,7 @@ bool scsi::unlock_device()
 		return true;
 	}
 
-	errlog("scsi::unlock_device: device is locked by someone else!");
+	DOLOG(logging::ll_error, "scsi::unlock_device", "-", "device is locked by someone else!");
 
 	return false;
 #endif

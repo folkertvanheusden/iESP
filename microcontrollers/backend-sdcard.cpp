@@ -83,7 +83,7 @@ bool backend_sdcard::reinit(const bool close_first)
 retry:
 	if (file.open(FILENAME, O_RDWR) == false)
 	{
-		errlog("Cannot access test.dat on SD-card");
+		DOLOG(logging::ll_error, "backend_sdcard::reinit", "-", "Cannot access test.dat on SD-card");
 		write_led(led_read,  LOW);
 		write_led(led_write, LOW);
 		return false;
@@ -115,7 +115,7 @@ bool backend_sdcard::sync()
 	std::lock_guard<std::mutex> lck(serial_access_lock);
 
 	if (file.sync() == false)
-		errlog("SD card backend: sync failed");
+		DOLOG(logging::ll_error, "backend_sdcard::sync", "-", "Cannot sync data to SD-card");
 
 	write_led(led_write, LOW);
 
@@ -145,7 +145,7 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 	std::lock_guard<std::mutex> lck(serial_access_lock);
 
 	if (file.seekSet(byte_address) == false) {
-		errlog("Cannot seek to position");
+		DOLOG(logging::ll_error, "backend_sdcard::write", "-", "Cannot seek to position");
 		write_led(led_write, LOW);
 		return false;
 	}
@@ -170,7 +170,7 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 	}
 ok:
 	if (!rc)
-		errlog("Cannot write (%d)", file.getError());
+		DOLOG(logging::ll_error, "backend_sdcard::write", "-", "Cannot write: %d", file.getError());
 
 	write_led(led_write, LOW);
 
@@ -185,7 +185,7 @@ bool backend_sdcard::trim(const uint64_t block_nr, const uint32_t n_blocks)
 	uint8_t *data = new uint8_t[get_block_size()];
 	for(uint32_t i=0; i<n_blocks; i++) {
 		if (write(block_nr + i, 1, data) == false) {
-			errlog("Cannot \"trim\"");
+			DOLOG(logging::ll_error, "backend_sdcard::trim", "-", "Cannot trim");
 			rc = false;
 			break;
 		}
@@ -207,7 +207,7 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 	std::lock_guard<std::mutex> lck(serial_access_lock);
 
 	if (file.seekSet(byte_address) == false) {
-		errlog("Cannot seek to position");
+		DOLOG(logging::ll_error, "backend_sdcard::read", "-", "Cannot seek to position");
 		write_led(led_read, LOW);
 		return false;
 	}
@@ -232,7 +232,7 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 	}
 ok:
 	if (!rc)
-		errlog("Cannot read (%d)", file.getError());
+		DOLOG(logging::ll_error, "backend_sdcard::read", "-", "Cannot read: %d", file.getError());
 	write_led(led_read, LOW);
 	ts_last_acces = get_micros();
 	return rc;
@@ -253,7 +253,7 @@ backend::cmpwrite_result_t backend_sdcard::cmpwrite(const uint64_t block_nr, con
 		off_t   offset = (block_nr + i) * block_size;
 
 		if (file.seekSet(offset) == false) {
-			errlog("Cannot seek to position");
+			DOLOG(logging::ll_error, "backend_sdcard::cmpwrite", "-", "Cannot seek to position (read)");
 			result = cmpwrite_result_t::CWR_READ_ERROR;
 			break;
 		}
@@ -274,7 +274,7 @@ backend::cmpwrite_result_t backend_sdcard::cmpwrite(const uint64_t block_nr, con
 
 		// write
 		if (file.seekSet(offset) == false) {
-			errlog("Cannot seek to position");
+			DOLOG(logging::ll_error, "backend_sdcard::cmpwrite", "-", "Cannot seek to position (write)");
 			result = cmpwrite_result_t::CWR_READ_ERROR;
 			break;
 		}

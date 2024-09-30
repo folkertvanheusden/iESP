@@ -37,7 +37,7 @@ bool backend_sdcard_teensy41::begin()
 	file = SD.sdfs.open(FILENAME, O_RDWR);
 	if (!file)
 	{
-		errlog("Cannot access test.dat on SD-card");
+		DOLOG(logging::ll_error, "backend_sdcard_teensy41::begin", "-", "Cannot access test.dat on SD-card");
 		write_led(led_read,  LOW);
 		write_led(led_write, LOW);
 		return false;
@@ -67,7 +67,7 @@ bool backend_sdcard_teensy41::sync()
 	n_syncs++;
 
 	if (file.sync() == false)
-		errlog("SD card backend: sync failed");
+		DOLOG(logging::ll_error, "backend_sdcard_teensy41::sync", "-", "Cannot sync data to SD-card");
 
 	write_led(led_write, LOW);
 
@@ -95,7 +95,7 @@ bool backend_sdcard_teensy41::write(const uint64_t block_nr, const uint32_t n_bl
 	uint64_t byte_address     = block_nr * iscsi_block_size;  // iSCSI to bytes
 
 	if (file.seekSet(byte_address) == false) {
-		errlog("Cannot seek to position");
+		DOLOG(logging::ll_error, "backend_sdcard_teensy41::write", "-", "Cannot seek to %" PRIu64, byte_address);
 		write_led(led_write, LOW);
 		return false;
 	}
@@ -115,7 +115,7 @@ bool backend_sdcard_teensy41::write(const uint64_t block_nr, const uint32_t n_bl
 		Serial.printf("Retrying write of %" PRIu32 " blocks starting at block number % " PRIu64 "\r\n", n_blocks, block_nr);
 	}
 	if (!rc)
-		errlog("Cannot write (%d)", file.getError());
+		DOLOG(logging::ll_error, "backend_sdcard_teensy41::write", "-", "Cannot write: %d", file.getError());
 
 	write_led(led_write, LOW);
 
@@ -131,7 +131,7 @@ bool backend_sdcard_teensy41::trim(const uint64_t block_nr, const uint32_t n_blo
 	arm_dcache_flush_delete(data, get_block_size() * n_blocks);
 	for(uint32_t i=0; i<n_blocks; i++) {
 		if (write(block_nr + i, 1, data) == false) {
-			errlog("Cannot \"trim\"");
+			DOLOG(logging::ll_error, "backend_sdcard_teensy41::trim", "-", "Cannot trim");
 			rc = false;
 			break;
 		}
@@ -151,7 +151,7 @@ bool backend_sdcard_teensy41::read(const uint64_t block_nr, const uint32_t n_blo
 	uint64_t byte_address     = block_nr * iscsi_block_size;  // iSCSI to bytes
 
 	if (file.seekSet(byte_address) == false) {
-		errlog("Cannot seek to position");
+		DOLOG(logging::ll_error, "backend_sdcard_teensy41::read", "-", "Cannot seek to %" PRIu64, byte_address);
 		write_led(led_read, LOW);
 		return false;
 	}
@@ -166,12 +166,12 @@ bool backend_sdcard_teensy41::read(const uint64_t block_nr, const uint32_t n_blo
 		rc = bytes_read == n_bytes_to_read;
 		if (rc)
 			break;
-		errlog("Read %zu bytes instead of %zu", bytes_read, n_bytes_to_read);
+		DOLOG(logging::ll_error, "backend_sdcard_teensy41::read", "-", "Read %zu bytes instead of %zu", bytes_read, n_bytes_to_read);
 		delay((i + 1) * 100); // 100ms is arbitrarily chosen
-		errlog("Retrying read of %" PRIu32 " blocks starting at block number % " PRIu64, n_blocks, block_nr);
+		DOLOG(logging::ll_error, "backend_sdcard_teensy41::read", "-", "Retrying read of %" PRIu32 " blocks starting at block number % " PRIu64, n_blocks, block_nr);
 	}
 	if (!rc)
-		errlog("Cannot read (%d)", file.getError());
+		DOLOG(logging::ll_error, "backend_sdcard_teensy41::read", "-", "Cannot read: %d", file.getError());
 	write_led(led_read, LOW);
 	ts_last_acces = get_micros();
 	return rc;
@@ -189,10 +189,10 @@ backend::cmpwrite_result_t backend_sdcard_teensy41::cmpwrite(const uint64_t bloc
 
 	// DO
 	for(uint32_t i=0; i<n_blocks; i++) {
-		off_t   offset = (block_nr + i) * block_size;
+		uint64_t  offset = (block_nr + i) * block_size;
 
 		if (file.seekSet(offset) == false) {
-			errlog("Cannot seek to position");
+			DOLOG(logging::ll_error, "backend_sdcard_teensy41::cmpwrite", "-", "Cannot seek to %" PRIu64 " (read)", offset);
 			result = cmpwrite_result_t::CWR_READ_ERROR;
 			break;
 		}
@@ -201,6 +201,7 @@ backend::cmpwrite_result_t backend_sdcard_teensy41::cmpwrite(const uint64_t bloc
 		ssize_t rc     = file.read(buffer, block_size);
 		if (rc != block_size) {
 			result = cmpwrite_result_t::CWR_READ_ERROR;
+			DOLOG(logging::ll_error, "backend_sdcard_teensy41::cmpwrite", "-", "Cannot read: %d", file.getError());
 			break;
 		}
 		bytes_read += block_size;
@@ -213,7 +214,7 @@ backend::cmpwrite_result_t backend_sdcard_teensy41::cmpwrite(const uint64_t bloc
 
 		// write
 		if (file.seekSet(offset) == false) {
-			errlog("Cannot seek to position");
+			DOLOG(logging::ll_error, "backend_sdcard_teensy41::cmpwrite", "-", "Cannot seek to %" PRIu64 " (write)", offset);
 			result = cmpwrite_result_t::CWR_READ_ERROR;
 			break;
 		}
@@ -221,6 +222,7 @@ backend::cmpwrite_result_t backend_sdcard_teensy41::cmpwrite(const uint64_t bloc
 		ssize_t rc2 = file.write(&data_write[i * block_size], block_size);
 		if (rc2 != block_size) {
 			result = cmpwrite_result_t::CWR_WRITE_ERROR;
+			DOLOG(logging::ll_error, "backend_sdcard_teensy41::cmpwrite", "-", "Cannot write: %d", file.getError());
 			break;
 		}
 

@@ -51,6 +51,52 @@ void initlogger()
 		Serial.println(F("UDP.begin(514) failed"));
 #endif
 }
+
+namespace logging {
+	void sendsyslog(const logging::log_level_t ll, const char *const component, const std::string context, const char *fmt, ...)
+	{
+		thread_local char err_log_buf[192];
+
+		int sl_nr = 3 /* "system daemons" */ * 8;  // see https://www.ietf.org/rfc/rfc3164.txt
+
+		if (ll == ll_info)
+			sl_nr += 6;
+		else if (ll == ll_warning)
+			sl_nr += 4;
+		else if (ll == ll_error)
+			sl_nr += 3;
+		else
+			sl_nr += 2;  // critical
+
+		int offset = snprintf(err_log_buf, sizeof err_log_buf, "<%d>%s|%s] ", sl_nr, component, context.c_str());
+
+		va_list ap;
+		va_start(ap, fmt);
+		(void)vsnprintf(&err_log_buf[offset], sizeof(err_log_buf) - offset, fmt, ap);
+		va_end(ap);
+
+		write_led(led_red, HIGH);
+
+		Serial.printf("%04d-%02d-%02d %02d:%02d:%02d ", ntp.year(), ntp.month(), ntp.day(), ntp.hours(), ntp.minutes(), ntp.seconds());
+		Serial.println(err_log_buf);
+
+		if (syslog_host.has_value() && is_network_up()) {
+			IPAddress ip;
+			static bool failed = false;
+			if (!ip.fromString(syslog_host.value().c_str()) && failed == false) {
+				failed = true;
+				Serial.printf("Problem converting \"%s\" to an internal representation\r\n", syslog_host.value().c_str());
+			}
+
+			if (!failed) {
+				UDP.beginPacket(ip, 514);
+				UDP.printf(err_log_buf);
+				UDP.endPacket();
+			}
+		}
+		write_led(led_red, LOW);
+	}
+}
 #else
 namespace logging {
 	static const char *logfile          = strdup("/tmp/iesp.log");
@@ -114,38 +160,5 @@ namespace logging {
 
 		fclose(lfh);
 	}
-}
-#endif
-
-#if defined(ARDUINO)
-void errlog(const char *const fmt, ...)
-{
-	int offset = snprintf(err_log_buf, sizeof err_log_buf, "%s] ", name.c_str());
-
-	va_list ap;
-	va_start(ap, fmt);
-	(void)vsnprintf(&err_log_buf[offset], sizeof(err_log_buf) - offset, fmt, ap);
-	va_end(ap);
-
-	write_led(led_red, HIGH);
-
-	Serial.printf("%04d-%02d-%02d %02d:%02d:%02d ", ntp.year(), ntp.month(), ntp.day(), ntp.hours(), ntp.minutes(), ntp.seconds());
-	Serial.println(err_log_buf);
-
-	if (syslog_host.has_value() && is_network_up()) {
-		IPAddress ip;
-		static bool failed = false;
-		if (!ip.fromString(syslog_host.value().c_str()) && failed == false) {
-			failed = true;
-			Serial.printf("Problem converting \"%s\" to an internal representation\r\n", syslog_host.value().c_str());
-		}
-
-		if (!failed) {
-			UDP.beginPacket(ip, 514);
-			UDP.printf(err_log_buf);
-			UDP.endPacket();
-		}
-	}
-	write_led(led_red, LOW);
 }
 #endif

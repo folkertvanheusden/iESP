@@ -82,7 +82,6 @@ std::vector<std::string> split(std::string in, const std::string & splitter)
 	return out;
 }
 
-#if !defined(ARDUINO)
 std::string to_hex(const uint8_t *const in, const size_t n)
 {
 	std::string out;
@@ -109,7 +108,6 @@ std::string to_hex(const uint8_t *const in, const size_t n)
 
 	return out;
 }
-#endif
 
 std::string myformat(const char *const fmt, ...)
 {
@@ -119,7 +117,8 @@ std::string myformat(const char *const fmt, ...)
         va_start(ap, fmt);
         if (vasprintf(&buffer, fmt, ap) == -1) {
                 va_end(ap);
-                errlog("myformat: failed to convert string with format \"%s\"", fmt);
+		// possible recursive error
+                DOLOG(logging::ll_error, "myformat", "-", "failed to convert string with format \"%s\"", fmt);
                 return fmt;
         }
         va_end(ap);
@@ -135,7 +134,7 @@ std::string myformat(const char *const fmt, ...)
         va_start(ap, fmt);
         if (vsnprintf(buffer, sizeof buffer, fmt, ap) == -1) {
                 va_end(ap);
-                errlog("myformat: failed to convert string with format \"%s\"", fmt);
+                DOLOG(logging::ll_error, "myformat", "-", "failed to convert string with format \"%s\"", fmt);
                 return fmt;
         }
         va_end(ap);
@@ -174,7 +173,7 @@ uint64_t get_micros()
 #else
         struct timespec tv { };
         if (clock_gettime(CLOCK_REALTIME, &tv) == -1) {
-		errlog("get_micros: clock_gettime failed (%s)", strerror(errno));
+		DOLOG(logging::ll_error, "get_micros", "-", "clock_gettime failed: %s", strerror(errno));
 		return 0;
 	}
 
@@ -189,7 +188,7 @@ uint64_t get_millis()
 #else
         struct timespec tv { };
         if (clock_gettime(CLOCK_REALTIME, &tv) == -1) {
-		errlog("get_millis: clock_gettime failed (%s)", strerror(errno));
+		DOLOG(logging::ll_error, "get_millis", "-", "clock_gettime failed: %s", strerror(errno));
 		return 0;
 	}
 

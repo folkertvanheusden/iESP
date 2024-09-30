@@ -1,5 +1,6 @@
 // (C) 2022-2024 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <cstdint>
+#include <cstring>
 #include <thread>
 #include <unistd.h>
 #if defined(ESP32)
@@ -424,7 +425,7 @@ void snmp::thread()
 			if (output_size) {
 #if !defined(ARDUINO) || defined(ESP32)
 				if (sendto(fd, packet_out, output_size, 0, reinterpret_cast<sockaddr *>(&clientaddr), len) == -1)
-					errlog("Failed to transmit SNMP reply packet\n");
+					DOLOG(logging::ll_debug, "snmp::thread", "-", "failed to transmit SNMP reply packet: %s", strerror(errno));
 #else
 				handle->beginPacket(handle->remoteIP(), handle->remotePort());
 				handle->write(packet_out, output_size);
