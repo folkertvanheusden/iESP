@@ -117,6 +117,7 @@ namespace logging {
 }
 #endif
 
+#if defined(ARDUINO)
 void errlog(const char *const fmt, ...)
 {
 	int offset = snprintf(err_log_buf, sizeof err_log_buf, "%s] ", name.c_str());
@@ -126,18 +127,6 @@ void errlog(const char *const fmt, ...)
 	(void)vsnprintf(&err_log_buf[offset], sizeof(err_log_buf) - offset, fmt, ap);
 	va_end(ap);
 
-#if !defined(ARDUINO)
-	syslog(LOG_ERR, "%s", err_log_buf);
-
-	uint64_t now   = get_millis();
-	time_t   t_now = now / 1000;
-	tm tm { };
-	localtime_r(&t_now, &tm);
-
-	printf("%04d-%02d-%02d %02d:%02d:%02d.%03d %s\n",
-                                tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, int(now % 1000000),
-				err_log_buf);
-#else
 	write_led(led_red, HIGH);
 
 	Serial.printf("%04d-%02d-%02d %02d:%02d:%02d ", ntp.year(), ntp.month(), ntp.day(), ntp.hours(), ntp.minutes(), ntp.seconds());
@@ -158,5 +147,5 @@ void errlog(const char *const fmt, ...)
 		}
 	}
 	write_led(led_red, LOW);
-#endif
 }
+#endif

@@ -2,6 +2,9 @@
 
 #if defined(ARDUINO)
 void initlogger();
+
+#include <cstdarg>
+void errlog(const char *const fmt, ...);
 #define DOLOG(ll, component, context, fmt, ...) do { } while(0)
 #else
 namespace logging {
@@ -18,10 +21,10 @@ namespace logging {
                         logging::dolog(ll, component, context, fmt, ##__VA_ARGS__);     \
         } while(0)
 }
+
+#define errlog(x, ...) DOLOG(logging::ll_error, "-", "-", x, ##__VA_ARGS__)
 #endif
 
-#include <cstdarg>
-void errlog(const char *const fmt, ...);
 #if defined(ARDUINO)
 #include <optional>
 #include <string>
