@@ -24,6 +24,7 @@ public:
 #endif
 	virtual ~com_client_arduino();
 
+	std::string get_local_address() const override;
 	std::string get_endpoint_name() const override;
 
 	bool recv(uint8_t *const to, const size_t n)         override;
@@ -46,7 +47,7 @@ public:
 
 	bool begin() override;
 
-	std::string get_local_address() override;
+	std::string get_local_address() const override;
 
 	com_client *accept() override;
 };

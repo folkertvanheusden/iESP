@@ -1,6 +1,9 @@
 #include <string>
 
-#if !defined(ARDUINO)
+#if defined(ARDUINO)
+void initlogger();
+#define DOLOG(ll, component, context, fmt, ...) do { } while(0)
+#else
 namespace logging {
         typedef enum { ll_debug, ll_info, ll_warning, ll_error } log_level_t;
 
@@ -15,8 +18,6 @@ namespace logging {
                         logging::dolog(ll, component, context, fmt, ##__VA_ARGS__);     \
         } while(0)
 }
-#else
-#define DOLOG(ll, component, context, fmt, ...) do { } while(0)
 #endif
 
 #include <cstdarg>

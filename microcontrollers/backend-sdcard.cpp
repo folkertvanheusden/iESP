@@ -28,7 +28,8 @@
 
 extern void write_led(const int gpio, const int state);
 
-backend_sdcard::backend_sdcard(const int led_read, const int led_write) :
+backend_sdcard::backend_sdcard(const int led_read, const int led_write):
+	backend("SD-card"),
 	led_read(led_read),
 	led_write(led_write)
 {

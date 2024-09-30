@@ -518,7 +518,7 @@ void setup() {
 #else
 	ETH.begin();  // ESP32-WT-ETH01, w32-eth01
 #endif
-	init_logger(name);
+	initlogger();
 
 	draw_status(8);
 
@@ -658,7 +658,7 @@ void loop()
 		}
 
 		draw_status(220);
-		server s(scsi_dev, &c, &is);
+		server s(scsi_dev, &c, &is, "test");
 		Serial.printf("Free heap space: %u\r\n", get_free_heap_space());
 		Serial.println(F("Go!"));
 		draw_status(500);

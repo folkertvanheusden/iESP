@@ -43,6 +43,15 @@ extern void write_led(const int gpio, const int state);
 extern int led_red;
 extern bool is_network_up();
 
+#if defined(ARDUINO)
+void initlogger()
+{
+#if defined(ESP32) || defined(RP2040)
+	if (UDP.begin(514) == 0)
+		Serial.println(F("UDP.begin(514) failed"));
+#endif
+}
+#else
 namespace logging {
 	static const char *logfile          = strdup("/tmp/iesp.log");
 	log_level_t        log_level_file   = ll_debug;
@@ -50,10 +59,6 @@ namespace logging {
 
 	void initlogger()
 	{
-#if defined(ESP32) || defined(RP2040)
-		if (UDP.begin(514) == 0)
-			Serial.println(F("UDP.begin(514) failed"));
-#endif
 	}
 
 	void setlog(const char *const lf, const logging::log_level_t ll_file, const logging::log_level_t ll_screen)
@@ -110,6 +115,7 @@ namespace logging {
 		fclose(lfh);
 	}
 }
+#endif
 
 void errlog(const char *const fmt, ...)
 {

@@ -74,7 +74,7 @@ com_arduino::~com_arduino()
 #endif
 }
 
-std::string com_arduino::get_local_address()
+std::string com_arduino::get_local_address() const
 {
 #if defined(TEENSY4_1)
 	auto ip = qn::Ethernet.localIP();
@@ -183,6 +183,14 @@ bool com_client_arduino::recv(uint8_t *const to, const size_t n)
 	}
 
 	return todo == 0;
+}
+
+std::string com_client_arduino::get_local_address() const
+{
+	auto ip = wc.localIP();
+	char buffer[16];
+	snprintf(buffer, sizeof buffer, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+	return buffer;
 }
 
 std::string com_client_arduino::get_endpoint_name() const
