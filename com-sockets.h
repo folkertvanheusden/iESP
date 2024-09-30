@@ -1,4 +1,5 @@
 #include "com.h"
+#include "utils.h"
 
 
 class com_client_sockets : public com_client
@@ -29,6 +30,8 @@ public:
 	virtual ~com_sockets();
 
 	bool begin() override;
+
+	std::string get_local_address() const override { return myformat("%s:%d", listen_ip.c_str(), listen_port); }
 
 	com_client *accept() override;
 };

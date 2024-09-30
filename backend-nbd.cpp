@@ -31,6 +31,7 @@
 #define NBD_ESHUTDOWN		  108  // Server is in the
 
 backend_nbd::backend_nbd(const std::string & host, const int port):
+	backend(myformat("%s:%d", host.c_str(), port)),
 	host(host), port(port),
 	fd(-1)
 {
@@ -65,19 +66,19 @@ bool backend_nbd::connect(const bool retry)
 
 		int rc = getaddrinfo(host.c_str(), port_str, &hints, &res);
 		if (rc != 0) {
-			DOLOG("Cannot resolve \"%s\"", host.c_str());
+			DOLOG(logging::ll_error, "backend_nbd::connect", identifier, "Cannot resolve \"%s\"", host.c_str());
 			sleep(1);
 			continue;
 		}
 
 		for(addrinfo *p = res; p != NULL; p = p->ai_next) {
 			if ((fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
-				DOLOG("Failed to create socket");
+				DOLOG(logging::ll_error, "backend_nbd::connect", identifier, "Failed to create socket");
 				continue;
 			}
 
 			if (::connect(fd, p->ai_addr, p->ai_addrlen) == -1) {
-				DOLOG("Failed to connect");
+				DOLOG(logging::ll_error, "backend_nbd::connect", identifier, "Failed to connect");
 				close(fd);
 				fd = -1;
 				continue;
@@ -98,7 +99,7 @@ bool backend_nbd::connect(const bool retry)
 
 		if (fd != -1) {
 			if (READ(fd, reinterpret_cast<uint8_t *>(&nbd_hello), sizeof nbd_hello) != sizeof nbd_hello) {
-				DOLOG("NBD_HELLO receive failed");
+				DOLOG(logging::ll_error, "backend_nbd::connect", identifier, "NBD_HELLO receive failed");
 				close(fd);
 				fd = -1;
 			}
@@ -107,7 +108,7 @@ bool backend_nbd::connect(const bool retry)
 		}
 
 		if (fd != -1 && memcmp(nbd_hello.magic1, "NBDMAGIC", 8) != 0) {
-			DOLOG("NBD_HELLO magic failed");
+			DOLOG(logging::ll_error, "backend_nbd::connect", identifier, "NBD_HELLO magic failed");
 			close(fd);
 			fd = -1;
 		}
@@ -115,12 +116,12 @@ bool backend_nbd::connect(const bool retry)
 		if (fd != -1) {
 			int flags = 1;
 			if (setsockopt(fd, SOL_TCP, TCP_NODELAY, (void *)&flags, sizeof(flags)) == -1)
-				DOLOG("TCP_NODELAY failed");
+				DOLOG(logging::ll_error, "backend_nbd::connect", identifier, "TCP_NODELAY failed");
 		}
 	}
 	while(fd == -1 && retry);
 
-	DOLOG("Connected to NBD server");
+	DOLOG(logging::ll_debug, "backend_nbd::connect", identifier, "Connected to NBD server");
 
 	return fd != -1;
 }
@@ -139,7 +140,7 @@ bool backend_nbd::invoke_nbd(const uint32_t command, const uint64_t offset, cons
 {
 	do {
 		if (!connect(true)) {
-			DOLOG("backend_nbd::invoke_nbd: (re-)connect");
+			DOLOG(logging::ll_debug, "backend_nbd::invoke_nbd", identifier, "(re-)connect");
 			sleep(1);
 			continue;
 		}
@@ -158,7 +159,7 @@ bool backend_nbd::invoke_nbd(const uint32_t command, const uint64_t offset, cons
 		nbd_request.length = htonl(n_bytes);
 
 		if (WRITE(fd, reinterpret_cast<const uint8_t *>(&nbd_request), sizeof nbd_request) != sizeof nbd_request) {
-			DOLOG("backend_nbd::invoke_nbd: problem sending request");
+			DOLOG(logging::ll_error, "backend_nbd::invoke_nbd", identifier, "backend_nbd::invoke_nbd: problem sending request");
 			close(fd);
 			fd = -1;
 			sleep(1);
@@ -167,7 +168,7 @@ bool backend_nbd::invoke_nbd(const uint32_t command, const uint64_t offset, cons
 
 		if (command == NBD_CMD_WRITE) {
 			if (WRITE(fd, reinterpret_cast<const uint8_t *>(data), n_bytes) != ssize_t(n_bytes)) {
-				DOLOG("backend_nbd::invoke_nbd: problem sending payload");
+				DOLOG(logging::ll_error, "backend_nbd::invoke_nbd", identifier, "backend_nbd::invoke_nbd: problem sending payload");
 				close(fd);
 				fd = -1;
 				sleep(1);
@@ -182,7 +183,7 @@ bool backend_nbd::invoke_nbd(const uint32_t command, const uint64_t offset, cons
 		} nbd_reply;
 
 		if (READ(fd, reinterpret_cast<uint8_t *>(&nbd_reply), sizeof nbd_reply) != sizeof nbd_reply) {
-			DOLOG("backend_nbd::invoke_nbd: problem receiving reply header");
+			DOLOG(logging::ll_error, "backend_nbd::invoke_nbd", identifier, "backend_nbd::invoke_nbd: problem receiving reply header");
 			close(fd);
 			fd = -1;
 			sleep(1);
@@ -190,7 +191,7 @@ bool backend_nbd::invoke_nbd(const uint32_t command, const uint64_t offset, cons
 		}
 
 		if (ntohl(nbd_reply.magic) != 0x67446698) {
-			DOLOG("backend_nbd::invoke_nbd: bad reply header %08x", nbd_reply.magic);
+			DOLOG(logging::ll_error, "backend_nbd::invoke_nbd", identifier, "backend_nbd::invoke_nbd: bad reply header %08x", nbd_reply.magic);
 			close(fd);
 			fd = -1;
 			sleep(1);
@@ -219,13 +220,13 @@ bool backend_nbd::invoke_nbd(const uint32_t command, const uint64_t offset, cons
 			else
 				error_str = myformat("%d", error);
 
-			DOLOG("backend_nbd::invoke_nbd: NBD server indicated error: %s", error_str.c_str());
+			DOLOG(logging::ll_error, "backend_nbd::invoke_nbd", identifier, "backend_nbd::invoke_nbd: NBD server indicated error: %s", error_str.c_str());
 			return false;
 		}
 
 		if (command == NBD_CMD_READ) {
 			if (READ(fd, data, n_bytes) != ssize_t(n_bytes)) {
-				DOLOG("backend_nbd::invoke_nbd: problem receiving payload");
+				DOLOG(logging::ll_error, "backend_nbd::invoke_nbd", identifier, "backend_nbd::invoke_nbd: problem receiving payload");
 				close(fd);
 				fd = -1;
 				sleep(1);
@@ -251,7 +252,7 @@ bool backend_nbd::write(const uint64_t block_nr, const uint32_t n_blocks, const 
 	auto   block_size = get_block_size();
 	off_t  offset     = block_nr * block_size;
 	size_t n_bytes    = n_blocks * block_size;
-	DOLOG("backend_nbd::write: block %" PRIu64 " (%lu), %d blocks, block size: %" PRIu64 "\n", block_nr, offset, n_blocks, block_size);
+	DOLOG(logging::ll_debug, "backend_nbd::write", identifier, "block %" PRIu64 " (%lu), %d blocks, block size: %" PRIu64, block_nr, offset, n_blocks, block_size);
 	auto   lock_list  = lock_range(block_nr, n_blocks);
 
 	bool rc = invoke_nbd(NBD_CMD_WRITE, offset, n_bytes, const_cast<uint8_t *>(data));
@@ -269,7 +270,7 @@ bool backend_nbd::trim(const uint64_t block_nr, const uint32_t n_blocks)
 	auto   block_size = get_block_size();
 	off_t  offset     = block_nr * block_size;
 	size_t n_bytes    = n_blocks * block_size;
-	DOLOG("backend_nbd::trim: block %" PRIu64 " (%lu), %d blocks, block size: %" PRIu64 "\n", block_nr, offset, n_blocks, block_size);
+	DOLOG(logging::ll_debug, "backend_nbd::trim", identifier, "block %" PRIu64 " (%lu), %d blocks, block size: %" PRIu64, block_nr, offset, n_blocks, block_size);
 	auto   lock_list  = lock_range(block_nr, n_blocks);
 
 	bool rc = invoke_nbd(NBD_CMD_TRIM, offset, n_bytes, nullptr);
@@ -288,6 +289,7 @@ bool backend_nbd::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_t
 	off_t  offset_in  = block_nr * block_size;
 	off_t  offset     = offset_in;
 	size_t n_bytes    = n_blocks * block_size;
+	DOLOG(logging::ll_debug, "backend_nbd::read", identifier, "block %" PRIu64 " (%lu), %d blocks, block size: %" PRIu64, block_nr, offset, n_blocks, block_size);
 	auto   lock_list  = lock_range(block_nr, n_blocks);
 
 	bool rc = invoke_nbd(NBD_CMD_READ, offset, n_bytes, data);
@@ -305,7 +307,7 @@ backend::cmpwrite_result_t backend_nbd::cmpwrite(const uint64_t block_nr, const 
 	auto lock_list  = lock_range(block_nr, n_blocks);
 	auto block_size = get_block_size();
 
-	DOLOG("backend_nbd::cmpwrite: block %" PRIu64 " (%lu), %d blocks (%zu), block size: %" PRIu64 "\n", block_nr, block_nr * block_size, n_blocks, n_blocks * block_size, block_size);
+	DOLOG(logging::ll_debug, "backend_nbd::cmpwrite", identifier, "block %" PRIu64 " (%lu), %d blocks (%zu), block size: %" PRIu64, block_nr, block_nr * block_size, n_blocks, n_blocks * block_size, block_size);
 
 	cmpwrite_result_t result = cmpwrite_result_t::CWR_OK;
 	uint8_t          *buffer = new uint8_t[block_size]();
@@ -316,7 +318,7 @@ backend::cmpwrite_result_t backend_nbd::cmpwrite(const uint64_t block_nr, const 
 		off_t offset = (block_nr + i) * block_size;
 		bool  rc     = invoke_nbd(NBD_CMD_READ, offset, block_size, buffer);
 		if (rc == false) {
-			DOLOG("backend_nbd::cmpwrite: ERROR reading\n");
+			DOLOG(logging::ll_error, "backend_nbd::cmpwrite", identifier, "error reading");
 			result = cmpwrite_result_t::CWR_READ_ERROR;
 			break;
 		}
@@ -324,7 +326,7 @@ backend::cmpwrite_result_t backend_nbd::cmpwrite(const uint64_t block_nr, const 
 
 		// compare
 		if (memcmp(buffer, &data_compare[i * block_size], block_size) != 0) {
-			DOLOG("backend_nbd::cmpwrite: data mismatch\n");
+			DOLOG(logging::ll_warning, "backend_nbd::cmpwrite", identifier, "data mismatch");
 			result = cmpwrite_result_t::CWR_MISMATCH;
 			break;
 		}
@@ -336,7 +338,7 @@ backend::cmpwrite_result_t backend_nbd::cmpwrite(const uint64_t block_nr, const 
 		// write
 		bool rc = invoke_nbd(NBD_CMD_WRITE, block_nr * block_size, n_blocks * block_size, const_cast<uint8_t *>(data_write));
 		if (rc == false) {
-			DOLOG("backend_nbd::cmpwrite: ERROR writing\n");
+			DOLOG(logging::ll_error, "backend_nbd::cmpwrite", identifier, "ERROR writing");
 			result = cmpwrite_result_t::CWR_WRITE_ERROR;
 		}
 		else {

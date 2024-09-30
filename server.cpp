@@ -72,7 +72,7 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 //	Serial.print(' ');
 //	Serial.println(pdu_opcode_to_string(bhs.get_opcode()).c_str());
 #else
-	DOLOG("opcode: %02xh / %s\n", bhs.get_opcode(), pdu_opcode_to_string(bhs.get_opcode()).c_str());
+	DOLOG(logging::ll_debug, "server::receive_pdu", cc->get_endpoint_name(), "opcode: %02xh / %s", bhs.get_opcode(), pdu_opcode_to_string(bhs.get_opcode()).c_str());
 #endif
 
 	iscsi_pdu_bhs *pdu_obj   = nullptr;
@@ -126,7 +126,7 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 				Serial.print(F("Initiator: "));
 				Serial.println(initiator.value().c_str());
 #else
-				DOLOG("server::receive_pdu: initiator: %s\n", initiator.value().c_str());
+				DOLOG(logging::ll_debug, "server::receive_pdu", cc->get_endpoint_name(), "initiator: %s", initiator.value().c_str());
 #endif
 			}
 		}
@@ -136,7 +136,7 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 
 		size_t ahs_len = pdu_obj->get_ahs_length();
 		if (ahs_len) {
-			DOLOG("server::receive_pdu: read %zu ahs bytes\n", ahs_len);
+			DOLOG(logging::ll_debug, "server::receive_pdu", cc->get_endpoint_name(), "read %zu ahs bytes", ahs_len);
 
 			uint8_t *ahs_temp = new uint8_t[ahs_len]();
 			if (cc->recv(ahs_temp, ahs_len) == false) {
@@ -156,7 +156,7 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 		if (data_length) {
 			size_t padded_data_length = (data_length + 3) & ~3;
 
-			DOLOG("server::receive_pdu: read %zu data bytes (%zu with padding)\n", data_length, padded_data_length);
+			DOLOG(logging::ll_debug, "server::receive_pdu", cc->get_endpoint_name(), "read %zu data bytes (%zu with padding)", data_length, padded_data_length);
 
 			uint8_t *data_temp = new uint8_t[padded_data_length]();
 			if (cc->recv(data_temp, padded_data_length) == false) {
@@ -201,12 +201,12 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 		}
 
 		if (session == nullptr) {
-			DOLOG("server::push_response: DATA-OUT PDU references unknown TTT (%08x)", TTT);
+			DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "DATA-OUT PDU references unknown TTT (%08x)", TTT);
 			return false;
 		}
 		else if (data.has_value() && data.value().second > 0) {
 			auto block_size = s->get_block_size();
-			DOLOG("server::push_response: writing %zu bytes to offset LBA %zu + offset %u => %zu (in bytes)\n", data.value().second, session->buffer_lba, offset, session->buffer_lba * block_size + offset);
+			DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "writing %zu bytes to offset LBA %zu + offset %u => %zu (in bytes)", data.value().second, session->buffer_lba, offset, session->buffer_lba * block_size + offset);
 
 			assert((offset % block_size) == 0);
 			assert((data.value().second % block_size) == 0);
@@ -228,13 +228,13 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 			session->bytes_left -= data.value().second;
 		}
 		else if (!F) {
-			DOLOG("server::push_response: DATA-OUT PDU has no data?\n");
+			DOLOG(logging::ll_warning, "server::push_response", cc->get_endpoint_name(), "DATA-OUT PDU has no data?");
 			return false;
 		}
 
 		// create response
 		if (F) {
-			DOLOG("server::push_response: end of batch\n");
+			DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "end of batch");
 
 			iscsi_pdu_scsi_cmd response(ses);
 			if (response.set(session->PDU_initiator.data, session->PDU_initiator.n) == false) {
@@ -244,12 +244,12 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 			response_set = response.get_response(sd, session->bytes_left);
 
 			if (session->bytes_left == 0) {
-				DOLOG("server::push_response: end of task\n");
+				DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "end of task");
 
 				ses->remove_r2t_session(TTT);
 			}
 			else {
-				DOLOG("server::push_response: ask for more (%u bytes left)\n", session->bytes_left);
+				DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "ask for more (%u bytes left)", session->bytes_left);
 				// send 0x31 for range
 				iscsi_pdu_scsi_cmd temp(ses);
 				temp.set(session->PDU_initiator.data, session->PDU_initiator.n);
@@ -270,7 +270,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 	}
 
 	if (response_set.has_value() == false) {
-		DOLOG("server::push_response: no response from PDU\n");
+		DOLOG(logging::ll_warning, "server::push_response", cc->get_endpoint_name(), "no response from PDU");
 		return true;
 	}
 
@@ -278,7 +278,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 		for(auto & blobs: pdu_out->get()) {
 			if (blobs.data == nullptr) {
 				ok = false;
-				DOLOG("server::push_response: PDU did not emit data bundle\n");
+				DOLOG(logging::ll_warning, "server::push_response", cc->get_endpoint_name(), "PDU did not emit data bundle");
 			}
 
 			assert((blobs.n & 3) == 0);
@@ -301,7 +301,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 	if (response_set.value().to_stream.has_value()) {
 		auto & stream_parameters = response_set.value().to_stream.value();
 
-		DOLOG("server::push_response: stream %u sectors, LBA: %zu\n", stream_parameters.n_sectors, size_t(stream_parameters.lba));
+		DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "stream %u sectors, LBA: %zu", stream_parameters.n_sectors, size_t(stream_parameters.lba));
 
 		iscsi_pdu_scsi_cmd reply_to(ses);
 		auto temp = pdu->get_raw();
@@ -310,7 +310,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 
 	        uint64_t use_pdu_data_size = uint64_t(stream_parameters.n_sectors) * s->get_block_size();
 		if (use_pdu_data_size > reply_to.get_ExpDatLen()) {
-			DOLOG("server::push_response: requested less (%u) than wat is available (%" PRIu64 ")\n", reply_to.get_ExpDatLen(), use_pdu_data_size);
+			DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "requested less (%u) than wat is available (%" PRIu64 ")", reply_to.get_ExpDatLen(), use_pdu_data_size);
 			use_pdu_data_size = reply_to.get_ExpDatLen();
 		}
 
@@ -361,7 +361,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 			auto [ out, data_pointer ] = iscsi_pdu_scsi_data_in::gen_data_in_pdu(ses, reply_to, use_pdu_data_size, offset, buffer_n);
 
 			uint64_t cur_block_nr = block_nr + stream_parameters.lba;
-			DOLOG("server::push_response: reading %u block(s) nr %zu from backend\n", n_left, size_t(cur_block_nr));
+			DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "reading %u block(s) nr %zu from backend", n_left, size_t(cur_block_nr));
 			if (buffer_n > 0) {
 				auto rc = s->read(cur_block_nr, n_left, data_pointer);
 
@@ -398,7 +398,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 		}
 	}
 
-	DOLOG(" ---\n");
+	DOLOG(logging::ll_debug, "server::push_response", "-", "---");
 
 	return ok;
 }
@@ -417,7 +417,7 @@ void server::handler()
 #if !defined(TEENSY4_1)
 		for(size_t i=0; i<threads.size();) {
 			if (*threads.at(i).second) {
-				DOLOG("server::handler: thread cleaned up\n");
+				DOLOG(logging::ll_debug, "server::handler", "-", "thread cleaned up");
 				threads.at(i).first->join();
 				delete threads.at(i).first;
 				delete threads.at(i).second;
@@ -435,9 +435,9 @@ void server::handler()
 			std::string endpoint = cc->get_endpoint_name();
 
 #if defined(ESP32) || defined(RP2040W) || defined(TEENSY4_1)
-			Serial.printf("new session with %s\r\n", endpoint.c_str());
+			Serial.printf("new session with %s\r", endpoint.c_str());
 #else
-			DOLOG("server::handler: new session with %s\n", endpoint.c_str());
+			DOLOG(logging::ll_info, "server::handler", "-", "new session with %s", endpoint.c_str());
 #endif
 			auto     prev_output = get_millis();
 			uint32_t pdu_count   = 0;
@@ -452,7 +452,7 @@ void server::handler()
 				auto incoming = receive_pdu(cc, &ses);
 				iscsi_pdu_bhs *pdu = std::get<0>(incoming);
 				if (!pdu) {
-					DOLOG("server::handler: no PDU received, aborting socket connection\n");
+					DOLOG(logging::ll_info, "server::handler", endpoint, "no PDU received, aborting socket connection");
 					is->iscsiInstSsnFailures++;
 					break;
 				}
@@ -478,7 +478,7 @@ void server::handler()
 					}
 					is->iscsiSsnTxDataOctets += reject.value().n;
 
-					DOLOG("server::handler: transmitted reject PDU\n");
+					DOLOG(logging::ll_debug, "server::handler", endpoint, "transmitted reject PDU");
 				}
 				else {
 					ok = push_response(cc, ses, pdu, s);
@@ -508,7 +508,7 @@ void server::handler()
 #if defined(ARDUINO)
 					Serial.printf("%.3f] PDU/s: %.2f, send: %.2f kB/s, recv: %.2f kB/s, written: %.2f kB/s, read: %.2f kB/s, syncs: %.2f/s, unmaps: %.2f/s, load: %.2f%%, mem: %" PRIu32 "\r\n", now / 1000., pdu_count / dtook, ses->get_bytes_tx() / dkB, ses->get_bytes_rx() / dkB, bytes_written / dkB, bytes_read / dkB, n_syncs / dtook, n_trims / dtook, busy * 0.1 / took, get_free_heap_space());
 #else
-					fprintf(stderr, "%.3f] PDU/s: %.2f, send: %.2f kB/s, recv: %.2f kB/s, written: %.2f kB/s, read: %.2f kB/s, syncs: %.2f/s, unmaps: %.2f/s, load: %.2f%%\n", now / 1000., pdu_count / dtook, ses->get_bytes_tx() / dkB, ses->get_bytes_rx() / dkB, bytes_written / dkB, bytes_read / dkB, n_syncs / dtook, n_trims / dtook, busy * 0.1 / took);
+					DOLOG(logging::ll_info, "server::handler", endpoint, "PDU/s: %.2f, send: %.2f kB/s, recv: %.2f kB/s, written: %.2f kB/s, read: %.2f kB/s, syncs: %.2f/s, unmaps: %.2f/s, load: %.2f%%", pdu_count / dtook, ses->get_bytes_tx() / dkB, ses->get_bytes_rx() / dkB, bytes_written / dkB, bytes_read / dkB, n_syncs / dtook, n_trims / dtook, busy * 0.1 / took);
 #endif
 					pdu_count  = 0;
 					ses->reset_bytes_rx();
@@ -520,7 +520,7 @@ void server::handler()
 #if defined(ESP32) || defined(RP2040W)
 			Serial.printf("session finished: %d\r\n", WiFi.status());
 #else
-			DOLOG("session finished\n");
+			DOLOG(logging::ll_debug, "server::handler", endpoint, "session finished");
 #endif
 
 			s->sync();

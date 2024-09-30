@@ -125,7 +125,7 @@ std::vector<blob_t> iscsi_pdu_bhs::get() const
 
 std::optional<iscsi_response_set> iscsi_pdu_bhs::get_response(scsi *const sd)
 {
-	DOLOG("iscsi_pdu_bhs::get_response invoked!\n");
+	DOLOG(logging::ll_debug, "iscsi_pdu_bhs::get_response", ses->get_endpoint_name(), "invoked!");
 	assert(0);
 	return { };
 }
@@ -192,7 +192,7 @@ iscsi_pdu_login_request::~iscsi_pdu_login_request()
 bool iscsi_pdu_login_request::set_data(std::pair<const uint8_t *, std::size_t> data_in)
 {
 	if (iscsi_pdu_bhs::set_data(data_in) == false) {
-		DOLOG("iscsi_pdu_login_request::set_data: iscsi_pdu_bhs::set_data returned false\n");
+		DOLOG(logging::ll_warning, "iscsi_pdu_login_request::set_data", ses->get_endpoint_name(), "iscsi_pdu_bhs::set_data returned false");
 		return false;
 	}
 
@@ -200,7 +200,7 @@ bool iscsi_pdu_login_request::set_data(std::pair<const uint8_t *, std::size_t> d
 	uint32_t    max_burst   = ~0;
 	std::string target_name;
 	for(auto & kv: kvs_in) {
-		DOLOG("iscsi_pdu_login_request::get_response: kv %s\n", kv.c_str());
+		DOLOG(logging::ll_debug, "iscsi_pdu_login_request::get_response", ses->get_endpoint_name(), "kv %s", kv.c_str());
 
 		auto parts = split(kv, "=");
 		if (parts.size() < 2)
@@ -217,12 +217,12 @@ bool iscsi_pdu_login_request::set_data(std::pair<const uint8_t *, std::size_t> d
 	}
 
 	if (max_burst < uint32_t(~0)) {
-		DOLOG("iscsi_pdu_login_request::get_response: set max-burst to %u\n", max_burst);
+		DOLOG(logging::ll_debug, "iscsi_pdu_login_request::get_response", ses->get_endpoint_name(), "set max-burst to %u", max_burst);
 		ses->set_ack_interval(max_burst);
 	}
 
 	if (target_name != ses->get_target_name()) {
-		DOLOG("iscsi_pdu_login_request::get_response: invalid target name \"%s\", expecting \"%s\"\n", target_name.c_str(), ses->get_target_name().c_str());
+		DOLOG(logging::ll_warning, "iscsi_pdu_login_request::get_response", ses->get_endpoint_name(), "invalid target name \"%s\", expecting \"%s\"", target_name.c_str(), ses->get_target_name().c_str());
 		return false;
 	}
 
@@ -266,22 +266,20 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 	bool discovery = reply_to.get_NSG() == 1;
 
 	if (discovery) {
-		DOLOG("iscsi_pdu_login_reply::set: discovery mode\n");
+		DOLOG(logging::ll_debug, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "discovery mode");
 
 		const std::vector<std::string> kvs {
 			"TargetPortalGroupTag=1",
 			"AuthMethod=None",
 		};
-#if !defined(NDEBUG)
 		for(auto & kv : kvs)
-			DOLOG("iscsi_pdu_login_reply::set: send KV \"%s\"\n", kv.c_str());
-#endif
+			DOLOG(logging::ll_debug, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "send KV \"%s\"", kv.c_str());
 		auto temp = text_array_to_data(kvs);
 		login_reply_reply_data.first  = temp.first;
 		login_reply_reply_data.second = temp.second;
 	}
 	else {
-		DOLOG("iscsi_pdu_login_reply::set: login mode\n");
+		DOLOG(logging::ll_debug, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "login mode");
 
 		const std::vector<std::string> kvs {
 			"HeaderDigest=None",
@@ -295,10 +293,8 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 			"MaxRecvDataSegmentLength=8388608",  // 8 MB, anything large
 #endif
 		};
-#if !defined(NDEBUG)
 		for(auto & kv : kvs)
-			DOLOG("iscsi_pdu_login_reply::set: send KV \"%s\"\n", kv.c_str());
-#endif
+			DOLOG(logging::ll_debug, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "send KV \"%s\"", kv.c_str());
 		auto temp = text_array_to_data(kvs);
 		login_reply_reply_data.first  = temp.first;
 		login_reply_reply_data.second = temp.second;
@@ -323,7 +319,7 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 	if (!discovery) {
 		do {
 			if (my_getrandom(&login_reply->TSIH, sizeof login_reply->TSIH) == false) {
-				DOLOG("Random generator returned an error");
+				DOLOG(logging::ll_error, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "random generator returned an error");
 				return false;
 			}
 		}
@@ -368,7 +364,7 @@ iscsi_pdu_scsi_cmd::~iscsi_pdu_scsi_cmd()
 bool iscsi_pdu_scsi_cmd::set(const uint8_t *const in, const size_t n)
 {
 	if (iscsi_pdu_bhs::set(in, n) == false) {
-		DOLOG("iscsi_pdu_scsi_cmd::set: iscsi_pdu_bhs::set returned error state\n");
+		DOLOG(logging::ll_error, "iscsi_pdu_scsi_cmd::set", ses->get_endpoint_name(), "iscsi_pdu_bhs::set returned error state");
 		return false;
 	}
 
@@ -392,7 +388,7 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(scsi *const s
 
 	auto *pdu_scsi_response = new iscsi_pdu_scsi_response(ses) /* 0x21 */;
 	if (pdu_scsi_response->set(*this, { }, { }) == false) {
-		DOLOG("iscsi_pdu_scsi_cmd::get_response: iscsi_pdu_scsi_response::set returned error\n");
+		DOLOG(logging::ll_error, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "iscsi_pdu_scsi_response::set returned error");
 
 		return { };
 	}
@@ -405,11 +401,11 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(scsi *const s
 std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(scsi *const sd)
 {
 	const uint64_t lun = get_LUN_nr();	
-	DOLOG("iscsi_pdu_scsi_cmd::get_response: working on ITT %08x for LUN %" PRIu64 "\n", get_Itasktag(), lun);
+	DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "working on ITT %08x for LUN %" PRIu64, get_Itasktag(), lun);
 
 	auto scsi_reply = sd->send(lun, get_CDB(), 16, data);
 	if (scsi_reply.has_value() == false) {
-		DOLOG("iscsi_pdu_scsi_cmd::get_response: scsi::send returned nothing\n");
+		DOLOG(logging::ll_warning, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "scsi::send returned nothing");
 		return { };
 	}
 
@@ -418,10 +414,11 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(scsi *const s
 
 	if (scsi_reply.value().io.is_inline) {
 		auto pdu_data_in = new iscsi_pdu_scsi_data_in(ses);  // 0x25
-		DOLOG("iscsi_pdu_scsi_cmd::get_response: sending SCSI DATA-IN with %zu payload bytes, is meta: %d\n", scsi_reply.value().io.what.data.second, scsi_reply.value().data_is_meta);
+		DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "sending SCSI DATA-IN with %zu payload bytes, is meta: %d", scsi_reply.value().io.what.data.second, scsi_reply.value().data_is_meta);
+
 		if (pdu_data_in->set(*this, scsi_reply.value().io.what.data, scsi_reply.value().data_is_meta) == false) {
 			ok = false;
-			DOLOG("iscsi_pdu_scsi_cmd::get_response: iscsi_pdu_scsi_data_in::set returned error state\n");
+			DOLOG(logging::ll_error, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "iscsi_pdu_scsi_data_in::set returned error state");
 		}
 		response.responses.push_back(pdu_data_in);
 		delete [] scsi_reply.value().io.what.data.first;
@@ -434,23 +431,25 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(scsi *const s
 	if (scsi_reply.value().type == ir_as_is || scsi_reply.value().type == ir_empty_sense) {
 		if (scsi_reply.value().sense_data.empty() == false || scsi_reply.value().type == ir_empty_sense) {
 			auto *temp = new iscsi_pdu_scsi_response(ses) /* 0x21 */;
-			DOLOG("iscsi_pdu_scsi_cmd::get_response: sending SCSI response with %zu sense bytes\n", scsi_reply.value().sense_data.size());
+			DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "sending SCSI response with %zu sense bytes", scsi_reply.value().sense_data.size());
 
 			if (temp->set(*this, scsi_reply.value().sense_data, { }) == false) {
 				ok = false;
-				DOLOG("iscsi_pdu_scsi_cmd::get_response: iscsi_pdu_scsi_response::set returned error\n");
+				DOLOG(logging::ll_error, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "iscsi_pdu_scsi_response::set returned error");
 			}
 			pdu_scsi_response = temp;
 		}
 	}
 	else if (scsi_reply.value().type == ir_r2t) {
 		auto *temp = new iscsi_pdu_scsi_r2t(ses) /* 0x31 */;
-		DOLOG("iscsi_pdu_scsi_cmd::get_response: sending R2T with %zu sense bytes\n", scsi_reply.value().sense_data.size());
+		DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "sending R2T with %zu sense bytes", scsi_reply.value().sense_data.size());
+
 		uint32_t TTT = ses->init_r2t_session(scsi_reply.value().r2t, scsi_reply.value().fua, this);
-		DOLOG("iscsi_pdu_scsi_cmd::get_response: TTT is %08x\n", TTT);
+		DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "TTT is %08x", TTT);
+
 		if (temp->set(*this, TTT, scsi_reply.value().r2t.bytes_done, scsi_reply.value().r2t.bytes_left) == false) {
 			ok = false;
-			DOLOG("iscsi_pdu_scsi_cmd::get_response: iscsi_pdu_scsi_response::set returned error\n");
+			DOLOG(logging::ll_error, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "iscsi_pdu_scsi_response::set returned error");
 		}
 		pdu_scsi_response = temp;
 	}
@@ -461,13 +460,13 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(scsi *const s
 		for(auto & r: response.responses)
 			delete r;
 
-		DOLOG("iscsi_pdu_scsi_cmd::get_response: failed\n");
+		DOLOG(logging::ll_error, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "failed");
 
 		return { };
 	}
 
 	if (scsi_reply.value().io.is_inline == false && scsi_reply.value().io.what.location.n_sectors > 0) {
-		DOLOG("iscsi_pdu_scsi_cmd::get_response: queing stream\n");
+		DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "queing stream");
 
 		response.to_stream = scsi_reply.value().io.what.location;
 	}
@@ -514,7 +513,8 @@ bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std
 
 	pdu_response_data.second = reply_data_plus_sense_header;
 	if (pdu_response_data.second) {
-		DOLOG("---------------- CHECK CONDITION\n");
+		DOLOG(logging::ll_warning, "iscsi_pdu_scsi_response::set", ses->get_endpoint_name(), "CHECK CONDITION");
+
 		pdu_response->status       = 0x02;  // check condition
 		pdu_response->response     = 0x01;  // target failure
 		pdu_response->ExpDataSN    = 0;
@@ -556,7 +556,7 @@ iscsi_pdu_scsi_data_in::~iscsi_pdu_scsi_data_in()
 
 bool iscsi_pdu_scsi_data_in::set(const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data, const bool has_sense)
 {
-	DOLOG("iscsi_pdu_scsi_data_in::set: with %zu payload bytes, has_sense: %d\n", scsi_reply_data.second, has_sense);
+	DOLOG(logging::ll_debug, "iscsi_pdu_scsi_data_in::set", ses->get_endpoint_name(), "%zu payload bytes, has_sense: %d", scsi_reply_data.second, has_sense);
 
 	auto temp = reply_to.get_raw();
 	reply_to_copy = new iscsi_pdu_scsi_cmd(ses);
@@ -579,9 +579,9 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get() const
 	auto use_pdu_data_size = pdu_data_in_data.second;
 
 	if (use_pdu_data_size > size_t(reply_to_copy->get_ExpDatLen()))
-		DOLOG("iscsi_pdu_scsi_data_in: requested less (%zu) than wat is available (%zu)\n", size_t(reply_to_copy->get_ExpDatLen()), use_pdu_data_size);
+		DOLOG(logging::ll_warning, "iscsi_pdu_scsi_data_in", ses->get_endpoint_name(), "requested less (%zu) than wat is available (%zu)", size_t(reply_to_copy->get_ExpDatLen()), use_pdu_data_size);
 	else if (use_pdu_data_size == 0)
-		DOLOG("iscsi_pdu_scsi_data_in: trying to send DATA-IN without data\n");
+		DOLOG(logging::ll_warning, "iscsi_pdu_scsi_data_in", ses->get_endpoint_name(), "trying to send DATA-IN without data");
 
 	use_pdu_data_size = std::min(use_pdu_data_size, size_t(reply_to_copy->get_ExpDatLen()));
 
@@ -597,7 +597,7 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get() const
 			set_bits(&pdu_data_in->b2, 0, 1, true);  // S
 		}
 		size_t cur_len = std::min(use_pdu_data_size - i, size_t(block_size));
-		DOLOG("iscsi_pdu_scsi_data_in::get: block %zu, last_block: %d, cur_len: %zu\n", count, last_block, cur_len);
+		DOLOG(logging::ll_debug, "iscsi_pdu_scsi_data_in::get", ses->get_endpoint_name(), "block %zu, last_block: %d, cur_len: %zu", count, last_block, cur_len);
 		pdu_data_in->datalenH   = cur_len >> 16;
 		pdu_data_in->datalenM   = cur_len >>  8;
 		pdu_data_in->datalenL   = cur_len      ;
@@ -620,7 +620,7 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get() const
 		v_out.push_back({ out, out_size });
 	}
 
-	DOLOG("iscsi_pdu_scsi_data_in::get: returning %zu PDUs\n", v_out.size());
+	DOLOG(logging::ll_debug, "iscsi_pdu_scsi_data_in::get", ses->get_endpoint_name(), "returning %zu PDUs", v_out.size());
 
 	return v_out;
 }
@@ -630,9 +630,9 @@ std::pair<blob_t, uint8_t *> iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *co
 	bool last_block = (offset_in_data + data_is_n_bytes) == use_pdu_data_size;
 
 	if (last_block)
-		DOLOG("iscsi_pdu_scsi_data_in::gen_data_in_pdu: last block\n");
+		DOLOG(logging::ll_debug, "iscsi_pdu_scsi_data_in::gen_data_in_pdu", ses->get_endpoint_name(), "last block");
 	else
-		DOLOG("iscsi_pdu_scsi_data_in::gen_data_in_pdu: offset %zu + %zu != %zu\n", offset_in_data, data_is_n_bytes, use_pdu_data_size);
+		DOLOG(logging::ll_warning, "iscsi_pdu_scsi_data_in::gen_data_in_pdu", ses->get_endpoint_name(), "offset %zu + %zu != %zu", offset_in_data, data_is_n_bytes, use_pdu_data_size);
 
 	__pdu_data_in__ pdu_data_in { };
 
@@ -679,7 +679,7 @@ iscsi_pdu_scsi_data_out::~iscsi_pdu_scsi_data_out()
 
 bool iscsi_pdu_scsi_data_out::set(const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data)
 {
-	DOLOG("iscsi_pdu_scsi_data_out::set: with %zu payload bytes\n", scsi_reply_data.second);
+	DOLOG(logging::ll_debug, "iscsi_pdu_scsi_data_out::set", ses->get_endpoint_name(), "with %zu payload bytes", scsi_reply_data.second);
 
 	pdu_data_out_data.second = scsi_reply_data.second;
 	if (pdu_data_out_data.second) {
@@ -708,7 +708,7 @@ iscsi_pdu_nop_out::~iscsi_pdu_nop_out()
 
 std::optional<iscsi_response_set> iscsi_pdu_nop_out::get_response(scsi *const sd)
 {
-	DOLOG("invoking iscsi_pdu_nop_out::get_response\n");
+	DOLOG(logging::ll_debug, "iscsi_pdu_nop_out::get_response", ses->get_endpoint_name(), "invoked");
 
 	iscsi_response_set response;
 	auto reply_pdu = new iscsi_pdu_nop_in(ses);
@@ -867,7 +867,7 @@ bool iscsi_pdu_text_reply::set(const iscsi_pdu_text_request & reply_to, scsi *co
 		if (parts[0] == "SendTargets")
 			send_targets = true;
 
-		DOLOG(" text request, responding to: %s\n", kv.c_str());
+		DOLOG(logging::ll_debug, "iscsi_pdu_text_reply::set", ses->get_endpoint_name(), "text request, responding to: %s", kv.c_str());
 	}
 
 	if (send_targets) {
@@ -1100,7 +1100,7 @@ std::optional<blob_t> generate_reject_pdu(const iscsi_pdu_bhs & about)
 	auto raw = about.get();
 	if (raw.empty()) {
 		delete reject;
-		DOLOG("generate_reject_pdu: can't get data from original PDU\n");
+		DOLOG(logging::ll_error, "generate_reject_pdu", "-", "can't get data from original PDU");
 		return { };
 	}
 	memcpy(reject->problem_pdu, raw[0].data, 48);

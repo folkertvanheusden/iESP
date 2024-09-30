@@ -21,7 +21,7 @@ std::atomic_bool stop { false };
 void sigh(int sig)
 {
 	stop = true;
-	DOLOG("Stop signal received\n");
+	DOLOG(logging::ll_info, "sigh", "-", "stop signal received");
 }
 
 uint64_t get_cpu_usage_us()
@@ -33,7 +33,7 @@ uint64_t get_cpu_usage_us()
 		       ru.ru_stime.tv_sec * 1000000 + ru.ru_stime.tv_usec;
 	}
 
-	DOLOG("getrusage failed\n");
+	DOLOG(logging::ll_error, "get_cpu_usage_us", "-", "getrusage failed: %s", strerror(errno));
 
 	return 0;
 }
@@ -130,7 +130,7 @@ int main(int argc, char *argv[])
 
 	char hostname[64] { 0 };
 	gethostname(hostname, sizeof hostname);
-	init_logger(hostname);
+	logging::initlogger();
 
 	io_stats_t    ios { };
 	iscsi_stats_t is  { };

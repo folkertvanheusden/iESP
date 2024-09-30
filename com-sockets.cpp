@@ -31,13 +31,13 @@ bool com_sockets::begin()
 	// setup listening socket for viewers
 	listen_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (listen_fd == -1) {
-		DOLOG("com_sockets::begin: failed to create socket: %s\n", strerror(errno));
+		DOLOG(logging::ll_error, "com_sockets::begin", get_local_address(), "failed to create socket: %s", strerror(errno));
 		return false;
 	}
 
         int reuse_addr = 1;
         if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<char *>(&reuse_addr), sizeof reuse_addr) == -1) {
-		DOLOG("com_sockets::begin: failed to set socket to reuse address: %s\n", strerror(errno));
+		DOLOG(logging::ll_error, "com_sockets::begin", get_local_address(), "failed to set socket to reuse address: %s", strerror(errno));
 		return false;
 	}
 
@@ -48,7 +48,7 @@ bool com_sockets::begin()
 #else
 	if (setsockopt(listen_fd, IPPROTO_TCP, TCP_FASTOPEN, &q_size, sizeof q_size)) {
 #endif
-		DOLOG("com_sockets::begin: failed to set \"TCP fast open\": %s\n", strerror(errno));
+		DOLOG(logging::ll_error, "com_sockets::begin", get_local_address(), "failed to set \"TCP fast open\": %s", strerror(errno));
 		return false;
 	}
 #endif
@@ -57,17 +57,17 @@ bool com_sockets::begin()
         server_addr.sin_family = AF_INET;
         server_addr.sin_port = htons(listen_port);
 	if (inet_aton(listen_ip.c_str(), &reinterpret_cast<sockaddr_in *>(&server_addr)->sin_addr) == 0) {
-		DOLOG("com_sockets::begin: failed to translate listen address (%s): %s\n", listen_ip.c_str(), strerror(errno));
+		DOLOG(logging::ll_error, "com_sockets::begin", get_local_address(), "failed to translate listen address (%s): %s", listen_ip.c_str(), strerror(errno));
 		return false;
 	}
 
         if (bind(listen_fd, reinterpret_cast<sockaddr *>(&server_addr), sizeof server_addr) == -1) {
-		DOLOG("com_sockets::begin: failed to bind socket to %s:%d: %s\n", listen_ip.c_str(), listen_port, strerror(errno));
+		DOLOG(logging::ll_error, "com_sockets::begin", get_local_address(), "failed to bind socket to %s:%d: %s", listen_ip.c_str(), listen_port, strerror(errno));
 		return false;
 	}
 
         if (listen(listen_fd, 4) == -1) {
-		DOLOG("com_sockets::begin: failed to setup listen queue: %s\n", strerror(errno));
+		DOLOG(logging::ll_error, "com_sockets::begin", get_local_address(), "failed to setup listen queue: %s", strerror(errno));
                 return false;
 	}
 
@@ -87,7 +87,7 @@ com_client *com_sockets::accept()
 	for(;;) {
 		int rc = poll(fds, 1, 100);
 		if (rc == -1) {
-			DOLOG("server::handler: poll failed with error %s\n", strerror(errno));
+			DOLOG(logging::ll_error, "com_sockets::accept", get_local_address(), "poll failed with error %s", strerror(errno));
 			return nullptr;
 		}
 
@@ -95,7 +95,7 @@ com_client *com_sockets::accept()
 			break;
 
 		if (*stop) {
-			DOLOG("server::handler: stop flag set\n");
+			DOLOG(logging::ll_info, "com_sockets::accept", get_local_address(), "stop flag set");
 			return nullptr;
 		}
 	}
@@ -118,7 +118,7 @@ com_client_sockets::com_client_sockets(const int fd, std::atomic_bool *const sto
 #else
 	if (setsockopt(fd, SOL_TCP, TCP_NODELAY, (void *)&flags, sizeof(flags)) == -1)
 #endif
-		DOLOG("server::handler: cannot disable Nagle algorithm\n");
+		DOLOG(logging::ll_error, "com_client_sockets", get_endpoint_name(), "cannot disable Nagle algorithm");
 }
 
 com_client_sockets::~com_client_sockets()
@@ -143,24 +143,24 @@ bool com_client_sockets::recv(uint8_t *const to, const size_t n)
 	while(todo > 0) {
 		int rc = poll(fds, 1, 100);
 		if (rc == -1) {
-			DOLOG("com_client_sockets::recv: poll failed with error %s\n", strerror(errno));
+			DOLOG(logging::ll_error, "com_client_sockets::recv", get_endpoint_name(), "poll failed with error %s", strerror(errno));
 			break;
 		}
 
 		if (*stop == true) {
-			DOLOG("com_client_sockets::recv: abort due external stop\n");
+			DOLOG(logging::ll_info, "com_client_sockets::recv", get_endpoint_name(), "abort due external stop");
 			break;
 		}
 
 		if (rc >= 1) {
 			int n_read = read(fd, &to[offset], todo);
 			if (n_read == -1) {
-				DOLOG("com_client_sockets::recv: read failed with error %s\n", strerror(errno));
+				DOLOG(logging::ll_error, "com_client_sockets::recv", get_endpoint_name(), "read failed with error %s", strerror(errno));
 				break;
 			}
 
 			if (n_read == 0) {
-				DOLOG("com_client_sockets::recv: socket closed\n");
+				DOLOG(logging::ll_info, "com_client_sockets::recv", get_endpoint_name(), "socket closed");
 				break;
 			}
 

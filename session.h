@@ -31,6 +31,7 @@ public:
 
 	std::string get_target_name  () const { return target_name;                       }
 	std::string get_local_address() const { return connected_to->get_local_address(); }
+	std::string get_endpoint_name() const { return connected_to->get_endpoint_name(); }
 
 	void     add_bytes_rx(const uint64_t n) { bytes_rx += n; }
 	uint64_t get_bytes_rx() const { return bytes_rx; }

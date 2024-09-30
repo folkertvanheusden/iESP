@@ -42,7 +42,7 @@ uint32_t session::init_r2t_session(const r2t_session & rs, const bool fua, iscsi
 	copy->fua           = fua;
 	copy->PDU_initiator = pdu->get_raw();
 
-	DOLOG("session::init_r2t_session: register ITT %08x\n", ITT);
+	DOLOG(logging::ll_debug, "session::init_r2t_session", get_endpoint_name(), "register ITT %08x", ITT);
 	r2t_sessions.insert({ ITT, copy });
 
 	return ITT;
@@ -50,7 +50,7 @@ uint32_t session::init_r2t_session(const r2t_session & rs, const bool fua, iscsi
 
 r2t_session *session::get_r2t_sesion(const uint32_t ttt)
 {
-	DOLOG("session::get_r2t_session: get TTT %08x\n", ttt);
+	DOLOG(logging::ll_debug, "session::get_r2t_session", get_endpoint_name(), "get TTT %08x", ttt);
 	auto it = r2t_sessions.find(ttt);
 	if (it == r2t_sessions.end())
 		return nullptr;
@@ -65,7 +65,7 @@ void session::remove_r2t_session(const uint32_t ttt)
 	if (it == r2t_sessions.end())
 		errlog("session::remove_r2t_session: unexpected TTT (%x)", ttt);
 	else {
-		DOLOG("session::remove_r2t_session: removing TTT %x\n", ttt);
+		DOLOG(logging::ll_debug, "session::remove_r2t_session", get_endpoint_name(), "removing TTT %x", ttt);
 		delete [] it->second->PDU_initiator.data;
 		delete it->second;
 		r2t_sessions.erase(it);

@@ -32,5 +32,7 @@ public:
 
 	virtual bool begin() = 0;
 
+	virtual std::string get_local_address() const = 0;
+
 	virtual com_client *accept() = 0;
 };

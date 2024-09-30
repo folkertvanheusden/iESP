@@ -6,7 +6,7 @@
 #include "utils.h"
 
 
-backend::backend()
+backend::backend(const std::string & identifier): identifier(identifier)
 {
 	ts_last_acces = get_micros();
 }
@@ -54,7 +54,7 @@ uint8_t backend::get_free_space_percentage()
 		// random in case a filesystem or whatever places static data at every xth position
 		uint64_t rnd = 0;
 		if (my_getrandom(&rnd, sizeof rnd) == false) {
-			DOLOG("Random generator returned an error");
+			DOLOG(logging::ll_error, "random", identifier, "random generator returned an error");
 			empty_count = 0;
 			break;
 		}

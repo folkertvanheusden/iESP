@@ -1,26 +1,22 @@
 #include <string>
 
-#if !defined(ARDUINO) && !defined(NDEBUG)
-#include <cstdio>
-#include <ctime>
-#include <sys/time.h>
-#define DOLOG(fmt, ...) do {                \
-		FILE *fh = fopen("log.dat", "a+"); \
-		if (fh) {                          \
-			timespec ts;          \
-			if (clock_gettime(CLOCK_REALTIME, &ts) == 0) { \
-				struct tm tm;        \
-				localtime_r(&ts.tv_sec, &tm);\
-				fprintf(fh, "%04d-%02d-%02d %02d:%02d:%02d.%06d ", \
-				tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, int(ts.tv_nsec / 1000)); \
-			} \
-			fprintf(fh, fmt, ##__VA_ARGS__); \
-			fclose(fh);         \
-		}                           \
-                printf(fmt, ##__VA_ARGS__); \
+#if !defined(ARDUINO)
+namespace logging {
+        typedef enum { ll_debug, ll_info, ll_warning, ll_error } log_level_t;
+
+        extern log_level_t log_level_file, log_level_screen;
+
+	void initlogger();
+        void setlog(const char *lf, const log_level_t ll_file, const log_level_t ll_screen);
+        void dolog (const logging::log_level_t ll, const char *const component, const std::string context, const char *fmt, ...);
+
+#define DOLOG(ll, component, context, fmt, ...) do {                            \
+                if (ll >= logging::log_level_file || ll >= logging::log_level_screen)           \
+                        logging::dolog(ll, component, context, fmt, ##__VA_ARGS__);     \
         } while(0)
+}
 #else
-#define DOLOG(fmt, ...) do { } while(0)
+#define DOLOG(ll, component, context, fmt, ...) do { } while(0)
 #endif
 
 #include <cstdarg>

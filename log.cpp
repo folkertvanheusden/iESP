@@ -1,6 +1,7 @@
 #include <cstdarg>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <optional>
 #include <string>
 #include <time.h>
@@ -17,6 +18,7 @@ namespace qn = qindesign::network;
 #include <syslog.h>
 #endif
 
+#include "log.h"
 #include "utils.h"
 
 
@@ -40,6 +42,74 @@ thread_local char err_log_buf[192];
 extern void write_led(const int gpio, const int state);
 extern int led_red;
 extern bool is_network_up();
+
+namespace logging {
+	static const char *logfile          = strdup("/tmp/iesp.log");
+	log_level_t        log_level_file   = ll_debug;
+	log_level_t        log_level_screen = ll_debug;
+
+	void initlogger()
+	{
+#if defined(ESP32) || defined(RP2040)
+		if (UDP.begin(514) == 0)
+			Serial.println(F("UDP.begin(514) failed"));
+#endif
+	}
+
+	void setlog(const char *const lf, const logging::log_level_t ll_file, const logging::log_level_t ll_screen)
+	{
+		free(const_cast<char *>(logfile));
+		logfile = strdup(lf);
+
+		log_level_file   = ll_file;
+		log_level_screen = ll_screen;
+	}
+
+	void dolog(const logging::log_level_t ll, const char *const component, const std::string context, const char *fmt, ...)
+	{
+		if (ll < log_level_file && ll < log_level_screen)
+			return;
+
+		FILE *lfh = fopen(logfile, "a+");
+		if (!lfh) {
+			fprintf(stderr, "Cannot access log-file \"%s\": %s\n", logfile, strerror(errno));
+			exit(1);
+		}
+
+		uint64_t now   = get_micros();
+		time_t   t_now = now / 1000000;
+
+		tm tm { };
+		if (!localtime_r(&t_now, &tm))
+			fprintf(stderr, "localtime_r: %s\n", strerror(errno));
+
+		char *ts_str = nullptr;
+
+		const char *const ll_names[] = { "debug  ", "info   ", "warning", "error  " };
+
+		asprintf(&ts_str, "%04d-%02d-%02d %02d:%02d:%02d.%06d %s %s %s ",
+				tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, int(now % 1000000),
+				ll_names[ll], component, context.c_str());
+
+		char *str = nullptr;
+
+		va_list ap;
+		va_start(ap, fmt);
+		(void)vasprintf(&str, fmt, ap);
+		va_end(ap);
+
+		if (ll >= log_level_file)
+			fprintf(lfh, "%s%s\n", ts_str, str);
+
+		if (ll >= log_level_screen)
+			printf("%s%s\n", ts_str, str);
+
+		free(str);
+		free(ts_str);
+
+		fclose(lfh);
+	}
+}
 
 void errlog(const char *const fmt, ...)
 {
@@ -82,15 +152,5 @@ void errlog(const char *const fmt, ...)
 		}
 	}
 	write_led(led_red, LOW);
-#endif
-}
-
-void init_logger(const std::string & new_name)
-{
-	name = new_name;
-
-#if defined(ESP32) || defined(RP2040)
-	if (UDP.begin(514) == 0)
-		Serial.println(F("UDP.begin(514) failed"));
 #endif
 }

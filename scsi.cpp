@@ -84,45 +84,47 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 	assert(size >= 16);
 
 	scsi_opcode opcode = scsi_opcode(CDB[0]);
-	DOLOG("SCSI opcode: %02xh, CDB size: %zu\n", opcode, size);
-	DOLOG("CDB contents: %s\n", to_hex(CDB, size).c_str());
+
+	std::string lun_identifier = myformat("LUN:%" PRIu64, lun);
+	DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "SCSI opcode: %02xh, CDB size: %zu", opcode, size);
+	DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "CDB contents: %s", to_hex(CDB, size).c_str());
 
 	scsi_response response { };
 	response.type         = ir_as_is;
 	response.data_is_meta = true;
 
 	if (opcode == o_test_unit_ready) {
-		DOLOG("scsi::send: TEST UNIT READY\n");
+		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "TEST UNIT READY");
 		response.type = ir_empty_sense;
 	}
 	else if (opcode == o_mode_sense_6) {  // 0x1a
-		DOLOG("scsi::send: MODE SENSE 6\n");
+		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "MODE SENSE 6");
 		if (CDB[1] & 8)
-			DOLOG(" MODE SENSE 6: DBD\n");
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "MODE SENSE 6: DBD");
 		uint8_t page_control = CDB[2] >> 6;
 		const char *const pagecodes[] { "current values", "changeable values", "default values", "saved values " };
-		DOLOG(" MODE SENSE 6: PAGE CONTROL %s (%d)\n", pagecodes[page_control], page_control);
+		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "MODE SENSE 6: PAGE CONTROL %s (%d)", pagecodes[page_control], page_control);
 		uint8_t page_code = CDB[2] & 0x3f;
-		DOLOG(" MODE SENSE 6: PAGE CODE %02xh\n", page_code);
-		DOLOG(" MODE SENSE 6: SUBPAGE CODE %02xh\n", CDB[3]);
-		DOLOG(" MODE SENSE 6: AllocationLength: %d\n", CDB[4]);
-		DOLOG(" MODE SENSE 6: Control: %02xh\n", CDB[5]);
+		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "MODE SENSE 6: PAGE CODE %02xh", page_code);
+		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "MODE SENSE 6: SUBPAGE CODE %02xh", CDB[3]);
+		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "MODE SENSE 6: AllocationLength: %d", CDB[4]);
+		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "MODE SENSE 6: Control: %02xh", CDB[5]);
 		response.io.is_inline          = true;
 		response.io.what.data.second   = 4;
 		response.io.what.data.first    = new uint8_t[response.io.what.data.second]();
 		response.io.what.data.first[0] = response.io.what.data.second - 1;  // length
 	}
 	else if (opcode == o_inquiry) {  // 0x12
-		DOLOG("scsi::send: INQUIRY\n");
+		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "INQUIRY");
 		if (CDB[1] & 1) {
-			DOLOG(" INQUIRY: EVPD\n");
-			DOLOG(" INQUIRY: PageCode: %02xh\n", CDB[2]);
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "INQUIRY: EVPD");
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "INQUIRY: PageCode: %02xh", CDB[2]);
 		}
 		if (CDB[1] & 2)
-			DOLOG(" INQUIRY: CmdDt\n");
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "INQUIRY: CmdDt");
 		uint16_t allocation_length = (CDB[3] << 8) | CDB[4];
-		DOLOG(" INQUIRY: AllocationLength: %d\n", allocation_length);
-		DOLOG(" INQUIRY: ControlByte: %02xh\n", CDB[5]);
+		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "INQUIRY: AllocationLength: %d", allocation_length);
+		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "INQUIRY: ControlByte: %02xh", CDB[5]);
 		bool ok = true;
 		uint8_t device_type = lun == 0 ? 0x0c :  // storage array controller
 						 0x00;  // direct access block device
@@ -258,7 +260,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		response.io.what.data.second = std::min(response.io.what.data.second, size_t(allocation_length));
 	}
 	else if (opcode == o_read_capacity_10) {
-		DOLOG("scsi::send: READ_CAPACITY\n");
+		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "READ_CAPACITY");
 		response.io.is_inline          = true;
 		response.io.what.data.second = 8;
 		response.io.what.data.first = new uint8_t[response.io.what.data.second]();
@@ -275,10 +277,10 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 	}
 	else if (opcode == o_get_lba_status) {
 		uint8_t service_action = CDB[1] & 31;
-		DOLOG("  ServiceAction: %02xh\n", service_action);
+		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "ServiceAction: %02xh", service_action);
 
 		if (service_action == 0x10) {  // READ CAPACITY
-			DOLOG("scsi::send: READ_CAPACITY(16)\n");
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "READ_CAPACITY(16)");
 
 			uint32_t allocation_length = get_uint32_t(&CDB[10]);
 
@@ -308,7 +310,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			}
 		}
 		else if (service_action == 0x12) {  // GET LBA STATUS
-			DOLOG("scsi::send: GET_LBA_STATUS\n");
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "GET_LBA_STATUS");
 
 			uint64_t lba             = get_uint64_t(&CDB[2]);
 			uint32_t transfer_length = get_uint32_t(&CDB[10]);
@@ -357,7 +359,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 
 		response.fua = CDB[1] & 8;
 
-		DOLOG("scsi::send: WRITE_1%c, offset %" PRIu64 ", %u sectors\n", opcode == o_write_10 ? '0' : '6', lba, transfer_length);
+		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE_1%c, offset %" PRIu64 ", %u sectors", opcode == o_write_10 ? '0' : '6', lba, transfer_length);
 
 		auto vr = validate_request(lba, transfer_length);
 		if (vr.has_value()) {
@@ -365,14 +367,14 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			response.sense_data = vr.value();
 		}
 		else if (data.first) {
-			DOLOG("scsi::send: write command includes data (%zu bytes)\n", data.second);
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "write command includes data (%zu bytes)", data.second);
 
 			auto   backend_block_size = b->get_block_size();
 			size_t expected_size      = transfer_length * backend_block_size;
 			size_t received_size      = data.second;
 			size_t received_blocks    = received_size / backend_block_size;
 			if (received_blocks)
-				DOLOG("scsi::send: WRITE_xx to LBA %" PRIu64 " is %zu in bytes, %zu bytes\n", lba, lba * backend_block_size, received_size);
+				DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE_xx to LBA %" PRIu64 " is %zu in bytes, %zu bytes", lba, lba * backend_block_size, received_size);
 
 			bool ok = true;
 			if (received_blocks > 0) {
@@ -396,25 +398,25 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			if (ok) {
 				if (received_size == expected_size) {
 					response.type = ir_empty_sense;
-					DOLOG("scsi::send: received_size == expected_size\n");
+					DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "received_size == expected_size");
 				}
 				else {  // allow R2T packets to come in
 					response.type                = ir_r2t;
 					response.r2t.buffer_lba      = lba;
 					response.r2t.bytes_left      = (transfer_length - received_blocks) * backend_block_size;
 					response.r2t.bytes_done      = received_blocks * backend_block_size;
-					DOLOG("scsi::send: starting R2T with %u bytes left (LBA: %" PRIu64 ", offset %u)\n", response.r2t.bytes_left, response.r2t.buffer_lba, response.r2t.bytes_done);
+					DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "starting R2T with %u bytes left (LBA: %" PRIu64 ", offset %u)", response.r2t.bytes_left, response.r2t.buffer_lba, response.r2t.bytes_done);
 				}
 			}
 		}
 		else {
-			DOLOG("scsi::send: WRITE without data\n");
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE without data");
 
 			if (transfer_length)
 				response.type = ir_r2t;  // allow R2T packets to come in
 			else {
 				response.type = ir_empty_sense;
-				DOLOG("scsi::send: WRITE with 0 transfer_length\n");
+				DOLOG(logging::ll_warning, "scsi::send", lun_identifier, "WRITE with 0 transfer_length");
 			}
 		}
 	}
@@ -425,19 +427,19 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		if (opcode == o_read_16) {
 			lba             = get_uint64_t(&CDB[2]);
 			transfer_length = get_uint32_t(&CDB[10]);
-			DOLOG("scsi::send: READ_16, LBA %" PRIu64 ", %u sectors\n", lba, transfer_length);
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "READ_16, LBA %" PRIu64 ", %u sectors", lba, transfer_length);
 		}
 		else if (opcode == o_read_10) {
 			lba             = get_uint32_t(&CDB[2]);
 			transfer_length =  (CDB[7] << 8) | CDB[8];
-			DOLOG("scsi::send: READ_10, LBA %" PRIu64 ", %u sectors\n", lba, transfer_length);
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "READ_10, LBA %" PRIu64 ", %u sectors", lba, transfer_length);
 		}
 		else {
 			lba             = ((CDB[1] & 31) << 16) | (CDB[2] << 8) | CDB[3];
 			transfer_length = CDB[4];
 			if (transfer_length == 0)
 				transfer_length = 256;
-			DOLOG("scsi::send: READ_6, LBA %" PRIu64 ", %u sectors\n", lba, transfer_length);
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "READ_6, LBA %" PRIu64 ", %u sectors", lba, transfer_length);
 		}
 
 		auto vr = validate_request(lba, transfer_length);
@@ -446,7 +448,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			response.sense_data = vr.value();
 		}
 		else if (transfer_length == 0) {
-			DOLOG("scsi::send: READ_1x 0-read\n");
+			DOLOG(logging::ll_warning, "scsi::send", lun_identifier, "READ_1x 0-read");
 			response.type = ir_empty_sense;
 		}
 		else {
@@ -458,14 +460,14 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		}
 	}
 	else if (opcode == o_sync_cache_10) {  // 0x35
-		DOLOG("scsi::send: SYNC CACHE 10\n");
+		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "SYNC CACHE 10");
 
 		this->sync();
 
 		response.type = ir_empty_sense;
 	}
 	else if (opcode == o_report_luns) {  // 0xa0
-		DOLOG("scsi::send: REPORT_LUNS, report: %02xh\n", CDB[2]);
+		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "REPORT_LUNS, report: %02xh", CDB[2]);
 
 		response.io.is_inline           = true;
 		response.io.what.data.second    = 16;
@@ -478,7 +480,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		uint8_t service_action     = CDB[1] & 31;
 		uint8_t reporting_options  = CDB[2] & 7;
 		uint8_t req_operation_code = CDB[3];
-		DOLOG("scsi::send: REPORT SUPPORTED OPERATION CODES, service action %02xh, requested operation code %02xh, reporting options: %xh\n", service_action, req_operation_code, reporting_options);
+		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "REPORT SUPPORTED OPERATION CODES, service action %02xh, requested operation code %02xh, reporting options: %xh", service_action, req_operation_code, reporting_options);
 		bool ok = false;
 
 		if (service_action == 0x0c) {
@@ -535,20 +537,20 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 	else if (opcode == o_compare_and_write) {  // 0x89
 		uint64_t lba         = get_uint64_t(&CDB[2]);
 		uint32_t block_count = CDB[13];
-		DOLOG("scsi::send: COMPARE AND WRITE: LBA %" PRIu64 ", transfer length: %u\n", lba, block_count);
+		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "COMPARE AND WRITE: LBA %" PRIu64 ", transfer length: %u", lba, block_count);
 
 		auto block_size         = b->get_block_size();
 		auto expected_data_size = block_size * block_count * 2;
 		if (expected_data_size != data.second)
-			DOLOG("scsi::send: COMPARE AND WRITE: data count mismatch (%zu versus %zu)\n", size_t(expected_data_size), data.second);
+			DOLOG(logging::ll_warning, "scsi::send", lun_identifier, "COMPARE AND WRITE: data count mismatch (%zu versus %zu)", size_t(expected_data_size), data.second);
 
 		auto vr = validate_request(lba, block_count);
 		if (vr.has_value()) {
-			DOLOG("scsi::send: COMPARE AND WRITE parameters invalid\n");
+			DOLOG(logging::ll_warning, "scsi::send", lun_identifier, "COMPARE AND WRITE parameters invalid");
 			response.sense_data = vr.value();
 		}
 		else if (block_count > max_compare_and_write_block_count) {
-			DOLOG("scsi::send: COMPARE AND WRITE: too many blocks in one go (%u versus %u)\n", block_count, max_compare_and_write_block_count);
+			DOLOG(logging::ll_warning, "scsi::send", lun_identifier, "COMPARE AND WRITE: too many blocks in one go (%u versus %u)", block_count, max_compare_and_write_block_count);
 			response.sense_data = error_compare_and_write_count();
 		}
 		else {
@@ -563,39 +565,34 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			else if (result == scsi_rw_result::rw_fail_rw)
 				response.sense_data = error_write_error();
 			else {
-				DOLOG("scsi::send: unexpected error for COMPARE AND WRITE: %d\n", result);
+				DOLOG(logging::ll_warning, "scsi::send", lun_identifier, "unexpected error for COMPARE AND WRITE: %d", result);
 			}
 		}
 	}
 	else if (opcode == o_prefetch_10 || opcode == o_prefetch_16) {  // 0x34 & 0x90
-		DOLOG("scsi::send: PREFETCH 10/16\n");
+		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "PREFETCH 10/16");
 		response.type = ir_empty_sense;
 	}
 	else if (opcode == o_reserve_6) {
-		DOLOG("scsi::send: RESERVE 6\n");
+		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "RESERVE 6");
 		if (reserve_device() == l_locked)
 			response.type = ir_empty_sense;
 		else
 			response.sense_data = error_reserve_6();
 	}
 	else if (opcode == o_release_6) {
-		DOLOG("scsi::send: RELEASE 6\n");
+		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "RELEASE 6");
 		if (unlock_device())
 			response.type = ir_empty_sense;
 		else
 			response.sense_data = error_reserve_6();
 	}
 	else if (opcode == o_unmap) {
-		DOLOG("scsi::send: UNMAP\n");
+		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "UNMAP");
 #ifndef NDEBUG
-		DOLOG("GREP unmap CDB size %zu\n", size);
-		DOLOG("GREP unmap data size %zu\n", data.second);
 		uint16_t parameter_list_length = (CDB[7] << 8) | CDB[8];
-		DOLOG("GREP parameter_list_length %u\n", parameter_list_length);
 		uint16_t unmap_data_length = (CDB[10 + 0] << 8) | CDB[10 + 1];
-		DOLOG("GREP unmap_data_length %u\n", unmap_data_length);
 		uint16_t unmap_block_descriptor_data_length = (CDB[10 + 2] << 8) | CDB[10 + 3];
-		DOLOG("GREP unmap_block_descriptor_data_length %u\n", unmap_block_descriptor_data_length);
 #endif
 		const uint8_t *const pd = data.first;
 		scsi_rw_result rc = rw_ok;
@@ -613,7 +610,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				rc = rw_fail_general;
 			}
 			else {
-				DOLOG("scsi::send: UNMAP trim LBA %" PRIu64 ", %u blocks\n", lba, transfer_length);
+				DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "UNMAP trim LBA %" PRIu64 ", %u blocks", lba, transfer_length);
 
 				rc = trim(lba, transfer_length);
 				if (rc != rw_ok) {
@@ -639,7 +636,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		response.sense_data = error_not_implemented();
 	}
 
-	DOLOG("-> returning %zu bytes of sense data\n", response.sense_data.size());
+	DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "returning %zu bytes of sense data", response.sense_data.size());
 
 	return response;
 }

@@ -5,6 +5,7 @@
 #include <mutex>
 #endif
 #include <set>
+#include <string>
 
 
 #if defined(ESP32)
@@ -16,6 +17,8 @@
 class backend
 {
 protected:
+	const std::string identifier;
+
 	uint64_t bytes_read    { 0 };
 	uint64_t bytes_written { 0 };
 	uint64_t n_syncs       { 0 };
@@ -30,7 +33,7 @@ protected:
 	void             unlock_range(const std::set<size_t> & locked_locks);
 
 public:
-	backend();
+	backend(const std::string & identifier);
 	virtual ~backend();
 
 	virtual bool begin() = 0;
