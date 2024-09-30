@@ -184,7 +184,7 @@ std::string com_client_sockets::get_endpoint_name() const
         socklen_t addr_len = sizeof addr;
 
         if (getpeername(fd, reinterpret_cast<sockaddr *>(&addr), &addr_len) == -1) {
-                DOLOG(logging::ll_error, "get_endpoint_name", get_endpoint_name(), "failed to find name of fd %d", fd);
+                DOLOG(logging::ll_error, "get_endpoint_name", "-", "failed to find name of fd %d", fd);
 		return "?:?";
 	}
 
