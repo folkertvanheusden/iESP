@@ -575,7 +575,29 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 	}
 	else if (opcode == o_prefetch_10 || opcode == o_prefetch_16) {  // 0x34 & 0x90
 		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "PREFETCH 10/16");
-		response.type = ir_empty_sense;
+
+		uint64_t lba             = 0;
+		uint32_t transfer_length = 0;
+
+		if (opcode == o_prefetch_16) {
+			lba             = get_uint64_t(&CDB[2]);  // TODO not checked in the documentation
+			transfer_length = get_uint32_t(&CDB[10]);
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "PREFETCH_16, LBA %" PRIu64 ", %u sectors", lba, transfer_length);
+		}
+		else if (opcode == o_prefetch_10) {
+			lba             = get_uint32_t(&CDB[2]);
+			transfer_length =  (CDB[7] << 8) | CDB[8];
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "PREFETCH_10, LBA %" PRIu64 ", %u sectors", lba, transfer_length);
+		}
+
+		auto vr = validate_request(lba, transfer_length);
+		if (vr.has_value()) {
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "PREFETCH parameters invalid");
+			response.sense_data = vr.value();
+		}
+		else {
+			response.type = ir_empty_sense;
+		}
 	}
 	else if (opcode == o_reserve_6) {
 		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "RESERVE 6");
