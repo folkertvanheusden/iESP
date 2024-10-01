@@ -319,7 +319,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			uint64_t lba             = get_uint64_t(&CDB[2]);
 			uint32_t transfer_length = get_uint32_t(&CDB[10]);
 
-			auto vr = validate_request(lba, transfer_length);
+			auto vr = validate_request(lba);
 			if (vr.has_value()) {
 				DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "GET LBA STATUS parameters invalid");
 				response.sense_data = vr.value();
@@ -675,8 +675,27 @@ std::optional<std::vector<uint8_t> > scsi::validate_request(const uint64_t lba, 
 {
 	auto size_in_blocks = get_size_in_blocks();
 
-	if (lba + n_blocks > size_in_blocks || lba + n_blocks < lba)
+	if (lba + n_blocks > size_in_blocks) {
+		DOLOG(logging::ll_debug, "scsi::validate_request", "-", "lba %" PRIu64 " + n_blocks %u > size_in_blocks %" PRIu64, lba, n_blocks, size_in_blocks);
 		return error_out_of_range();
+	}
+
+	if (lba + n_blocks < lba) {
+		DOLOG(logging::ll_debug, "scsi::validate_request", "-", "lba %" PRIu64 " + n_blocks %u wraps" PRIu64, lba, n_blocks);
+		return error_out_of_range();
+	}
+
+	return { };  // no error
+}
+
+std::optional<std::vector<uint8_t> > scsi::validate_request(const uint64_t lba) const
+{
+	auto size_in_blocks = get_size_in_blocks();
+
+	if (lba >= size_in_blocks) {
+		DOLOG(logging::ll_debug, "scsi::validate_request", "-", "lba %" PRIu64 " >= size_in_blocks %" PRIu64, lba, size_in_blocks);
+		return error_out_of_range();
+	}
 
 	return { };  // no error
 }

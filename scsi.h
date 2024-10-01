@@ -59,6 +59,7 @@ private:
 #endif
 
 	std::optional<std::vector<uint8_t> > validate_request(const uint64_t lba, const uint32_t n_blocks) const;
+	std::optional<std::vector<uint8_t> > validate_request(const uint64_t lba) const;
 
 	std::vector<uint8_t> error_reserve_6()               const;
 	std::vector<uint8_t> error_not_implemented()         const;
