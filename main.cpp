@@ -56,8 +56,8 @@ void maintenance_thread(std::atomic_bool *const stop, backend *const bf, int *co
 
 			if (disk_act_pars.first > prev_disk_act && now - disk_act_pars.first >= disk_act_pars.second) {
 				prev_df_poll   = now;
-				prev_disk_act  = disk_act_pars.first;
 				*df_percentage = bf->get_free_space_percentage();
+				prev_disk_act  = get_micros();
 			}
 		}
 
