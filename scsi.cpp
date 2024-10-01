@@ -238,6 +238,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				response.io.what.data.first[1] = CDB[2];
 				response.io.what.data.first[2] = (response.io.what.data.second - 4)>> 8;  // page length
 				response.io.what.data.first[3] = response.io.what.data.second - 4;
+				response.io.what.data.first[5] = 128 /* LBPU */ | 2 /* LBRZ: zeros */;
 				// TODO
 			}
 			else {
@@ -602,14 +603,17 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 
 			auto vr = validate_request(lba, transfer_length);
 			if (vr.has_value() || transfer_length > MAX_UNMAP_BLOCKS) {
-				DOLOG(logging::ll_debug, "scsi::send", lun_identifier,"UNMAP parameters invalid");
-				if (vr.has_value())
+				if (vr.has_value()) {
+					DOLOG(logging::ll_debug, "scsi::send", lun_identifier,"UNMAP parameters invalid");
 					response.sense_data = vr.value();
-				else
+				}
+				else {
+					DOLOG(logging::ll_debug, "scsi::send", lun_identifier,"UNMAP parameters out of range");
 					response.sense_data = error_out_of_range();
+				}
 				rc = rw_fail_general;
 			}
-			else {
+			else if (transfer_length > 0) {  // 0 is not an error but the backend may not handle it well
 				DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "UNMAP trim LBA %" PRIu64 ", %u blocks", lba, transfer_length);
 
 				rc = trim(lba, transfer_length);
