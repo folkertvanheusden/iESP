@@ -5,4 +5,6 @@
 - does not send syslog when connected to wifi only
 - use serial of SD-card as an iscsi serial!
 
+- write same 10/16/etc
+
 - https://stackoverflow.com/questions/15944254/physical-disk-block-size-on-posix-using-c-c
