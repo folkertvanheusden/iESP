@@ -46,7 +46,7 @@ public:
 	// mainly for thin provisioning
 	virtual uint8_t get_free_space_percentage();
 
-	virtual bool is_idle();
+	virtual std::pair<uint64_t, uint32_t> get_idle_state();
 
 	virtual bool sync() = 0;
 

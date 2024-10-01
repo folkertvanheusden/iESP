@@ -40,8 +40,9 @@ uint64_t get_cpu_usage_us()
 
 void maintenance_thread(std::atomic_bool *const stop, backend *const bf, int *const df_percentage, int *const cpu_usage, int *const ram_free_kb)
 {
-	uint64_t prev_df_poll = 0;
-	uint64_t prev_w_poll  = 0;
+	uint64_t prev_df_poll  = 0;
+	uint64_t prev_w_poll   = 0;
+	uint64_t prev_disk_act = 0;
 
 	int prev_cpu_usage = get_cpu_usage_us();
 
@@ -50,9 +51,14 @@ void maintenance_thread(std::atomic_bool *const stop, backend *const bf, int *co
 
 		uint64_t now = get_micros();
 
-		if (now - prev_df_poll >= 30000000 && bf->is_idle()) {
-			*df_percentage = bf->get_free_space_percentage();
-			prev_df_poll   = now;
+		if (now - prev_df_poll >= 30000000) {
+			auto disk_act_pars = bf->get_idle_state();
+
+			if (disk_act_pars.first > prev_disk_act && now - disk_act_pars.first >= disk_act_pars.second) {
+				prev_df_poll   = now;
+				prev_disk_act  = disk_act_pars.first;
+				*df_percentage = bf->get_free_space_percentage();
+			}
 		}
 
 		if (now - prev_w_poll >= 1000000) {

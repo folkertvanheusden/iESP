@@ -28,11 +28,9 @@ void backend::get_and_reset_stats(uint64_t *const bytes_read, uint64_t *const by
 	this->n_trims       = 0;
 }
 
-bool backend::is_idle()
+std::pair<uint64_t, uint32_t> backend::get_idle_state()
 {
-	uint64_t now = get_micros();
-
-	return now - ts_last_acces >= 499000;  // about halve a second ago?
+	return { ts_last_acces, 500000 };
 }
 
 uint8_t backend::get_free_space_percentage()
