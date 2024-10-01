@@ -524,8 +524,10 @@ void server::handler()
 #endif
 
 			s->sync();
-			if (s->locking_status() == scsi::l_locked)
+			if (s->locking_status() == scsi::l_locked) {
+				DOLOG(logging::ll_debug, "server::handler", endpoint, "unlocking device");
 				s->unlock_device();
+			}
 
 			delete cc;
 			delete ses;
