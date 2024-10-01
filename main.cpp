@@ -80,6 +80,8 @@ void help()
 	printf("-i x    IP-address of adapter to listen on\n");
 	printf("-p x    TCP-port to listen on\n");
 	printf("-T x    trim level (0=disable, 1=normal (default), 2=auto)\n");
+	printf("-L x,y  set file log level (x) and screen log level (y)\n");
+	printf("-l x    set log file\n");
 	printf("-S      enable SNMP agent\n");
 	printf("-h      this help\n");
 }
@@ -98,8 +100,11 @@ int main(int argc, char *argv[])
 	int            trim_level = 1;
 	bool           use_snmp   = false;
 	backend_type_t bt         = backend_type_t::BT_FILE;
+	const char    *logfile    = "/tmp/iesp.log";
+	logging::log_level_t ll_screen = logging::ll_error;
+	logging::log_level_t ll_file   = logging::ll_error;
 	int o = -1;
-	while((o = getopt(argc, argv, "Sb:d:i:p:T:t:h")) != -1) {
+	while((o = getopt(argc, argv, "Sb:d:i:p:T:t:L:l:h")) != -1) {
 		if (o == 'S')
 			use_snmp = true;
 		else if (o == 'b') {
@@ -122,11 +127,25 @@ int main(int argc, char *argv[])
 			trim_level = atoi(optarg);
 		else if (o == 't')
 			target_name = optarg;
+		else if (o == 'L') {
+			auto parts = split(optarg, ",");
+			if (parts.size() != 2) {
+				fprintf(stderr, "Argument missing for -L (file,screen)\n");
+				return 1;
+			}
+
+			ll_screen  = logging::parse_ll(parts[0]);
+			ll_file    = logging::parse_ll(parts[1]);
+		}
+		else if (o == 'l')
+			logfile = optarg;
 		else {
 			help();
 			return o != 'h';
 		}
 	}
+
+	logging::setlog(logfile, ll_file, ll_screen);
 
 	char hostname[64] { 0 };
 	gethostname(hostname, sizeof hostname);

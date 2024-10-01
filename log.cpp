@@ -100,8 +100,30 @@ namespace logging {
 #else
 namespace logging {
 	static const char *logfile          = strdup("/tmp/iesp.log");
-	log_level_t        log_level_file   = ll_debug;
-	log_level_t        log_level_screen = ll_debug;
+	log_level_t        log_level_file   = logging::ll_debug;
+	log_level_t        log_level_screen = logging::ll_error;
+
+	log_level_t parse_ll(const std::string & str)
+	{
+		if (str == "debug")
+			return logging::ll_debug;
+
+		if (str == "info")
+			return logging::ll_info;
+
+		if (str == "warning")
+			return logging::ll_warning;
+
+		if (str == "error")
+			return logging::ll_error;
+
+#if !defined(ARDUINO)
+		fprintf(stderr, "Log level \"%s\" not understood\n", str.c_str());
+		exit(1);
+#endif
+
+		return logging::ll_debug;
+	}
 
 	void initlogger()
 	{

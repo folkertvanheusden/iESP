@@ -18,6 +18,7 @@ namespace logging {
 #else
         extern log_level_t log_level_file, log_level_screen;
 
+	log_level_t parse_ll(const std::string & str);
 	void initlogger();
         void setlog(const char *lf, const log_level_t ll_file, const log_level_t ll_screen);
         void dolog (const logging::log_level_t ll, const char *const component, const std::string context, const char *fmt, ...);
