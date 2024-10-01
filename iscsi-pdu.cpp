@@ -199,6 +199,7 @@ bool iscsi_pdu_login_request::set_data(std::pair<const uint8_t *, std::size_t> d
 	auto        kvs_in      = data_to_text_array(data.first, data.second);
 	uint32_t    max_burst   = ~0;
 	std::string target_name;
+	bool        discovery   = false;
 	for(auto & kv: kvs_in) {
 		DOLOG(logging::ll_debug, "iscsi_pdu_login_request::get_response", ses->get_endpoint_name(), "kv %s", kv.c_str());
 
@@ -214,6 +215,8 @@ bool iscsi_pdu_login_request::set_data(std::pair<const uint8_t *, std::size_t> d
 			initiator = parts[1];
 		else if (parts[0] == "TargetName")
 			target_name = parts[1];
+		else if (parts[0] == " SessionType")
+			discovery = parts[1] == "Discovery";
 	}
 
 	if (max_burst < uint32_t(~0)) {
@@ -221,7 +224,7 @@ bool iscsi_pdu_login_request::set_data(std::pair<const uint8_t *, std::size_t> d
 		ses->set_ack_interval(max_burst);
 	}
 
-	if (target_name != ses->get_target_name()) {
+	if (target_name != ses->get_target_name() && discovery == false) {
 		DOLOG(logging::ll_warning, "iscsi_pdu_login_request::get_response", ses->get_endpoint_name(), "invalid target name \"%s\", expecting \"%s\"", target_name.c_str(), ses->get_target_name().c_str());
 		return false;
 	}
