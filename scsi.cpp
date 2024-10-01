@@ -148,6 +148,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				memcpy(&response.io.what.data.first[32], VERSION, 3);
 				memset(&response.io.what.data.first[36], '0', 8);
 				memcpy(&response.io.what.data.first[36], serial.c_str(), std::min(serial.size(), size_t(8)));
+				// https://www.t10.org/lists/stds-num.htm
 				response.io.what.data.first[58] = 0x06;  // SBC-4
 				response.io.what.data.first[59] = 0x00;
 				response.io.what.data.first[60] = 0x09;  // iSCSI
@@ -156,6 +157,8 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				response.io.what.data.first[63] = 0xfb;
 				response.io.what.data.first[64] = 0x01;  // SPC
 				response.io.what.data.first[65] = 0x20;
+				response.io.what.data.first[66] = 0x04;  // SBC-3
+				response.io.what.data.first[67] = 0xc0;
 			}
 		}
 		else {
