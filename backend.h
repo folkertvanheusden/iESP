@@ -10,8 +10,10 @@
 
 #if defined(ESP32)
 #define N_BACKEND_LOCKS 4
+#define LOCK_SPREADER 3
 #else
 #define N_BACKEND_LOCKS 131
+#define LOCK_SPREADER 31
 #endif
 
 class backend

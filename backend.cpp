@@ -84,7 +84,7 @@ std::set<size_t> backend::lock_range(const uint64_t block_nr, const uint32_t blo
 	std::set<size_t> indexes;
 
 	for(uint64_t i=block_nr; i<block_nr + block_n; i++)
-		indexes.insert(size_t(i % N_BACKEND_LOCKS));
+		indexes.insert(size_t((i * LOCK_SPREADER) % N_BACKEND_LOCKS));
 
 	for(auto nr: indexes)
 		locks[nr].lock();
