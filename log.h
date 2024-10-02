@@ -1,35 +1,38 @@
-#if !defined(ARDUINO)
-#ifndef NDEBUG
-#include <cstdio>
-#include <ctime>
-#include <sys/time.h>
-#define DOLOG(fmt, ...) do {                \
-		FILE *fh = fopen("log.dat", "a+"); \
-		if (fh) {                          \
-			timespec ts;          \
-			if (clock_gettime(CLOCK_REALTIME, &ts) == 0) { \
-				struct tm tm;        \
-				localtime_r(&ts.tv_sec, &tm);\
-				fprintf(fh, "%04d-%02d-%02d %02d:%02d:%02d.%06d ", \
-				tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, int(ts.tv_nsec / 1000)); \
-			} \
-			fprintf(fh, fmt, ##__VA_ARGS__); \
-			fclose(fh);         \
-		}                           \
-                printf(fmt, ##__VA_ARGS__); \
-        } while(0)
-#else
-#define DOLOG(fmt, ...) do { } while(0)
-#endif
-#else
-#define DOLOG(fmt, ...) do { } while(0)
+#include <string>
+
+#if defined(ARDUINO)
+void initlogger();
 #endif
 
-#include <cstdarg>
-void errlog(const char *const fmt, ...);
+namespace logging {
+        typedef enum { ll_debug, ll_info, ll_warning, ll_error } log_level_t;
+
+#if defined(ARDUINO)
+	void sendsyslog(const logging::log_level_t ll, const char *const component, const std::string context, const char *fmt, ...);
+
+#define DOLOG(ll, component, context, fmt, ...) do {  \
+		if (ll != logging::ll_debug) {  \
+			sendsyslog(ll, component, context, fmt, ##__VA_ARGS__);  \
+		}  \
+	} while(0)
+#else
+        extern log_level_t log_level_file, log_level_screen;
+
+	log_level_t parse_ll(const std::string & str);
+	void initlogger();
+        void setlog(const char *lf, const log_level_t ll_file, const log_level_t ll_screen);
+        void dolog (const logging::log_level_t ll, const char *const component, const std::string context, const char *fmt, ...);
+
+#define DOLOG(ll, component, context, fmt, ...) do {                            \
+                if (ll >= logging::log_level_file || ll >= logging::log_level_screen)           \
+                        logging::dolog(ll, component, context, fmt, ##__VA_ARGS__);     \
+        } while(0)
+#endif
+}
+
 #if defined(ARDUINO)
 #include <optional>
 #include <string>
 extern std::optional<std::string> syslog_host;
-#endif
 void init_logger(const std::string & name);
+#endif

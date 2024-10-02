@@ -14,6 +14,7 @@ public:
 	com_client(std::atomic_bool *const stop);
 	virtual ~com_client();
 
+	virtual std::string get_local_address() const = 0;
 	virtual std::string get_endpoint_name() const = 0;
 
 	virtual bool recv(uint8_t *const to, const size_t n) = 0;
@@ -31,7 +32,7 @@ public:
 
 	virtual bool begin() = 0;
 
-	virtual std::string get_local_address() = 0;
+	virtual std::string get_local_address() const = 0;
 
 	virtual com_client *accept() = 0;
 };

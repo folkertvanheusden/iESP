@@ -29,6 +29,7 @@ struct scsi_response
 	iscsi_reacion_t              type;
 	std::vector<uint8_t>         sense_data;  // error data
 	bool                         data_is_meta;  // scsi command reply data
+	bool                         fua;  // force unit access
 
 	struct {
 		bool is_inline;  // if true, then next is valid
@@ -58,8 +59,10 @@ private:
 #endif
 
 	std::optional<std::vector<uint8_t> > validate_request(const uint64_t lba, const uint32_t n_blocks) const;
+	std::optional<std::vector<uint8_t> > validate_request(const uint64_t lba) const;
 
-	std::vector<uint8_t> error_reserve_6()               const;
+	std::vector<uint8_t> error_reservation_conflict_1()  const;
+	std::vector<uint8_t> error_reservation_conflict_2()  const;
 	std::vector<uint8_t> error_not_implemented()         const;
 	std::vector<uint8_t> error_write_error()             const;
 	std::vector<uint8_t> error_compare_and_write_count() const;
@@ -86,11 +89,13 @@ public:
 		o_write_verify_10  = 0x2e,
 		o_prefetch_10      = 0x34,
 		o_sync_cache_10    = 0x35,
+		o_write_same_10    = 0x41,
 		o_unmap            = 0x42,
 		o_read_16          = 0x88,
 		o_compare_and_write= 0x89,
 		o_write_16         = 0x8a,
 		o_prefetch_16      = 0x90,
+		o_write_same_16    = 0x93,
 		o_get_lba_status   = 0x9e,
 		o_report_luns      = 0xa0,
 		o_rep_sup_oper     = 0xa3,
@@ -104,8 +109,10 @@ public:
 
 	enum scsi_rw_result {
 		rw_ok,
-		rw_fail_general,
+		rw_fail_rw,
 		rw_fail_locked,
+		rw_fail_general,
+		rw_fail_mismatch
 	};
 
         uint64_t get_size_in_blocks() const;
@@ -118,9 +125,10 @@ public:
 	scsi_lock_status locking_status();
 
 	scsi_rw_result sync();
-	scsi_rw_result write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data);
-	scsi_rw_result trim (const uint64_t block_nr, const uint32_t n_blocks);
-	scsi_rw_result read (const uint64_t block_nr, const uint32_t n_blocks,       uint8_t *const data);
+	scsi_rw_result write   (const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data);
+	scsi_rw_result trim    (const uint64_t block_nr, const uint32_t n_blocks);
+	scsi_rw_result read    (const uint64_t block_nr, const uint32_t n_blocks,       uint8_t *const data);
+	scsi_rw_result cmpwrite(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const write_data, const uint8_t *const compare_data);
 
 	std::optional<scsi_response> send(const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
 };

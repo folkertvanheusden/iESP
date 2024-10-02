@@ -143,7 +143,7 @@ void write_led(const int gpio, const int state) {
 }
 
 void fail_flash() {
-	errlog("System cannot continue");
+	DOLOG(logging::ll_error, "fail_flash", "-", "System cannot continue");
 
 	write_led(led_green,  LOW);
 	write_led(led_yellow, LOW);
@@ -226,25 +226,25 @@ void enable_OTA() {
 	ArduinoOTA.setPassword("iojasdsjiasd");
 
 	ArduinoOTA.onStart([]() {
-			errlog("OTA start\n");
+			DOLOG(logging::ll_info, "enable_OTA", "-", "OTA start\n");
 			ota_update = true;
 			stop = true;
 			LittleFS.end();
 			});
 	ArduinoOTA.onEnd([]() {
-			errlog("OTA end");
+			DOLOG(logging::ll_info, "enable_OTA", "-", "OTA end");
 			});
 	ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
 			Serial.printf("OTA progress: %u%%\r", progress * 100 / total);
 			});
 	ArduinoOTA.onError([](ota_error_t error) {
 			write_led(led_red, HIGH);
-			errlog("OTA error[%u]: ", error);
-			if (error == OTA_AUTH_ERROR) errlog("auth failed");
-			else if (error == OTA_BEGIN_ERROR) errlog("begin failed");
-			else if (error == OTA_CONNECT_ERROR) errlog("connect failed");
-			else if (error == OTA_RECEIVE_ERROR) errlog("receive failed");
-			else if (error == OTA_END_ERROR) errlog("end failed");
+			DOLOG(logging::ll_info, "enable_OTA", "-", "OTA error[%u]: ", error);
+			if (error == OTA_AUTH_ERROR) DOLOG(logging::ll_info, "enable_OTA", "-", "auth failed");
+			else if (error == OTA_BEGIN_ERROR) DOLOG(logging::ll_info, "enable_OTA", "-", "begin failed");
+			else if (error == OTA_CONNECT_ERROR) DOLOG(logging::ll_info, "enable_OTA", "-", "connect failed");
+			else if (error == OTA_RECEIVE_ERROR) DOLOG(logging::ll_info, "enable_OTA", "-", "receive failed");
+			else if (error == OTA_END_ERROR) DOLOG(logging::ll_info, "enable_OTA", "-", "end failed");
 			});
 	ArduinoOTA.begin();
 
@@ -263,7 +263,7 @@ bool is_network_up()
 void heap_caps_alloc_failed_hook(size_t requested_size, uint32_t caps, const char *function_name)
 {
 	write_led(led_red, HIGH);
-	errlog("%s was called but failed to allocate %zu bytes with 0x%x capabilities (by %p)", function_name, requested_size, caps, __builtin_return_address(0));
+	DOLOG(logging::ll_error, "heap_caps_alloc_failed_hook", "-", "%s was called but failed to allocate %zu bytes with 0x%x capabilities (by %p)", function_name, requested_size, caps, __builtin_return_address(0));
 
 	esp_backtrace_print(25);
 	write_led(led_red, LOW);
@@ -518,7 +518,7 @@ void setup() {
 #else
 	ETH.begin();  // ESP32-WT-ETH01, w32-eth01
 #endif
-	init_logger(name);
+	initlogger();
 
 	draw_status(8);
 
@@ -549,7 +549,7 @@ void setup() {
 #endif
 	draw_status(14);
 	if (bs->begin() == false) {
-		errlog("Failed to load initialize storage backend!");
+		DOLOG(logging::ll_error, "setup", "-", "Failed to load initialize storage backend!");
 		draw_status(15);
 		fail_flash();
 	}
@@ -561,9 +561,9 @@ void setup() {
 	draw_status(20);
 	auto reset_reason = esp_reset_reason();
 	if (reset_reason != ESP_RST_POWERON)
-		errlog("Reset reason: %s (%d), software version %s", reset_name(reset_reason), reset_reason, version_str);
+		DOLOG(logging::ll_error, "setup", "-", "Reset reason: %s (%d), software version %s", reset_name(reset_reason), reset_reason, version_str);
 	else
-		errlog("System (re-)started, software version %s", version_str);
+		DOLOG(logging::ll_info, "setup", "-", "System (re-)started, software version %s", version_str);
 #endif
 
 	draw_status(28);
@@ -571,12 +571,12 @@ void setup() {
 	if (qn::MDNS.begin(name))
 		qn::MDNS.addService("iscsi", "tcp", 3260);
 	else
-		errlog("Failed starting MDNS responder");
+		DOLOG(logging::ll_error, "setup", "-", "Failed starting MDNS responder");
 #else
 	if (MDNS.begin(name))
 		MDNS.addService("iscsi", "tcp", 3260);
 	else
-		errlog("Failed starting MDNS responder");
+		DOLOG(logging::ll_error, "setup", "-", "Failed starting MDNS responder");
 #endif
 
 #if !defined(TEENSY4_1)
@@ -652,13 +652,13 @@ void loop()
 		com_sockets c(buffer, 3260, &stop);
 #endif
 		if (c.begin() == false) {
-			errlog("Failed to initialize communication layer!");
+			DOLOG(logging::ll_error, "loop", "-", "Failed to initialize communication layer!");
 			draw_status(210);
 			fail_flash();
 		}
 
 		draw_status(220);
-		server s(scsi_dev, &c, &is);
+		server s(scsi_dev, &c, &is, "test");
 		Serial.printf("Free heap space: %u\r\n", get_free_heap_space());
 		Serial.println(F("Go!"));
 		draw_status(500);
@@ -668,7 +668,7 @@ void loop()
 
 	if (ota_update) {
 		draw_status(950);
-		errlog("Halting for OTA update");
+		DOLOG(logging::ll_info, "loop", "-", "Halting for OTA update");
 
 		for(;;)
 			delay(1000);

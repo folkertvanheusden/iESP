@@ -104,7 +104,8 @@ void WiFiEvent(WiFiEvent_t event)
 			Serial.printf("Unknown/unexpected ETH event %d\r\n", event);
 			break;
 	}
-	errlog(msg.c_str());
+
+	DOLOG(logging::ll_info, "WiFiEvent", "-", "%s", msg.c_str());
 	write_led(led_red, LOW);
 }
 

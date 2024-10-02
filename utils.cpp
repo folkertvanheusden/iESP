@@ -82,7 +82,6 @@ std::vector<std::string> split(std::string in, const std::string & splitter)
 	return out;
 }
 
-#if !defined(ARDUINO)
 std::string to_hex(const uint8_t *const in, const size_t n)
 {
 	std::string out;
@@ -109,7 +108,6 @@ std::string to_hex(const uint8_t *const in, const size_t n)
 
 	return out;
 }
-#endif
 
 std::string myformat(const char *const fmt, ...)
 {
@@ -119,7 +117,8 @@ std::string myformat(const char *const fmt, ...)
         va_start(ap, fmt);
         if (vasprintf(&buffer, fmt, ap) == -1) {
                 va_end(ap);
-                errlog("myformat: failed to convert string with format \"%s\"", fmt);
+		// possible recursive error
+                DOLOG(logging::ll_error, "myformat", "-", "failed to convert string with format \"%s\"", fmt);
                 return fmt;
         }
         va_end(ap);
@@ -135,7 +134,7 @@ std::string myformat(const char *const fmt, ...)
         va_start(ap, fmt);
         if (vsnprintf(buffer, sizeof buffer, fmt, ap) == -1) {
                 va_end(ap);
-                errlog("myformat: failed to convert string with format \"%s\"", fmt);
+                DOLOG(logging::ll_error, "myformat", "-", "failed to convert string with format \"%s\"", fmt);
                 return fmt;
         }
         va_end(ap);
@@ -174,11 +173,26 @@ uint64_t get_micros()
 #else
         struct timespec tv { };
         if (clock_gettime(CLOCK_REALTIME, &tv) == -1) {
-		errlog("get_micros: clock_gettime failed (%s)", strerror(errno));
+		DOLOG(logging::ll_error, "get_micros", "-", "clock_gettime failed: %s", strerror(errno));
 		return 0;
 	}
 
         return uint64_t(tv.tv_sec) * uint64_t(1000 * 1000) + uint64_t(tv.tv_nsec / 1000);
+#endif
+}
+
+uint64_t get_millis()
+{
+#if defined(ARDUINO)
+	return millis();
+#else
+        struct timespec tv { };
+        if (clock_gettime(CLOCK_REALTIME, &tv) == -1) {
+		DOLOG(logging::ll_error, "get_millis", "-", "clock_gettime failed: %s", strerror(errno));
+		return 0;
+	}
+
+        return uint64_t(tv.tv_sec) * uint64_t(1000) + uint64_t(tv.tv_nsec / 1000000);
 #endif
 }
 
@@ -218,12 +232,20 @@ void encode_lun(uint8_t *const target, const uint64_t lun_nr)
 
 uint16_t HTONS(const uint16_t x)
 {
-	return (x << 8) | (x >> 8);
+	constexpr const uint16_t e = 1;
+	if (*reinterpret_cast<const uint8_t *>(&e))  // system is little endian
+		return (x << 8) | (x >> 8);
+
+	return x;
 }
 
 uint32_t HTONL(const uint32_t x)
 {
-	return (HTONS(x) << 16) | HTONS(x >> 16);
+	constexpr const uint16_t e = 1;
+	if (*reinterpret_cast<const uint8_t *>(&e))  // system is little endian
+		return (HTONS(x) << 16) | HTONS(x >> 16);
+
+	return x;
 }
 
 uint16_t NTOHS(const uint16_t x)
@@ -234,4 +256,11 @@ uint16_t NTOHS(const uint16_t x)
 uint32_t NTOHL(const uint32_t x)
 {
 	return HTONL(x);
+}
+
+uint8_t * duplicate_new(const void *const in, const size_t n)
+{
+	uint8_t *out = new uint8_t[n];
+	memcpy(out, in, n);
+	return out;
 }

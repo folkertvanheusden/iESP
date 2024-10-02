@@ -8,6 +8,13 @@ import sys
 import threading
 import time
 
+fa = False
+try:
+    import fallocate
+    fa = True
+except Exception as e:
+    print('fallocate library not installed, continuing without TRIM/UNMAP support')
+
 ##### DO NOT RUN THIS ON A DEVICE WITH DATA! IT GETS ERASED! ######
 
 hash_algo = hashlib.sha3_512
@@ -18,6 +25,7 @@ max_b = 16
 unique_perc = 51
 trim_perc = 0
 n_threads = 2
+stop_at_100 = False
 
 def help():
     print(f'Usage: {sys.argv[0]} ...arguments...')
@@ -27,13 +35,14 @@ def help():
     print('-u unique-percentage: for testing de-duplication devices')
     print('-f fast random:       used for generating non-dedupable data')
     print('-n thread count:      number of parallel threads. run this with PYTHON_GIL=0 (python 3.13 and more recent)')
-    print('-t trim-percentage:   how much to apply "trim"')
+    print('-T trim-percentage:   how much to apply "trim"')
+    print('-t                    terminate when aproximately 100% (at least) is tested')
     print()
     print(' ##### DO NOT RUN THIS ON A DEVICE WITH DATA! IT GETS ERASED! ###### ')
     print()
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], 'd:b:m:u:fn:t:h')
+    opts, args = getopt.getopt(sys.argv[1:], 'd:b:m:u:fn:T:th')
 except getopt.GetoptError as err:
     print(err)
     help()
@@ -52,8 +61,13 @@ for o, a in opts:
         fast_random = True
     elif o == '-n':
         n_threads = int(a)
-    elif o == '-t':
+    elif o == '-T':
         trim_perc = int(a)
+        if fa == False:
+            print('"fallocate" library not installed (pip3 install fallocate)')
+            sys.exit(1)
+    elif o == '-t':
+        stop_at_100 = True
     elif o == '-h':
         help()
         sys.exit(0)
@@ -67,6 +81,8 @@ random.seed()
 seed = int(time.time())
 fd = os.open(dev, os.O_RDWR)
 dev_size = os.lseek(fd, 0, os.SEEK_END)
+
+print(f'Device size: {dev_size} bytes or {dev_size // 1024 // 1024 // 1024} GB')
 
 n_blocks = dev_size // blocksize
 if dev_size % blocksize:
@@ -167,7 +183,9 @@ def do(show_stats):
 
             # read from disk
             try:
-                data = os.pread(fd, blocksize * cur_n_blocks, offset)
+                byte_count = blocksize * cur_n_blocks
+                os.posix_fadvise(fd, offset, byte_count, os.POSIX_FADV_DONTNEED)
+                data = os.pread(fd, byte_count, offset)
 
                 for i in range(0, cur_n_blocks):
                     cur_b_offset = i * blocksize 
@@ -205,12 +223,12 @@ def do(show_stats):
         try:
             os.pwrite(fd, b, offset)
             for i in range(0, cur_n_blocks):
-                if seen[nr + 1] == apply_trim:
-                    os.trim(fd, offset)
-                    pass
+                if seen[nr + i] == apply_trim:
+                    fallocate.fallocate(fd, offset + i * blocksize, blocksize, fallocate.FALLOC_FL_PUNCH_HOLE)
             os.fdatasync(fd)
+            os.posix_fadvise(fd, offset, len(b), os.POSIX_FADV_DONTNEED)
         except OSError as e:
-            print(f'Write error: {e} at {offset} ({len(b)} bytes)', offset/blocksize)
+            print(f'Write/trim error: {e} at {offset} ({len(b)} bytes)', offset/blocksize)
             write_error_count += 1
 
         n += 1
@@ -232,10 +250,14 @@ def do(show_stats):
                 break
         lock.release()
 
+        if w >= n_blocks and stop_at_100:
+            break
+
 t = []
 for i in range(n_threads):
     tcur = threading.Thread(target=do, args=(len(t) == 0,))
     tcur.start()
     t.append(tcur)
 
-t[0].join()
+for th in t:
+    th.join()

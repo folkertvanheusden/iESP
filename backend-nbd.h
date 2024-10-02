@@ -3,15 +3,20 @@
 #include "backend.h"
 
 
-class backend_file : public backend
+class backend_nbd : public backend
 {
 private:
-	const std::string filename;
+	const std::string host;
+	const int         port     { 0  };
 	int               fd       { -1 };
+	uint64_t          dev_size { 0  };
+
+	bool connect   (const bool retry);
+	bool invoke_nbd(const uint32_t command, const uint64_t offset, const uint32_t n_bytes, uint8_t *const data);
 
 public:
-	backend_file(const std::string & filename);
-	virtual ~backend_file();
+	backend_nbd(const std::string & host, const int port);
+	virtual ~backend_nbd();
 
 	bool begin() override;
 

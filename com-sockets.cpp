@@ -31,13 +31,13 @@ bool com_sockets::begin()
 	// setup listening socket for viewers
 	listen_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (listen_fd == -1) {
-		DOLOG("com_sockets::begin: failed to create socket: %s\n", strerror(errno));
+		DOLOG(logging::ll_error, "com_sockets::begin", get_local_address(), "failed to create socket: %s", strerror(errno));
 		return false;
 	}
 
         int reuse_addr = 1;
         if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<char *>(&reuse_addr), sizeof reuse_addr) == -1) {
-		DOLOG("com_sockets::begin: failed to set socket to reuse address: %s\n", strerror(errno));
+		DOLOG(logging::ll_error, "com_sockets::begin", get_local_address(), "failed to set socket to reuse address: %s", strerror(errno));
 		return false;
 	}
 
@@ -48,7 +48,7 @@ bool com_sockets::begin()
 #else
 	if (setsockopt(listen_fd, IPPROTO_TCP, TCP_FASTOPEN, &q_size, sizeof q_size)) {
 #endif
-		DOLOG("com_sockets::begin: failed to set \"TCP fast open\": %s\n", strerror(errno));
+		DOLOG(logging::ll_error, "com_sockets::begin", get_local_address(), "failed to set \"TCP fast open\": %s", strerror(errno));
 		return false;
 	}
 #endif
@@ -57,17 +57,17 @@ bool com_sockets::begin()
         server_addr.sin_family = AF_INET;
         server_addr.sin_port = htons(listen_port);
 	if (inet_aton(listen_ip.c_str(), &reinterpret_cast<sockaddr_in *>(&server_addr)->sin_addr) == 0) {
-		DOLOG("com_sockets::begin: failed to translate listen address (%s): %s\n", listen_ip.c_str(), strerror(errno));
+		DOLOG(logging::ll_error, "com_sockets::begin", get_local_address(), "failed to translate listen address (%s): %s", listen_ip.c_str(), strerror(errno));
 		return false;
 	}
 
         if (bind(listen_fd, reinterpret_cast<sockaddr *>(&server_addr), sizeof server_addr) == -1) {
-		DOLOG("com_sockets::begin: failed to bind socket to %s:%d: %s\n", listen_ip.c_str(), listen_port, strerror(errno));
+		DOLOG(logging::ll_error, "com_sockets::begin", get_local_address(), "failed to bind socket to %s:%d: %s", listen_ip.c_str(), listen_port, strerror(errno));
 		return false;
 	}
 
         if (listen(listen_fd, 4) == -1) {
-		DOLOG("com_sockets::begin: failed to setup listen queue: %s\n", strerror(errno));
+		DOLOG(logging::ll_error, "com_sockets::begin", get_local_address(), "failed to setup listen queue: %s", strerror(errno));
                 return false;
 	}
 
@@ -79,11 +79,6 @@ com_sockets::~com_sockets()
 	close(listen_fd);
 }
 
-std::string com_sockets::get_local_address()
-{
-	return listen_ip + myformat(":%d", listen_port);
-}
-
 com_client *com_sockets::accept()
 {
 	struct pollfd fds[] { { listen_fd, POLLIN, 0 } };
@@ -92,7 +87,7 @@ com_client *com_sockets::accept()
 	for(;;) {
 		int rc = poll(fds, 1, 100);
 		if (rc == -1) {
-			DOLOG("server::handler: poll failed with error %s\n", strerror(errno));
+			DOLOG(logging::ll_error, "com_sockets::accept", get_local_address(), "poll failed with error %s", strerror(errno));
 			return nullptr;
 		}
 
@@ -100,7 +95,7 @@ com_client *com_sockets::accept()
 			break;
 
 		if (*stop) {
-			DOLOG("server::handler: stop flag set\n");
+			DOLOG(logging::ll_info, "com_sockets::accept", get_local_address(), "stop flag set");
 			return nullptr;
 		}
 	}
@@ -108,7 +103,7 @@ com_client *com_sockets::accept()
 
 	int fd = ::accept(listen_fd, nullptr, nullptr);
 	if (fd == -1) {
-		errlog("com_sockets::accept: accept failed: %s", strerror(errno));
+		DOLOG(logging::ll_error, "com_sockets::accept", get_local_address(), "accept failed: %s", strerror(errno));
 		return nullptr;
 	}
 
@@ -123,7 +118,7 @@ com_client_sockets::com_client_sockets(const int fd, std::atomic_bool *const sto
 #else
 	if (setsockopt(fd, SOL_TCP, TCP_NODELAY, (void *)&flags, sizeof(flags)) == -1)
 #endif
-		DOLOG("server::handler: cannot disable Nagle algorithm\n");
+		DOLOG(logging::ll_error, "com_client_sockets", get_endpoint_name(), "cannot disable Nagle algorithm");
 }
 
 com_client_sockets::~com_client_sockets()
@@ -135,39 +130,46 @@ bool com_client_sockets::send(const uint8_t *const from, const size_t n)
 {
 	auto rc = WRITE(fd, from, n);
 	if (rc == -1)
-		errlog("com_client_sockets::send: write failed with error %s", strerror(errno));
-	return rc == n;
+		DOLOG(logging::ll_error, "com_client_sockets::send", get_endpoint_name(), "write failed with error %s", strerror(errno));
+	return rc == ssize_t(n);
 }
 
 bool com_client_sockets::recv(uint8_t *const to, const size_t n)
 {
-#ifndef ESP32
 	pollfd fds[] { { fd, POLLIN, 0 } };
+	size_t offset = 0;
+	size_t todo   = n;
 
-	for(;;) {
+	while(todo > 0) {
 		int rc = poll(fds, 1, 100);
 		if (rc == -1) {
-			DOLOG("com_client_sockets::recv: poll failed with error %s\n", strerror(errno));
-			return false;
+			DOLOG(logging::ll_error, "com_client_sockets::recv", get_endpoint_name(), "poll failed with error %s", strerror(errno));
+			break;
 		}
 
 		if (*stop == true) {
-			DOLOG("com_client_sockets::recv: abort due external stop\n");
-			return false;
+			DOLOG(logging::ll_info, "com_client_sockets::recv", get_endpoint_name(), "abort due external stop");
+			break;
 		}
 
-		if (rc >= 1)
-			break;
+		if (rc >= 1) {
+			int n_read = read(fd, &to[offset], todo);
+			if (n_read == -1) {
+				DOLOG(logging::ll_error, "com_client_sockets::recv", get_endpoint_name(), "read failed with error %s", strerror(errno));
+				break;
+			}
+
+			if (n_read == 0) {
+				DOLOG(logging::ll_info, "com_client_sockets::recv", get_endpoint_name(), "socket closed");
+				break;
+			}
+
+			offset += n_read;
+			todo   -= n_read;
+		}
 	}
-#endif
 
-	// ideally the poll-loop should include the read (TODO)
-	auto rc = READ(fd, to, n);
-
-	if (rc == -1)
-		errlog("com_client_sockets::recv: read failed with error %s", strerror(errno));
-
-	return rc == n;
+	return todo == 0;
 }
 
 std::string com_client_sockets::get_endpoint_name() const
@@ -182,7 +184,7 @@ std::string com_client_sockets::get_endpoint_name() const
         socklen_t addr_len = sizeof addr;
 
         if (getpeername(fd, reinterpret_cast<sockaddr *>(&addr), &addr_len) == -1) {
-                errlog("get_endpoint_name: failed to find name of fd %d", fd);
+                DOLOG(logging::ll_error, "get_endpoint_name", "-", "failed to find name of fd %d", fd);
 		return "?:?";
 	}
 
@@ -192,5 +194,30 @@ std::string com_client_sockets::get_endpoint_name() const
 #else
 	getnameinfo(reinterpret_cast<sockaddr *>(&addr), addr_len, host, sizeof(host), serv, sizeof(serv), NI_NUMERICHOST | NI_NUMERICSERV);
 	return myformat("[%s]:%s", host, serv);
+#endif
+}
+
+std::string com_client_sockets::get_local_address() const
+{
+        char host[256];
+#ifdef ESP32
+        sockaddr_in addr { };
+#else
+        char         serv[16];
+        sockaddr_in6 addr { };
+#endif
+        socklen_t addr_len = sizeof addr;
+
+        if (getsockname(fd, reinterpret_cast<sockaddr *>(&addr), &addr_len) == -1) {
+                DOLOG(logging::ll_error, "get_local_address", get_endpoint_name(), "failed to find local name of fd %d", fd);
+		return "?:?";
+	}
+
+#ifdef ESP32
+	inet_ntop(addr.sin_family, &addr.sin_addr.s_addr, host, sizeof host);
+	return host + myformat(":%d", addr.sin_port);
+#else
+	getnameinfo(reinterpret_cast<sockaddr *>(&addr), addr_len, host, sizeof(host), serv, sizeof(serv), NI_NUMERICHOST | NI_NUMERICSERV);
+	return myformat("%s:%s", host, serv);
 #endif
 }

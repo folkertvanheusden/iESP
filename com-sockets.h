@@ -1,4 +1,5 @@
 #include "com.h"
+#include "utils.h"
 
 
 class com_client_sockets : public com_client
@@ -10,6 +11,7 @@ public:
 	com_client_sockets(const int fd, std::atomic_bool *const stop);
 	virtual ~com_client_sockets();
 
+	std::string get_local_address() const override;
 	std::string get_endpoint_name() const override;
 
 	bool recv(uint8_t *const to, const size_t n)         override;
@@ -29,7 +31,7 @@ public:
 
 	bool begin() override;
 
-	std::string get_local_address() override;
+	std::string get_local_address() const override { return myformat("%s:%d", listen_ip.c_str(), listen_port); }
 
 	com_client *accept() override;
 };

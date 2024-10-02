@@ -249,7 +249,7 @@ std::string snmp_data::find_next_oid(const std::string & oid)
 
 	std::string cur_oid;
 
-	std::vector<std::pair<snmp_data_type *, ssize_t> > branch;
+	std::vector<std::pair<snmp_data_type *, size_t> > branch;
 
 	for(size_t i=0; i<parts.size(); i++) {
 		if (cur_oid.empty() == false)
@@ -258,7 +258,6 @@ std::string snmp_data::find_next_oid(const std::string & oid)
 		cur_oid += parts.at(i);
 
 		ssize_t idx = find_oid_in_vector(p_lut, cur_oid);
-
 		if (idx == -1)
 			break;
 
@@ -284,7 +283,7 @@ std::string snmp_data::find_next_oid(const std::string & oid)
 	// go to a sibbling
 	while(branch.empty() == false) {
 		snmp_data_type *element = branch.back().first;
-		ssize_t         index   = branch.back().second;
+		size_t          index   = branch.back().second;
 
 		if (element == nullptr) {  // top node
 			assert(branch.size() == 1);

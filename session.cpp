@@ -4,7 +4,9 @@
 #include "session.h"
 
 
-session::session()
+session::session(com_client *const connected_to, const std::string & target_name):
+	connected_to(connected_to),
+	target_name(target_name)
 {
 }
 
@@ -27,7 +29,7 @@ uint32_t session::get_inc_datasn(const uint32_t data_sn_itt)
 	return data_sn++;
 }
 
-uint32_t session::init_r2t_session(const r2t_session & rs, iscsi_pdu_scsi_cmd *const pdu)
+uint32_t session::init_r2t_session(const r2t_session & rs, const bool fua, iscsi_pdu_scsi_cmd *const pdu)
 {
 	uint32_t ITT = pdu->get_Itasktag();
 
@@ -36,11 +38,11 @@ uint32_t session::init_r2t_session(const r2t_session & rs, iscsi_pdu_scsi_cmd *c
 		return ITT;
 
 	r2t_session *copy = new r2t_session;
-	*copy = rs;
-
+	*copy               = rs;
+	copy->fua           = fua;
 	copy->PDU_initiator = pdu->get_raw();
 
-	DOLOG("session::init_r2t_session: register ITT %08x\n", ITT);
+	DOLOG(logging::ll_debug, "session::init_r2t_session", get_endpoint_name(), "register ITT %08x", ITT);
 	r2t_sessions.insert({ ITT, copy });
 
 	return ITT;
@@ -48,7 +50,7 @@ uint32_t session::init_r2t_session(const r2t_session & rs, iscsi_pdu_scsi_cmd *c
 
 r2t_session *session::get_r2t_sesion(const uint32_t ttt)
 {
-	DOLOG("session::get_r2t_session: get TTT %08x\n", ttt);
+	DOLOG(logging::ll_debug, "session::get_r2t_session", get_endpoint_name(), "get TTT %08x", ttt);
 	auto it = r2t_sessions.find(ttt);
 	if (it == r2t_sessions.end())
 		return nullptr;
@@ -61,9 +63,9 @@ void session::remove_r2t_session(const uint32_t ttt)
 	auto it = r2t_sessions.find(ttt);
 
 	if (it == r2t_sessions.end())
-		errlog("session::remove_r2t_session: unexpected TTT (%x)", ttt);
+		DOLOG(logging::ll_error, "session::remove_r2t_session", get_endpoint_name(), "unexpected TTT (%x)", ttt);
 	else {
-		DOLOG("session::remove_r2t_session: removing TTT %x\n", ttt);
+		DOLOG(logging::ll_debug, "session::remove_r2t_session", get_endpoint_name(), "removing TTT %x", ttt);
 		delete [] it->second->PDU_initiator.data;
 		delete it->second;
 		r2t_sessions.erase(it);
