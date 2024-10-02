@@ -52,6 +52,9 @@ private:
 	std::string       serial;
 	const int         trim_level { 1   };
 	io_stats_t *const is     { nullptr };
+#if !defined(ARDUINO) && !defined(NDEBUG)
+	std::atomic_uint64_t cmd_use_count[256] { };
+#endif
 
 #if !defined(TEENSY4_1)
 	std::mutex locked_by_lock;

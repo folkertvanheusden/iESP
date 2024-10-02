@@ -79,6 +79,11 @@ scsi::scsi(backend *const b, const int trim_level, io_stats_t *const is) : b(b),
 
 scsi::~scsi()
 {
+#if !defined(ARDUINO) && !defined(NDEBUG)
+	DOLOG(logging::ll_debug, "~scsi()", "-", "SCSI opcode usage counts:");
+	for(auto & e: scsi_a3_data)
+		DOLOG(logging::ll_debug, "~scsi()", "-", "  %02x: %" PRIu64, e.first, cmd_use_count[e.first].load());
+#endif
 }
 
 std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data)
@@ -86,6 +91,9 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 	assert(size >= 16);
 
 	scsi_opcode opcode = scsi_opcode(CDB[0]);
+#if !defined(ARDUINO) && !defined(NDEBUG)
+	cmd_use_count[CDB[0]]++;
+#endif
 
 	std::string lun_identifier = myformat("LUN:%" PRIu64, lun);
 	DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "SCSI opcode: %02xh, CDB size: %zu", opcode, size);
