@@ -352,7 +352,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 		for(uint32_t block_nr = 0; block_nr < stream_parameters.n_sectors;) {
 			uint32_t n_left = low_ram ? 1 : std::min(block_group_size, stream_parameters.n_sectors - block_nr);
 			buffer_n = n_left * s->get_block_size();
-			buffer_n = std::max(s->get_block_size(), std::min(buffer_n, size_t(use_pdu_data_size - offset)));
+			buffer_n = std::max(s->get_block_size(), uint64_t(std::min(buffer_n, size_t(use_pdu_data_size - offset))));
 			uint32_t do_n = buffer_n / s->get_block_size();
 
 			auto [ out, data_pointer ] = iscsi_pdu_scsi_data_in::gen_data_in_pdu(ses, reply_to, use_pdu_data_size, offset, buffer_n);

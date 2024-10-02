@@ -599,11 +599,11 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get() const
 			set_bits(&pdu_data_in->b2, 7, 1, true);  // F
 			if (pdu_data_in_data.second < reply_to_copy->get_ExpDatLen()) {
 				set_bits(&pdu_data_in->b2, 1, 1, true);  // U
-				pdu_data_in->ResidualCt = htonl(reply_to_copy->get_ExpDatLen() - pdu_data_in_data.second);
+				pdu_data_in->ResidualCt = HTONL(reply_to_copy->get_ExpDatLen() - pdu_data_in_data.second);
 			}
 			else if (pdu_data_in_data.second > reply_to_copy->get_ExpDatLen()) {
 				set_bits(&pdu_data_in->b2, 2, 1, true);  // O
-				pdu_data_in->ResidualCt = htonl(pdu_data_in_data.second - reply_to_copy->get_ExpDatLen());
+				pdu_data_in->ResidualCt = HTONL(pdu_data_in_data.second - reply_to_copy->get_ExpDatLen());
 			}
 			set_bits(&pdu_data_in->b2, 0, 1, true);  // S
 		}
@@ -619,7 +619,7 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get() const
 		pdu_data_in->MaxCmdSN   = HTONL(reply_to_copy->get_CmdSN() + 128);  // TODO?
 		pdu_data_in->DataSN     = HTONL(ses->get_inc_datasn(reply_to_copy->get_Itasktag()));
 		pdu_data_in->bufferoff  = HTONL(i);
-		pdu_data_in->ResidualCt = htonl(use_pdu_data_size - i);
+		pdu_data_in->ResidualCt = HTONL(use_pdu_data_size - i);
 
 		size_t out_size = sizeof(*pdu_data_in) + cur_len;
 		out_size = (out_size + 3) & ~3;
