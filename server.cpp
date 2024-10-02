@@ -208,14 +208,45 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 			auto block_size = s->get_block_size();
 			DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "writing %zu bytes to offset LBA %zu + offset %u => %zu (in bytes)", data.value().second, session->buffer_lba, offset, session->buffer_lba * block_size + offset);
 
-			assert((offset % block_size) == 0);
-			assert((data.value().second % block_size) == 0);
+			 if (offset % block_size) {
+				DOLOG(logging::ll_info, "server::push_response", cc->get_endpoint_name(), "offset is not multiple of block size");
+				return false;
+			 }
 
-			auto rc = s->write(session->buffer_lba + offset / block_size, data.value().second / block_size, data.value().first);
-			if (rc != scsi::rw_ok) {
-				DOLOG(logging::ll_info, "server::push_response", cc->get_endpoint_name(), "DATA-OUT problem writing to backend (%d)", rc);
+			if (data.value().second % block_size) {
+				DOLOG(logging::ll_info, "server::push_response", cc->get_endpoint_name(), "data size is not multiple of block size");
 				return false;
 			}
+
+			scsi::scsi_rw_result rc = scsi::scsi_rw_result::rw_ok;
+
+			if (session->is_write_same) {
+				uint32_t n_blocks = session->bytes_left / block_size;
+
+				if (session->write_same_is_unmap) {  // makes no sense to do this in R2T?
+					rc = s->trim(session->buffer_lba, session->bytes_left / block_size);
+				}
+				else {
+					uint64_t lba = session->buffer_lba;
+
+					for(uint32_t i=0; i<n_blocks; i++) {
+						rc = s->write(lba, block_size, data.value().first);
+						if (rc != scsi::rw_ok)
+							break;
+					}
+				}
+			}
+			else {
+				rc = s->write(session->buffer_lba + offset / block_size, data.value().second / block_size, data.value().first);
+			}
+
+			if (rc != scsi::rw_ok) {
+				DOLOG(logging::ll_info, "server::push_response", cc->get_endpoint_name(), "DATA-OUT problem writing to backend: %d", rc);
+				return false;
+			}
+
+			session->bytes_done += data.value().second;
+			session->bytes_left -= data.value().second;
 
 			if (session->fua) {
 				if (s->sync() == false) {
@@ -223,9 +254,6 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 					return false;
 				}
 			}
-
-			session->bytes_done += data.value().second;
-			session->bytes_left -= data.value().second;
 		}
 		else if (!F) {
 			DOLOG(logging::ll_warning, "server::push_response", cc->get_endpoint_name(), "DATA-OUT PDU has no data?");
@@ -436,14 +464,12 @@ void server::handler()
 #else
 			DOLOG(logging::ll_info, "server::handler", "-", "new session with %s", endpoint.c_str());
 #endif
-			auto     prev_output = get_millis();
-			uint32_t pdu_count   = 0;
-			auto     start       = prev_output;
-			unsigned long busy   = 0;
-			const long interval  = 5000;
-
-			session *ses = nullptr;
-			bool     ok  = true;
+			auto          prev_output = get_millis();
+			uint32_t      pdu_count   = 0;
+			unsigned long busy        = 0;
+			const long    interval    = 5000;
+			session      *ses         = nullptr;
+			bool          ok          = true;
 
 			do {
 				auto incoming = receive_pdu(cc, &ses);

@@ -33,6 +33,8 @@ const std::map<scsi::scsi_opcode, scsi_opcode_details> scsi_a3_data {
 	{ scsi::scsi_opcode::o_read_capacity_10,{ { 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07 }, 10 } },
 	{ scsi::scsi_opcode::o_read_10,		{ { 0xff, 0xfe, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 }, 10 } },
 	{ scsi::scsi_opcode::o_write_10,	{ { 0xff, 0xfa, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 }, 10 } },
+	{ scsi::scsi_opcode::o_write_same_10,	{ {  }, 0 } },
+	{ scsi::scsi_opcode::o_write_same_16,	{ {  }, 0 } },
 	{ scsi::scsi_opcode::o_write_verify_10,	{ { 0xff, 0xf2, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 }, 10 } },
 	{ scsi::scsi_opcode::o_sync_cache_10,	{ { 0xff, 0x06, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 }, 10 } },
 	{ scsi::scsi_opcode::o_unmap,           { { 0xff, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0x07 }, 10 } },
@@ -624,11 +626,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 	}
 	else if (opcode == o_unmap) {
 		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "UNMAP");
-#ifndef NDEBUG
-		uint16_t parameter_list_length = (CDB[7] << 8) | CDB[8];
-		uint16_t unmap_data_length = (CDB[10 + 0] << 8) | CDB[10 + 1];
-		uint16_t unmap_block_descriptor_data_length = (CDB[10 + 2] << 8) | CDB[10 + 3];
-#endif
+
 		const uint8_t *const pd = data.first;
 		scsi_rw_result rc = rw_ok;
 		for(size_t i=8; i<data.second; i+= 16) {
@@ -667,6 +665,91 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			response.sense_data = error_reservation_conflict_1();
 		else {
 			response.sense_data = error_write_error();
+		}
+	}
+	else if (opcode == o_write_same_10 || opcode == o_write_same_16) {  // 0x41 & 0x93
+		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE SAME 10/16");
+
+		uint64_t lba             = 0;
+		uint32_t transfer_length = 0;
+
+		if (opcode == o_write_same_16) {
+			lba             = get_uint64_t(&CDB[2]);  // TODO not checked in the documentation
+			transfer_length = get_uint32_t(&CDB[10]);
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE_SAME_16, LBA %" PRIu64 ", %u sectors", lba, transfer_length);
+		}
+		else if (opcode == o_write_same_10) {
+			lba             = get_uint32_t(&CDB[2]);
+			transfer_length =  (CDB[7] << 8) | CDB[8];
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE_SAME_10, LBA %" PRIu64 ", %u sectors", lba, transfer_length);
+		}
+
+		response.r2t.is_write_same       = true;
+		response.r2t.write_same_is_unmap = CDB[1] & 8;
+
+		auto   backend_block_size = b->get_block_size();
+		size_t expected_size      = backend_block_size;
+
+		auto vr = validate_request(lba, transfer_length);
+		if (vr.has_value()) {
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE_SAME parameters invalid");
+			response.sense_data = vr.value();
+		}
+		else if (data.first) {
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE SAME command includes data (%zu bytes)", data.second);
+
+			size_t received_size      = data.second;
+			size_t received_blocks    = received_size / backend_block_size;
+
+			bool ok = true;
+
+			if (received_blocks == 1)
+				DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE_SAME to LBA %" PRIu64 " is %zu in bytes", lba, backend_block_size);
+			else {
+				DOLOG(logging::ll_info, "scsi::send", lun_identifier, "WRITE_SAME received block count (%u) != 1", received_blocks);
+				ok = false;
+			}
+
+			if (ok) {
+				scsi::scsi_rw_result rc = rw_fail_general;
+
+				for(uint32_t i=0; i<transfer_length; i++) {
+					rc = response.r2t.write_same_is_unmap ?
+						trim(lba, 1) :
+						write(lba, 1, data.first);
+					if (rc != rw_ok)
+						break;
+
+					lba++;
+				}
+
+				if (rc == scsi_rw_result::rw_fail_rw) {
+					DOLOG(logging::ll_error, "scsi::send", lun_identifier, "WRITE_SAME, general %s error", response.r2t.write_same_is_unmap ? "trim" : "write");
+					response.sense_data = error_write_error();
+					ok = false;
+				}
+				else if (rc == rw_fail_locked) {
+					DOLOG(logging::ll_error, "scsi::send", lun_identifier, "WRITE_SAME, failed due to reservations");
+					response.sense_data = error_reservation_conflict_1();
+					ok = false;
+				}
+			}
+
+			if (ok) {
+				response.type = ir_empty_sense;
+				DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "received_size == expected_size");
+			}
+		}
+		else {
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE_SAME without data");
+
+			if (transfer_length == expected_size)
+				response.type = ir_r2t;  // allow R2T packets to come in
+			else {
+				// TODO: error of transfer_length != 0?
+				response.type = ir_empty_sense;
+				DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE_SAME with 0 transfer_length");
+			}
 		}
 	}
 	else {
