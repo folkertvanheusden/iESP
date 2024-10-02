@@ -100,7 +100,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 	else if (opcode == o_mode_sense_6) {  // 0x1a
 		if (locking_status() == l_locked_other) {
 			DOLOG(logging::ll_error, "scsi::send", lun_identifier, "MODE SENSE 6 failed due to reservations");
-			response.sense_data = error_reservation_conflict();
+			response.sense_data = error_reservation_conflict_2();
 		}
 		else {
 			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "MODE SENSE 6");
@@ -396,7 +396,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				}
 				else if (rc == rw_fail_locked) {
 					DOLOG(logging::ll_error, "scsi::send", lun_identifier, "WRITE_xx, failed writing due to reservations");
-					response.sense_data = error_reservation_conflict();
+					response.sense_data = error_reservation_conflict_1();
 					ok = false;
 				}
 
@@ -568,7 +568,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			if (result == scsi_rw_result::rw_ok)
 				response.type = ir_empty_sense;
 			else if (result == scsi_rw_result::rw_fail_locked)
-				response.sense_data = error_reservation_conflict();
+				response.sense_data = error_reservation_conflict_1();
 			else if (result == scsi_rw_result::rw_fail_mismatch)
 				response.sense_data = error_miscompare();
 			else if (result == scsi_rw_result::rw_fail_rw)
@@ -610,7 +610,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			response.type = ir_empty_sense;
 		else {
 			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "RESERVE 6 failed");
-			response.sense_data = error_reservation_conflict();
+			response.sense_data = error_reservation_conflict_1();
 		}
 	}
 	else if (opcode == o_release_6) {
@@ -619,7 +619,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			response.type = ir_empty_sense;
 		else {
 			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "RELEASE 6 failed");
-			response.sense_data = error_reservation_conflict();
+			response.sense_data = error_reservation_conflict_1();
 		}
 	}
 	else if (opcode == o_unmap) {
@@ -664,7 +664,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			// error already set
 		}
 		else if (rc == rw_fail_locked)
-			response.sense_data = error_reservation_conflict();
+			response.sense_data = error_reservation_conflict_1();
 		else {
 			response.sense_data = error_write_error();
 		}
@@ -904,13 +904,19 @@ scsi::scsi_lock_status scsi::locking_status()
 #endif
 }
 
-std::vector<uint8_t> scsi::error_reservation_conflict() const
+std::vector<uint8_t> scsi::error_reservation_conflict_1() const  // TODO naming
 {
 	// https://www.stix.id.au/wiki/SCSI_Sense_Data
 	// sense key 0x06, asc 0x29, ascq 0x00; bus reset
 	// 0x06: unit attention, 
 	return  { 0x70, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x29, 0x00, 0x00, 0x00, 0x00, 0x00 };
 	//                    ^^^^                                                        ^^^^  ^^^^
+}
+
+std::vector<uint8_t> scsi::error_reservation_conflict_2() const  // TODO naming
+{
+        // sense key 0x05, asc 0x2c, ascq 0x09; 'illegal request':: 'PREVIOUS RESERVATION CONFLICT STATUS'
+        return  { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x09, 0x00, 0x00, 0x00, 0x00 };
 }
 
 std::vector<uint8_t> scsi::error_not_implemented() const

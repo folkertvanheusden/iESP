@@ -61,7 +61,8 @@ private:
 	std::optional<std::vector<uint8_t> > validate_request(const uint64_t lba, const uint32_t n_blocks) const;
 	std::optional<std::vector<uint8_t> > validate_request(const uint64_t lba) const;
 
-	std::vector<uint8_t> error_reservation_conflict()    const;
+	std::vector<uint8_t> error_reservation_conflict_1()  const;
+	std::vector<uint8_t> error_reservation_conflict_2()  const;
 	std::vector<uint8_t> error_not_implemented()         const;
 	std::vector<uint8_t> error_write_error()             const;
 	std::vector<uint8_t> error_compare_and_write_count() const;
