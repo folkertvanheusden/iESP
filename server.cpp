@@ -352,22 +352,19 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 		for(uint32_t block_nr = 0; block_nr < stream_parameters.n_sectors;) {
 			uint32_t n_left = low_ram ? 1 : std::min(block_group_size, stream_parameters.n_sectors - block_nr);
 			buffer_n = n_left * s->get_block_size();
-
-			if (offset < use_pdu_data_size)
-				buffer_n = std::min(buffer_n, size_t(use_pdu_data_size - offset));
-			else
-				buffer_n = 0;
+			buffer_n = std::max(s->get_block_size(), std::min(buffer_n, size_t(use_pdu_data_size - offset)));
+			uint32_t do_n = buffer_n / s->get_block_size();
 
 			auto [ out, data_pointer ] = iscsi_pdu_scsi_data_in::gen_data_in_pdu(ses, reply_to, use_pdu_data_size, offset, buffer_n);
 
 			uint64_t cur_block_nr = block_nr + stream_parameters.lba;
-			DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "reading %u block(s) nr %zu from backend", n_left, size_t(cur_block_nr));
+			DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "reading %u block(s) nr %zu from backend", do_n, size_t(cur_block_nr));
 			if (buffer_n > 0) {
-				auto rc = s->read(cur_block_nr, n_left, data_pointer);
+				auto rc = s->read(cur_block_nr, do_n, data_pointer);
 
 				if (rc != scsi::rw_ok) {
 					delete [] out.data;
-					DOLOG(logging::ll_error, "server::push_response", cc->get_endpoint_name(), "reading %u block(s) %zu from backend failed (%d)", n_left, size_t(cur_block_nr), rc);
+					DOLOG(logging::ll_error, "server::push_response", cc->get_endpoint_name(), "reading %u block(s) %zu from backend failed (%d)", do_n, size_t(cur_block_nr), rc);
 					ok = false;
 					break;
 				}
@@ -389,7 +386,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 
 				ses->add_bytes_tx(out.n);
 				offset   += buffer_n;
-				block_nr += n_left;
+				block_nr += do_n;
 				is->iscsiSsnTxDataOctets += out.n;
 			}
 
