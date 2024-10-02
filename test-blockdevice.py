@@ -8,12 +8,8 @@ import sys
 import threading
 import time
 
-fa = False
-try:
-    import fallocate
-    fa = True
-except Exception as e:
-    print('fallocate library not installed, continuing without TRIM/UNMAP support')
+from ctypes import *
+libc = cdll.LoadLibrary("libc.so.6")
 
 ##### DO NOT RUN THIS ON A DEVICE WITH DATA! IT GETS ERASED! ######
 
@@ -63,9 +59,6 @@ for o, a in opts:
         n_threads = int(a)
     elif o == '-T':
         trim_perc = int(a)
-        if fa == False:
-            print('"fallocate" library not installed (pip3 install fallocate)')
-            sys.exit(1)
     elif o == '-t':
         stop_at_100 = True
     elif o == '-h':
@@ -98,7 +91,7 @@ def gen_block(size, offset, seed2):
     if seed2 == duplicate:
         seed_data = seed.to_bytes(8, 'big')
     elif seed2 == apply_trim:
-        seed_data = bytes(size)
+        return bytes(size)
     else:
         seed_data = offset.to_bytes(8, 'big') + seed.to_bytes(8, 'big') + seed2.to_bytes(4, 'big')
     if fast_random:
@@ -191,7 +184,7 @@ def do(show_stats):
                     cur_b_offset = i * blocksize 
                     if data[cur_b_offset:cur_b_offset+blocksize] != b[i]:
                         if n_failed < 3:
-                            print(f'Sector {cur_n_blocks + i} has unexpected data')
+                            print(f'Sector {cur_n_blocks + i} has unexpected data ({data[cur_b_offset:cur_b_offset+16]}... instead of {b[i][0:16]}...')
                             n_failed += 1
                             if n_failed == 3:
                                 print('Stopped outputting errors for this thread')
@@ -224,7 +217,8 @@ def do(show_stats):
             os.pwrite(fd, b, offset)
             for i in range(0, cur_n_blocks):
                 if seen[nr + i] == apply_trim:
-                    fallocate.fallocate(fd, offset + i * blocksize, blocksize, fallocate.FALLOC_FL_PUNCH_HOLE)
+                    # 3 = keep size & punch hole
+                    libc.fallocate(fd, c_int(3), c_longlong(offset + i * blocksize), c_longlong(blocksize))
             os.fdatasync(fd)
             os.posix_fadvise(fd, offset, len(b), os.POSIX_FADV_DONTNEED)
         except OSError as e:
