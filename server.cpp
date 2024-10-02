@@ -40,6 +40,11 @@ server::server(scsi *const s, com *const c, iscsi_stats_t *is, const std::string
 
 server::~server()
 {
+#if !defined(ARDUINO) && !defined(NDEBUG)
+	DOLOG(logging::ll_debug, "~server()", "-", "iSCSI opcode usage counts:");
+	for(int opcode=0; opcode<64; opcode++)
+		DOLOG(logging::ll_debug, "~server()", "-", "  %02x: %" PRIu64, opcode, cmd_use_count[opcode].load());
+#endif
 }
 
 std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *const cc, session **const ses)
@@ -77,8 +82,12 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 
 	iscsi_pdu_bhs *pdu_obj   = nullptr;
 	bool           pdu_error = false;
+	auto           opcode    = bhs.get_opcode();
+#if !defined(ARDUINO) && !defined(NDEBUG)
+	cmd_use_count[opcode]++;
+#endif
 
-	switch(bhs.get_opcode()) {
+	switch(opcode) {
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_login_req:
 			pdu_obj = new iscsi_pdu_login_request(*ses);
 			break;

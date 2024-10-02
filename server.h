@@ -24,6 +24,9 @@ private:
 	com           *const c          { nullptr };
 	iscsi_stats_t *const is         { nullptr };
 	const std::string target_name;
+#if !defined(ARDUINO) && !defined(NDEBUG)
+	std::atomic_uint64_t cmd_use_count[64] { };
+#endif
 
 	std::tuple<iscsi_pdu_bhs *, bool, uint64_t>
 		receive_pdu  (com_client *const cc, session **const s);
