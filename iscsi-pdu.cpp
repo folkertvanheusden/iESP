@@ -639,7 +639,8 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get() const
 
 std::pair<blob_t, uint8_t *> iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *const ses, const iscsi_pdu_scsi_cmd & reply_to, const size_t use_pdu_data_size, const size_t offset_in_data, const size_t data_is_n_bytes)
 {
-	bool last_block = (offset_in_data + data_is_n_bytes) >= use_pdu_data_size;  // > in case iSCSI transfer length is less
+	uint64_t offset_after_block = offset_in_data + data_is_n_bytes;
+	bool     last_block         = offset_after_block >= use_pdu_data_size;  // > in case iSCSI transfer length is less
 
 	if (last_block)
 		DOLOG(logging::ll_debug, "iscsi_pdu_scsi_data_in::gen_data_in_pdu", ses->get_endpoint_name(), "last block");
@@ -654,7 +655,7 @@ std::pair<blob_t, uint8_t *> iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *co
 		if (use_pdu_data_size < reply_to.get_ExpDatLen()) {
 			set_bits(&pdu_data_in.b2, 1, 1, true);  // U
 		}
-		else if (use_pdu_data_size > reply_to.get_ExpDatLen()) {
+		else if (offset_after_block > reply_to.get_ExpDatLen()) {
 			set_bits(&pdu_data_in.b2, 2, 1, true);  // O
 		}
 		set_bits(&pdu_data_in.b2, 0, 1, true);  // S
@@ -669,7 +670,11 @@ std::pair<blob_t, uint8_t *> iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *co
 	pdu_data_in.MaxCmdSN   = HTONL(reply_to.get_CmdSN() + 128);  // TODO?
 	pdu_data_in.DataSN     = HTONL(ses->get_inc_datasn(reply_to.get_Itasktag()));
 	pdu_data_in.bufferoff  = HTONL(offset_in_data);
-	pdu_data_in.ResidualCt = HTONL(use_pdu_data_size - offset_in_data);
+
+	if (reply_to.get_ExpDatLen() < offset_after_block)
+		pdu_data_in.ResidualCt = HTONL(offset_after_block - reply_to.get_ExpDatLen());
+	else
+		pdu_data_in.ResidualCt = HTONL(reply_to.get_ExpDatLen() - (offset_in_data + data_is_n_bytes));
 
 	size_t out_size = sizeof(pdu_data_in) + data_is_n_bytes;
 	out_size = (out_size + 3) & ~3;
