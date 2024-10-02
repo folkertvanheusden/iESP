@@ -639,7 +639,7 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get() const
 
 std::pair<blob_t, uint8_t *> iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *const ses, const iscsi_pdu_scsi_cmd & reply_to, const size_t use_pdu_data_size, const size_t offset_in_data, const size_t data_is_n_bytes)
 {
-	bool last_block = (offset_in_data + data_is_n_bytes) == use_pdu_data_size;
+	bool last_block = (offset_in_data + data_is_n_bytes) >= use_pdu_data_size;  // > in case iSCSI transfer length is less
 
 	if (last_block)
 		DOLOG(logging::ll_debug, "iscsi_pdu_scsi_data_in::gen_data_in_pdu", ses->get_endpoint_name(), "last block");
