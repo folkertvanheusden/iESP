@@ -98,21 +98,27 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		response.type = ir_empty_sense;
 	}
 	else if (opcode == o_mode_sense_6) {  // 0x1a
-		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "MODE SENSE 6");
-		if (CDB[1] & 8)
-			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "MODE SENSE 6: DBD");
-		uint8_t page_control = CDB[2] >> 6;
-		const char *const pagecodes[] { "current values", "changeable values", "default values", "saved values " };
-		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "MODE SENSE 6: PAGE CONTROL %s (%d)", pagecodes[page_control], page_control);
-		uint8_t page_code = CDB[2] & 0x3f;
-		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "MODE SENSE 6: PAGE CODE %02xh", page_code);
-		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "MODE SENSE 6: SUBPAGE CODE %02xh", CDB[3]);
-		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "MODE SENSE 6: AllocationLength: %d", CDB[4]);
-		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "MODE SENSE 6: Control: %02xh", CDB[5]);
-		response.io.is_inline          = true;
-		response.io.what.data.second   = 4;
-		response.io.what.data.first    = new uint8_t[response.io.what.data.second]();
-		response.io.what.data.first[0] = response.io.what.data.second - 1;  // length
+		if (locking_status() == l_locked_other) {
+			DOLOG(logging::ll_error, "scsi::send", lun_identifier, "MODE SENSE 6 failed due to reservations");
+			response.sense_data = error_reservation_conflict();
+		}
+		else {
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "MODE SENSE 6");
+			if (CDB[1] & 8)
+				DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "MODE SENSE 6: DBD");
+			uint8_t page_control = CDB[2] >> 6;
+			const char *const pagecodes[] { "current values", "changeable values", "default values", "saved values " };
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "MODE SENSE 6: PAGE CONTROL %s (%d)", pagecodes[page_control], page_control);
+			uint8_t page_code = CDB[2] & 0x3f;
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "MODE SENSE 6: PAGE CODE %02xh", page_code);
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "MODE SENSE 6: SUBPAGE CODE %02xh", CDB[3]);
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "MODE SENSE 6: AllocationLength: %d", CDB[4]);
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "MODE SENSE 6: Control: %02xh", CDB[5]);
+			response.io.is_inline          = true;
+			response.io.what.data.second   = 4;
+			response.io.what.data.first    = new uint8_t[response.io.what.data.second]();
+			response.io.what.data.first[0] = response.io.what.data.second - 1;  // length
+		}
 	}
 	else if (opcode == o_inquiry) {  // 0x12
 		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "INQUIRY");
@@ -317,7 +323,6 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "GET_LBA_STATUS");
 
 			uint64_t lba             = get_uint64_t(&CDB[2]);
-			uint32_t transfer_length = get_uint32_t(&CDB[10]);
 
 			auto vr = validate_request(lba);
 			if (vr.has_value()) {
@@ -391,7 +396,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				}
 				else if (rc == rw_fail_locked) {
 					DOLOG(logging::ll_error, "scsi::send", lun_identifier, "WRITE_xx, failed writing due to reservations");
-					response.sense_data = error_reserve_6();
+					response.sense_data = error_reservation_conflict();
 					ok = false;
 				}
 
@@ -563,7 +568,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			if (result == scsi_rw_result::rw_ok)
 				response.type = ir_empty_sense;
 			else if (result == scsi_rw_result::rw_fail_locked)
-				response.sense_data = error_reserve_6();
+				response.sense_data = error_reservation_conflict();
 			else if (result == scsi_rw_result::rw_fail_mismatch)
 				response.sense_data = error_miscompare();
 			else if (result == scsi_rw_result::rw_fail_rw)
@@ -603,15 +608,19 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "RESERVE 6");
 		if (reserve_device() == l_locked)
 			response.type = ir_empty_sense;
-		else
-			response.sense_data = error_reserve_6();
+		else {
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "RESERVE 6 failed");
+			response.sense_data = error_reservation_conflict();
+		}
 	}
 	else if (opcode == o_release_6) {
 		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "RELEASE 6");
 		if (unlock_device())
 			response.type = ir_empty_sense;
-		else
-			response.sense_data = error_reserve_6();
+		else {
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "RELEASE 6 failed");
+			response.sense_data = error_reservation_conflict();
+		}
 	}
 	else if (opcode == o_unmap) {
 		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "UNMAP");
@@ -655,7 +664,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			// error already set
 		}
 		else if (rc == rw_fail_locked)
-			response.sense_data = error_reserve_6();
+			response.sense_data = error_reservation_conflict();
 		else {
 			response.sense_data = error_write_error();
 		}
@@ -895,10 +904,12 @@ scsi::scsi_lock_status scsi::locking_status()
 #endif
 }
 
-std::vector<uint8_t> scsi::error_reserve_6() const
+std::vector<uint8_t> scsi::error_reservation_conflict() const
 {
-	// sense key 0x05, asc 0x2c, ascq 0x09; 'illegal request':: 'PREVIOUS RESERVATION CONFLICT STATUS'
-	return  { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x09, 0x00, 0x00, 0x00, 0x00 };
+	// https://www.stix.id.au/wiki/SCSI_Sense_Data
+	// sense key 0x06, asc 0x29, ascq 0x00; bus reset
+	// 0x06: unit attention, 
+	return  { 0x70, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x29, 0x00, 0x00, 0x00, 0x00, 0x00 };
 	//                    ^^^^                                                        ^^^^  ^^^^
 }
 
