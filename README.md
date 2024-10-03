@@ -70,7 +70,7 @@ test tools
 disclaimer
 ----------
 Things are not stable/reliable yet for microcontrollers: it may destroy the contents of your SD-card.
-On other systems it should run fine. Tested with "test-blockdevice.py" and 'FSX' by Apple (the rust version from https://github.com/asomers/fsx-rs the original version is at https://github.com/apple/fstools/ ).
+On other systems it should run fine. Tested with "test-blockdevice.py" and 'FSX' by Apple (using the rust version from https://github.com/asomers/fsx-rs the original version is at https://github.com/apple/fstools/ ).
 
 
 license
