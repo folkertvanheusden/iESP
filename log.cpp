@@ -6,7 +6,9 @@
 #include <string>
 #include <time.h>
 #if defined(ARDUINO)
+#if !defined(RP2040W)
 #include <NTP.h>
+#endif
 #if defined(TEENSY4_1)
 #include <QNEthernet.h>
 namespace qn = qindesign::network;
@@ -32,7 +34,7 @@ WiFiUDP UDP;
 #endif
 std::string name { "?" };
 
-#if defined(ARDUINO)
+#if defined(ARDUINO) && !defined(RP2040W)
 extern NTP ntp;
 #endif
 
@@ -43,10 +45,10 @@ extern void write_led(const int gpio, const int state);
 extern int led_red;
 extern bool is_network_up();
 
-#if defined(ARDUINO)
+#if defined(ARDUINO) && !defined(RP2040W)
 void initlogger()
 {
-#if defined(ESP32) || defined(RP2040)
+#if defined(ESP32)
 	if (UDP.begin(514) == 0)
 		Serial.println(F("UDP.begin(514) failed"));
 #endif
@@ -160,20 +162,31 @@ namespace logging {
 			fprintf(stderr, "localtime_r: %s\n", strerror(errno));
 #endif
 
-		char *ts_str = nullptr;
-
 		const char *const ll_names[] = { "debug", "info", "warning", "error" };
 
+#if defined(RP2040W)
+		char ts_str[48] { };
+		snprintf(ts_str, sizeof ts_str, "%04d-%02d-%02d %02d:%02d:%02d.%06d %s | %s | %s | ",
+				tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, int(now % 1000000),
+				ll_names[ll], component, context.c_str());
+
+		char str[128];
+		va_list ap;
+		va_start(ap, fmt);
+		(void)vsnprintf(str, sizeof str, fmt, ap);
+		va_end(ap);
+#else
+		char *ts_str = nullptr;
 		asprintf(&ts_str, "%04d-%02d-%02d %02d:%02d:%02d.%06d %s | %s | %s | ",
 				tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, int(now % 1000000),
 				ll_names[ll], component, context.c_str());
 
 		char *str = nullptr;
-
 		va_list ap;
 		va_start(ap, fmt);
 		(void)vasprintf(&str, fmt, ap);
 		va_end(ap);
+#endif
 
 		if (ll >= log_level_file)
 			fprintf(lfh, "%s%s\n", ts_str, str);

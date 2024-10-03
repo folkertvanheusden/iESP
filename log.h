@@ -7,7 +7,7 @@ void initlogger();
 namespace logging {
         typedef enum { ll_debug, ll_info, ll_warning, ll_error } log_level_t;
 
-#if defined(ARDUINO)
+#if defined(ARDUINO) && !defined(RP2040W)
 	void sendsyslog(const logging::log_level_t ll, const char *const component, const std::string context, const char *fmt, ...);
 
 #define DOLOG(ll, component, context, fmt, ...) do {  \

@@ -36,8 +36,13 @@ bool com_arduino::begin()
 	Serial.println(F("Disable WiFi low power"));
 	WiFi.noLowPowerMode();
 	Serial.print(F("Connecting to: "));
+#if defined(RP2040W)
+	Serial.println(SSID);
+	WiFi.begin(SSID, WIFI_PW);
+#else
 	Serial.println(ssid);
 	WiFi.begin(ssid, wifi_pw);
+#endif
  
 	Serial.println(F("Wait for connection:"));
 	for(;;) {
