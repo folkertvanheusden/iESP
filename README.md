@@ -8,7 +8,7 @@ requirements
 ------------
 * a Linux/\*BSD/Windows system or a supported microcontroller with an SD-card reader connected to it.
 * platformio (for microcontrollers)
-* cmake (for the other systems)
+* cmake (for other systems)
 
 
 compiling
@@ -26,11 +26,13 @@ For Linux/FreeBSD:
 For Windows:
 * mkdir buildMingw64 && cd buildMingw64
 * cmake -DCMAKE_TOOLCHAIN_FILE=../mingw64.cmake ..
+
 If you copy the result (iesp.exe) to an other windows system, make sure to include:
 * libgcc_s_seh-1.dll
 * libgomp-1.dll
 * libstdc++-6.dll
 * libwinpthread-1.dll
+
 When crosscompiling under Debian, they are under /usr/lib/gcc/x86_64-w64-mingw32/13-posix/ and /usr/x86_64-w64-mingw32/lib/.
 
 
