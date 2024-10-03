@@ -6,6 +6,9 @@
 #include <unistd.h>
 #if !defined(__MINGW32__)
 #include <sys/resource.h>
+#else
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #endif
 
 #include "backend-file.h"
@@ -104,6 +107,15 @@ int main(int argc, char *argv[])
 	signal(SIGPIPE, SIG_IGN);
 #endif
 	signal(SIGINT,  sigh);
+
+#if defined(__MINGW32__)
+	WSADATA wsaData { };
+	int result = WSAStartup(MAKEWORD(2,2), &wsaData);
+	if (result != 0) {
+		printf("WSAStartup failed: %d\n", result);
+		return 1;
+	}
+#endif
 
 	enum backend_type_t { BT_FILE, BT_NBD };
 
