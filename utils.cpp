@@ -28,9 +28,8 @@ ssize_t READ(const int fd, uint8_t *whereto, size_t len)
 	while(len > 0)
 	{
 		ssize_t rc = read(fd, whereto, len);
-
 		if (rc <= 0)
-			return -1;
+			return rc;
 
 		whereto += rc;
 		len -= rc;
