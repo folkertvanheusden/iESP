@@ -4,7 +4,9 @@
 #include <cstring>
 #include <getopt.h>
 #include <unistd.h>
+#if !defined(__MINGW32__)
 #include <sys/resource.h>
+#endif
 
 #include "backend-file.h"
 #include "backend-nbd.h"
@@ -26,6 +28,7 @@ void sigh(int sig)
 
 uint64_t get_cpu_usage_us()
 {
+#if !defined(__MINGW32__)
 	rusage ru { };
 
 	if (getrusage(RUSAGE_SELF, &ru) == 0) {
@@ -34,6 +37,7 @@ uint64_t get_cpu_usage_us()
 	}
 
 	DOLOG(logging::ll_error, "get_cpu_usage_us", "-", "getrusage failed: %s", strerror(errno));
+#endif
 
 	return 0;
 }
@@ -66,11 +70,13 @@ void maintenance_thread(std::atomic_bool *const stop, backend *const bf, int *co
 			*cpu_usage = (current_cpu_usage - prev_cpu_usage) / 10000;
 			prev_cpu_usage = current_cpu_usage;
 
+#if !defined(__MINGW32__)
 			rlimit rlim { };
 			rusage ru   { };
 			if (getrlimit(RLIMIT_DATA, &rlim) == 0 && getrusage(RUSAGE_SELF, &ru) == 0)
 				*ram_free_kb = rlim.rlim_max / 1024 - ru.ru_maxrss;
 			else
+#endif
 				*ram_free_kb = 0;
 
 			prev_w_poll = now;
@@ -94,7 +100,9 @@ void help()
 
 int main(int argc, char *argv[])
 {
+#if !defined(__MINGW32__)
 	signal(SIGPIPE, SIG_IGN);
+#endif
 	signal(SIGINT,  sigh);
 
 	enum backend_type_t { BT_FILE, BT_NBD };
@@ -151,11 +159,8 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	logging::setlog(logfile, ll_file, ll_screen);
-
-	char hostname[64] { 0 };
-	gethostname(hostname, sizeof hostname);
 	logging::initlogger();
+	logging::setlog(logfile, ll_file, ll_screen);
 
 	io_stats_t    ios { };
 	iscsi_stats_t is  { };

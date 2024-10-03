@@ -2,14 +2,19 @@
 #include <cinttypes>
 #include <cstring>
 #include <fcntl.h>
-#include <netdb.h>
 #include <unistd.h>
+#if defined(__MINGW32__)
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
+#include <netdb.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#endif
 
 #include "backend-nbd.h"
 #include "log.h"
@@ -115,7 +120,11 @@ bool backend_nbd::connect(const bool retry)
 
 		if (fd != -1) {
 			int flags = 1;
+#if defined(__MINGW32__)
+			if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&flags, sizeof(flags)) == -1)
+#else
 			if (setsockopt(fd, SOL_TCP, TCP_NODELAY, (void *)&flags, sizeof(flags)) == -1)
+#endif
 				DOLOG(logging::ll_error, "backend_nbd::connect", identifier, "TCP_NODELAY failed");
 		}
 	}

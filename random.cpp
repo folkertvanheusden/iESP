@@ -1,4 +1,20 @@
-#if defined(linux) || defined(__FreeBSD__)
+#if defined(__MINGW32__)
+#include <cstdint>
+#include <cstdlib>
+
+void init_my_getrandom()
+{
+}
+
+bool my_getrandom(void *const tgt, const size_t n)
+{
+	uint8_t *workp = reinterpret_cast<uint8_t *>(tgt);
+	for(size_t i=0; i<n; i++)
+		workp[i] = rand();  // hope for the best!
+
+	return true;
+}
+#elif defined(linux) || defined(__FreeBSD__)
 #include <cstdint>
 #include <sys/random.h>
 

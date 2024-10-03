@@ -14,7 +14,7 @@ namespace qn = qindesign::network;
 #include <WiFi.h>
 #include <WiFiUdp.h>
 #endif
-#else
+#elif !defined(__MINGW32__)
 #include <syslog.h>
 #endif
 
@@ -152,9 +152,13 @@ namespace logging {
 		uint64_t now   = get_micros();
 		time_t   t_now = now / 1000000;
 
+#if defined(__MINGW32__)
+		tm tm = *localtime(&t_now);
+#else
 		tm tm { };
 		if (!localtime_r(&t_now, &tm))
 			fprintf(stderr, "localtime_r: %s\n", strerror(errno));
+#endif
 
 		char *ts_str = nullptr;
 

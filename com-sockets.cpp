@@ -3,16 +3,21 @@
 #include <cstring>
 #ifdef ESP32
 #include <Arduino.h>
+#elif defined(__MINGW32__)
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #else
 #include <netdb.h>
 #include <poll.h>
 #endif
 #include <unistd.h>
+#if !defined(__MINGW32__)
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#endif
 
 #include "com-sockets.h"
 #include "log.h"
@@ -41,7 +46,7 @@ bool com_sockets::begin()
 		return false;
 	}
 
-#if !defined(ARDUINO)
+#if !defined(ARDUINO) && !defined(__MINGW32__)
 	int q_size = SOMAXCONN;
 #ifdef linux 
 	if (setsockopt(listen_fd, SOL_TCP, TCP_FASTOPEN, &q_size, sizeof q_size)) {
@@ -56,10 +61,17 @@ bool com_sockets::begin()
         sockaddr_in server_addr { };
         server_addr.sin_family = AF_INET;
         server_addr.sin_port = htons(listen_port);
+#if !defined(__MINGW32__)
 	if (inet_aton(listen_ip.c_str(), &reinterpret_cast<sockaddr_in *>(&server_addr)->sin_addr) == 0) {
 		DOLOG(logging::ll_error, "com_sockets::begin", get_local_address(), "failed to translate listen address (%s): %s", listen_ip.c_str(), strerror(errno));
 		return false;
 	}
+#else
+	if (inet_pton(AF_INET, listen_ip.c_str(), &reinterpret_cast<sockaddr_in *>(&server_addr)->sin_addr) == 0) {
+		DOLOG(logging::ll_error, "com_sockets::begin", get_local_address(), "failed to translate listen address (%s): %s", listen_ip.c_str(), strerror(errno));
+		return false;
+	}
+#endif
 
         if (bind(listen_fd, reinterpret_cast<sockaddr *>(&server_addr), sizeof server_addr) == -1) {
 		DOLOG(logging::ll_error, "com_sockets::begin", get_local_address(), "failed to bind socket to %s:%d: %s", listen_ip.c_str(), listen_port, strerror(errno));
@@ -83,7 +95,7 @@ com_client *com_sockets::accept()
 {
 	struct pollfd fds[] { { listen_fd, POLLIN, 0 } };
 
-#ifndef ESP32
+#if !defined(__MINGW32__)
 	for(;;) {
 		int rc = poll(fds, 1, 100);
 		if (rc == -1) {
@@ -113,8 +125,8 @@ com_client *com_sockets::accept()
 com_client_sockets::com_client_sockets(const int fd, std::atomic_bool *const stop): com_client(stop), fd(fd)
 {
 	int flags = 1;
-#if defined(__FreeBSD__) || defined(ESP32)
-	if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (void *)&flags, sizeof(flags)) == -1)
+#if defined(__FreeBSD__) || defined(ESP32) || defined(__MINGW32__)
+	if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&flags, sizeof(flags)) == -1)
 #else
 	if (setsockopt(fd, SOL_TCP, TCP_NODELAY, (void *)&flags, sizeof(flags)) == -1)
 #endif
@@ -141,6 +153,9 @@ bool com_client_sockets::recv(uint8_t *const to, const size_t n)
 	size_t todo   = n;
 
 	while(todo > 0) {
+#if defined(__MINGW32__)
+		int rc = 1;  // uggly hack
+#else
 		int rc = poll(fds, 1, 100);
 		if (rc == -1) {
 			DOLOG(logging::ll_error, "com_client_sockets::recv", get_endpoint_name(), "poll failed with error %s", strerror(errno));
@@ -151,6 +166,7 @@ bool com_client_sockets::recv(uint8_t *const to, const size_t n)
 			DOLOG(logging::ll_info, "com_client_sockets::recv", get_endpoint_name(), "abort due external stop");
 			break;
 		}
+#endif
 
 		if (rc >= 1) {
 			int n_read = read(fd, &to[offset], todo);

@@ -10,7 +10,7 @@
 #include <lwip/sys.h>
 #elif defined(TEENSY4_1)
 //
-#else
+#elif !defined(__MINGW32__)
 #include <arpa/inet.h>
 #endif
 #include <sys/types.h>

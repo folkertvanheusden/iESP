@@ -51,8 +51,13 @@ bool backend_file::sync()
 {
 	n_syncs++;
 	ts_last_acces = get_micros();
+#if defined(__MINGW32__)
+	if (_commit(fd) == 0)
+		return true;
+#else
 	if (fdatasync(fd) == 0)
 		return true;
+#endif
 
 	DOLOG(logging::ll_error, "backend_file::sync", identifier, "failed: %s", strerror(errno));
 
@@ -65,9 +70,16 @@ bool backend_file::write(const uint64_t block_nr, const uint32_t n_blocks, const
 	off_t  offset     = block_nr * block_size;
 	size_t n_bytes    = n_blocks * block_size;
 	DOLOG(logging::ll_debug, "backend_file::write", identifier, "block %" PRIu64 " (%lu), %d blocks, block size: %" PRIu64, block_nr, offset, n_blocks, block_size);
+#if defined(__MINGW32__)
+	std::unique_lock<std::mutex> lck(io_lock);
+	int rc = lseek(fd, offset, SEEK_SET);
+	if (rc != -1)
+		rc = ::write(fd, data, n_bytes);
+#else
 	auto lock_list = lock_range(block_nr, 1);
 	ssize_t rc = pwrite(fd, data, n_bytes, offset);
 	unlock_range(lock_list);
+#endif
 	if (rc == -1)
 		DOLOG(logging::ll_error, "backend_file::write", identifier, "ERROR writing: %s", strerror(errno));
 	ts_last_acces = get_micros();
@@ -108,9 +120,16 @@ bool backend_file::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_
 	off_t  offset     = block_nr * block_size;
 	size_t n_bytes    = n_blocks * block_size;
 	DOLOG(logging::ll_debug, "backend_file::read", identifier, "block %" PRIu64 " (%lu), %d blocks (%zu), block size: %" PRIu64, block_nr, offset, n_blocks, n_bytes, block_size);
+#if defined(__MINGW32__)
+	std::unique_lock<std::mutex> lck(io_lock);
+	int rc = lseek(fd, offset, SEEK_SET);
+	if (rc != -1)
+		rc = ::read(fd, data, n_bytes);
+#else
 	auto lock_list = lock_range(block_nr, n_blocks);
 	ssize_t rc = pread(fd, data, n_bytes, offset);
 	unlock_range(lock_list);
+#endif
 	if (rc == -1)
 		DOLOG(logging::ll_error, "backend_file::read", identifier, "error reading: %s", strerror(errno));
 	else if (rc != ssize_t(n_bytes))
@@ -122,7 +141,6 @@ bool backend_file::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_
 
 backend::cmpwrite_result_t backend_file::cmpwrite(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data_write, const uint8_t *const data_compare)
 {
-	auto lock_list  = lock_range(block_nr, n_blocks);
 	auto block_size = get_block_size();
 
 	DOLOG(logging::ll_debug, "backend_file::cmpwrite", identifier, "block %" PRIu64 " (%lu), %d blocks (%zu), block size: %" PRIu64, block_nr, block_nr * block_size, n_blocks, n_blocks * block_size, block_size);
@@ -130,11 +148,23 @@ backend::cmpwrite_result_t backend_file::cmpwrite(const uint64_t block_nr, const
 	cmpwrite_result_t result = cmpwrite_result_t::CWR_OK;
 	uint8_t          *buffer = new uint8_t[block_size]();
 
+#if defined(__MINGW32__)
+	std::unique_lock<std::mutex> lck(io_lock);
+#else
+	auto lock_list  = lock_range(block_nr, n_blocks);
+#endif
+
 	// DO
 	for(uint32_t i=0; i<n_blocks; i++ ) {
 		// read
 		off_t   offset = (block_nr + i) * block_size;
+#if defined(__MINGW32__)
+		int rc = lseek(fd, offset, SEEK_SET);
+		if (rc != -1)
+			rc = ::read(fd, buffer, block_size);
+#else
 		ssize_t rc     = pread(fd, buffer, block_size, offset);
+#endif
 		if (rc != ssize_t(block_size)) {
 			if (rc == -1)
 				DOLOG(logging::ll_error, "backend_file::cmpwrite", identifier, "error reading: %s", strerror(errno));
@@ -155,7 +185,13 @@ backend::cmpwrite_result_t backend_file::cmpwrite(const uint64_t block_nr, const
 
 	if (result == cmpwrite_result_t::CWR_OK) {
 		// write
+#if defined(__MINGW32__)
+		int rc = lseek(fd, block_nr * block_size, SEEK_SET);
+		if (rc != -1)
+			rc = ::write(fd, data_write, n_blocks * block_size);
+#else
 		ssize_t rc = pwrite(fd, data_write, n_blocks * block_size, block_nr * block_size);
+#endif
 		if (rc != ssize_t(n_blocks * block_size)) {
 			if (rc == -1)
 				DOLOG(logging::ll_error, "backend_file::cmpwrite", identifier, "error writing: %s", strerror(errno));
@@ -172,7 +208,9 @@ backend::cmpwrite_result_t backend_file::cmpwrite(const uint64_t block_nr, const
 
 	delete [] buffer;
 
+#if !defined(__MINGW32__)
 	unlock_range(lock_list);
+#endif
 
 	return result;
 }

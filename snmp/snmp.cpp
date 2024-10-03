@@ -8,11 +8,14 @@
 #elif defined(TEENSY4_1)
 #include <QNEthernet.h>
 namespace qn = qindesign::network;
+#elif defined(__MINGW32__)
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #else
 #include <arpa/inet.h>
 #include <poll.h>
 #endif
-#if !defined(TEENSY4_1)
+#if !defined(TEENSY4_1) && !defined(__MINGW32__)
 #include <sys/socket.h>
 #include <sys/types.h>
 #endif
@@ -388,7 +391,7 @@ void snmp::poll()
 #else
 void snmp::thread()
 {
-#if !defined(ARDUINO) || defined(ESP32)
+#if (!defined(ARDUINO) || defined(ESP32)) && !defined(__MINGW32__)
 	pollfd fds[] { { fd, POLLIN, 0 } };
 #endif
 
@@ -397,10 +400,12 @@ void snmp::thread()
 		sockaddr_in clientaddr   {   };
 		socklen_t   len          { sizeof clientaddr };
 
+#if !defined(__MINGW32__)
 		if (poll(fds, 1, 100) == 0)
 			continue;
+#endif
 
-		int rc = recvfrom(fd, buffer, SNMP_RECV_BUFFER_SIZE, 0, reinterpret_cast<sockaddr *>(&clientaddr), &len);
+		int rc = recvfrom(fd, reinterpret_cast<char *>(buffer), SNMP_RECV_BUFFER_SIZE, 0, reinterpret_cast<sockaddr *>(&clientaddr), &len);
 		if (rc == -1)
 			break;
 #else
@@ -424,7 +429,7 @@ void snmp::thread()
 			gen_reply(or_, &packet_out, &output_size);
 			if (output_size) {
 #if !defined(ARDUINO) || defined(ESP32)
-				if (sendto(fd, packet_out, output_size, 0, reinterpret_cast<sockaddr *>(&clientaddr), len) == -1)
+				if (sendto(fd, reinterpret_cast<char *>(packet_out), output_size, 0, reinterpret_cast<sockaddr *>(&clientaddr), len) == -1)
 					DOLOG(logging::ll_debug, "snmp::thread", "-", "failed to transmit SNMP reply packet: %s", strerror(errno));
 #else
 				handle->beginPacket(handle->remoteIP(), handle->remotePort());

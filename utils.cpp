@@ -6,15 +6,19 @@
 #include <vector>
 #if defined(RP2040W) || defined(ARDUINO)
 #include <Arduino.h>
+#elif defined(__MINGW32__)
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #else
 #include <netdb.h>
-#include <time.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #endif
+#include <time.h>
 #include <sys/types.h>
 
 #include "log.h"
+#include "utils.h"
 
 
 ssize_t READ(const int fd, uint8_t *whereto, size_t len)
@@ -264,3 +268,39 @@ uint8_t * duplicate_new(const void *const in, const size_t n)
 	memcpy(out, in, n);
 	return out;
 }
+
+#if defined(__MINGW32__)
+// https://stackoverflow.com/questions/40159892/using-asprintf-on-windows
+#ifndef _vscprintf
+/* For some reason, MSVC fails to honour this #ifndef. */
+/* Hence function renamed to _vscprintf_so(). */
+int _vscprintf_so(const char * format, va_list pargs) {
+    int retval;
+    va_list argcopy;
+    va_copy(argcopy, pargs);
+    retval = vsnprintf(NULL, 0, format, argcopy);
+    va_end(argcopy);
+    return retval;}
+#endif // _vscprintf
+
+#ifndef vasprintf
+int vasprintf(char **strp, const char *fmt, va_list ap) {
+    int len = _vscprintf_so(fmt, ap);
+    if (len == -1) return -1;
+    char *str = (char *)malloc((size_t) len + 1);
+    if (!str) return -1;
+    int r = vsnprintf(str, len + 1, fmt, ap); /* "secure" version of vsprintf */
+    if (r == -1) return free(str), -1;
+    *strp = str;
+    return r;}
+#endif // vasprintf
+
+#ifndef asprintf
+int asprintf(char *strp[], const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    int r = vasprintf(strp, fmt, ap);
+    va_end(ap);
+    return r;}
+#endif // asprintf
+#endif

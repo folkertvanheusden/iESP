@@ -8,6 +8,10 @@ class backend_file : public backend
 private:
 	const std::string filename;
 	int               fd       { -1 };
+#if defined(__MINGW32__)
+	// because mingw does not do pread/pwrite and multiple threads can access backend_file
+	std::mutex        io_lock;
+#endif
 
 public:
 	backend_file(const std::string & filename);

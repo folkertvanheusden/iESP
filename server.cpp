@@ -9,12 +9,9 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
-#if !defined(ESP32) && !defined(RP2040W) && !defined(TEENSY4_1)
-#include <poll.h>
-#endif
 #include <thread>
 #include <unistd.h>
-#if !defined(RP2040W) && !defined(TEENSY4_1)
+#if !defined(RP2040W) && !defined(TEENSY4_1) && !defined(__MINGW32__)
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
