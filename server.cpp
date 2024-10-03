@@ -51,7 +51,7 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 		(*ses)->set_block_size(s->get_block_size());
 	}
 
-	uint8_t pdu[48] { 0 };
+	uint8_t pdu[48] { };
 	if (cc->recv(pdu, sizeof pdu) == false) {
 		DOLOG(logging::ll_info, "server::receive_pdu", cc->get_endpoint_name(), "PDU receive error");
 		return { nullptr, false, 0 };
@@ -466,7 +466,7 @@ void server::handler()
 			std::string endpoint = cc->get_endpoint_name();
 
 #if defined(ESP32) || defined(RP2040W) || defined(TEENSY4_1)
-			Serial.printf("new session with %s\r", endpoint.c_str());
+			Serial.printf("new session with %s\r\n", endpoint.c_str());
 #else
 			DOLOG(logging::ll_info, "server::handler", "-", "new session with %s", endpoint.c_str());
 #endif
