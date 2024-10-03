@@ -20,7 +20,11 @@ backend_file::~backend_file()
 
 bool backend_file::begin()
 {
+#if defined(__MINGW32__)
+	fd = open(filename.c_str(), O_RDWR | O_BINARY);
+#else
 	fd = open(filename.c_str(), O_RDWR);
+#endif
 	if (fd == -1) {
 		DOLOG(logging::ll_error, "backend_file", identifier, "cannot access file %s: %s", filename.c_str(), strerror(errno));
 		return false;
@@ -116,15 +120,17 @@ bool backend_file::trim(const uint64_t block_nr, const uint32_t n_blocks)
 
 bool backend_file::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_t *const data)
 {
-	auto   block_size = get_block_size();
-	off_t  offset     = block_nr * block_size;
-	size_t n_bytes    = n_blocks * block_size;
+	auto     block_size = get_block_size();
+	off_t    offset     = block_nr * block_size;
+	size_t   n_bytes    = n_blocks * block_size;
 	DOLOG(logging::ll_debug, "backend_file::read", identifier, "block %" PRIu64 " (%lu), %d blocks (%zu), block size: %" PRIu64, block_nr, offset, n_blocks, n_bytes, block_size);
 #if defined(__MINGW32__)
 	std::unique_lock<std::mutex> lck(io_lock);
-	int rc = lseek(fd, offset, SEEK_SET);
-	if (rc != -1)
-		rc = ::read(fd, data, n_bytes);
+	ssize_t rc = 0;
+	if (lseek(fd, offset, SEEK_SET) != off_t(-1))
+		rc = READ(fd, data, n_bytes);
+	else
+		DOLOG(logging::ll_error, "backend_file::read", identifier, "lseek failed: %s", strerror(errno));
 #else
 	auto lock_list = lock_range(block_nr, n_blocks);
 	ssize_t rc = pread(fd, data, n_bytes, offset);
