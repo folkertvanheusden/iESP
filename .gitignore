@@ -1,3 +1,6 @@
 build
-*/.pio
-*/version.cpp
+buildMingw64/
+microcontrollers/.pio
+microcontrollers/version.cpp
+microcontrollers/RP2040/.pio/
+microcontrollers/RP2040/version.cpp
