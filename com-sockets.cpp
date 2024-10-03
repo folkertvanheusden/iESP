@@ -34,11 +34,18 @@ com_sockets::com_sockets(const std::string & listen_ip, const int listen_port, s
 bool com_sockets::begin()
 {
 	// setup listening socket for viewers
-	listen_fd = socket(AF_INET, SOCK_STREAM, 0);
+	listen_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+#if defined(__MINGW32__)
+	if (listen_fd == INVALID_SOCKET) {
+		DOLOG(logging::ll_error, "com_sockets::begin", get_local_address(), "failed to create socket: %d", WSAGetLastError());
+		return false;
+	}
+#else
 	if (listen_fd == -1) {
 		DOLOG(logging::ll_error, "com_sockets::begin", get_local_address(), "failed to create socket: %s", strerror(errno));
 		return false;
 	}
+#endif
 
         int reuse_addr = 1;
         if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<char *>(&reuse_addr), sizeof reuse_addr) == -1) {
@@ -148,7 +155,9 @@ bool com_client_sockets::send(const uint8_t *const from, const size_t n)
 
 bool com_client_sockets::recv(uint8_t *const to, const size_t n)
 {
+#if !defined(__MINGW32__)
 	pollfd fds[] { { fd, POLLIN, 0 } };
+#endif
 	size_t offset = 0;
 	size_t todo   = n;
 
@@ -169,7 +178,11 @@ bool com_client_sockets::recv(uint8_t *const to, const size_t n)
 #endif
 
 		if (rc >= 1) {
+#if defined(__MINGW32__)
+			int n_read = ::recv(fd, reinterpret_cast<char *>(&to[offset]), todo, 0);
+#else
 			int n_read = read(fd, &to[offset], todo);
+#endif
 			if (n_read == -1) {
 				DOLOG(logging::ll_error, "com_client_sockets::recv", get_endpoint_name(), "read failed with error %s", strerror(errno));
 				break;
