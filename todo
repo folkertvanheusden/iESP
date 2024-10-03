@@ -5,8 +5,8 @@
 - does not send syslog when connected to wifi only
 - use serial of SD-card as an iscsi serial!
 
-- write same 10/16/etc
-
 - server::push_response needs to be cleaned-up
+
+- https://mibbrowser.online/mibdb_search.php?mib=SCSI-MIB
 
 - https://stackoverflow.com/questions/15944254/physical-disk-block-size-on-posix-using-c-c
