@@ -38,9 +38,9 @@ server::server(scsi *const s, com *const c, iscsi_stats_t *is, const std::string
 server::~server()
 {
 #if !defined(ARDUINO) && !defined(NDEBUG)
-	DOLOG(logging::ll_debug, "~server()", "-", "iSCSI opcode usage counts:");
+	DOLOG(logging::ll_info, "~server()", "-", "iSCSI opcode usage counts:");
 	for(int opcode=0; opcode<64; opcode++)
-		DOLOG(logging::ll_debug, "~server()", "-", "  %02x: %" PRIu64, opcode, cmd_use_count[opcode].load());
+		DOLOG(logging::ll_info, "~server()", "-", "  %02x: %" PRIu64, opcode, cmd_use_count[opcode].load());
 #endif
 }
 

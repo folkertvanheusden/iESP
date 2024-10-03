@@ -80,9 +80,9 @@ scsi::scsi(backend *const b, const int trim_level, io_stats_t *const is) : b(b),
 scsi::~scsi()
 {
 #if !defined(ARDUINO) && !defined(NDEBUG)
-	DOLOG(logging::ll_debug, "~scsi()", "-", "SCSI opcode usage counts:");
+	DOLOG(logging::ll_info, "~scsi()", "-", "SCSI opcode usage counts:");
 	for(auto & e: scsi_a3_data)
-		DOLOG(logging::ll_debug, "~scsi()", "-", "  %02x: %" PRIu64, e.first, cmd_use_count[e.first].load());
+		DOLOG(logging::ll_info, "~scsi()", "-", "  %02x: %" PRIu64, e.first, cmd_use_count[e.first].load());
 #endif
 }
 
