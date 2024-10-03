@@ -76,7 +76,7 @@ private:
 		uint8_t  lunfields[8];    // lun or opcode specific fields
 		uint32_t Itasktag  : 32;  // initiator task tag
 		uint8_t  ofields[28];     // opcode specific fields
-	};
+	} __attribute__((packed));
 
 	__bhs__ *bhs __attribute__((packed)) { reinterpret_cast<__bhs__ *>(pdu_bytes) };
 
@@ -172,7 +172,7 @@ public:
 		uint32_t CmdSN     : 32;
 		uint32_t ExpStatSN : 32;
 		uint8_t  filler3[16];
-	};
+	} __attribute__((packed));
 
 	__login_req__ *login_req __attribute__((packed)) { reinterpret_cast<__login_req__ *>(pdu_bytes) };
 
@@ -234,7 +234,7 @@ public:
 		uint8_t  statusdet :  8;  // status-detail
 		uint16_t reserved2 : 16;
 		uint8_t  filler3[8];
-	};
+	} __attribute__((packed));
 
 	__login_reply__ *login_reply __attribute__((packed)) =  { reinterpret_cast<__login_reply__ *>(pdu_bytes) };
 
@@ -275,7 +275,7 @@ public:
 		uint32_t CmdSN     ;
 		uint32_t ExpStatSN ;
 		uint8_t  CDB[16];
-	};
+	} __attribute__((packed));
 
 	__cdb_pdu_req__ *cdb_pdu_req __attribute__((packed)) { reinterpret_cast<__cdb_pdu_req__ *>(pdu_bytes) };
 
@@ -379,7 +379,7 @@ public:
 		uint32_t DataSN    : 32;
 		uint32_t bufferoff : 32;
 		uint32_t reserved5 : 32;  // residual count or reserved
-	};
+	} __attribute__((packed));
 
 	__pdu_data_out__ *pdu_data_out __attribute__((packed)) { reinterpret_cast<__pdu_data_out__ *>(pdu_bytes) };
 	std::pair<uint8_t *, size_t> pdu_data_out_data { nullptr, 0 };
@@ -431,7 +431,7 @@ public:
 		uint32_t ExpDataSN : 32;
 		uint32_t BidirResCt: 32;  // bidirectional read residual count or reserved
 		uint32_t ResidualCt: 32;  // residual count or reserved
-	};
+	} __attribute__((packed));
 
 	__pdu_response__ *pdu_response __attribute__((packed)) =  { reinterpret_cast<__pdu_response__ *>(pdu_bytes) };
 
@@ -468,7 +468,7 @@ public:
 		uint32_t CmdSN     : 32;
 		uint32_t ExpStatSN : 32;
 		uint8_t  filler4[16];
-	};
+	} __attribute__((packed));
 
 	__nop_out__ *nop_out __attribute__((packed)) { reinterpret_cast<__nop_out__ *>(pdu_bytes) };
 
@@ -506,7 +506,7 @@ public:
 		uint32_t ExpCmdSN  : 32;
 		uint32_t MaxCmdSN  : 32;
 		uint8_t  filler4[12];
-	};
+	} __attribute__((packed));
 
 	__nop_in__ *nop_in __attribute__((packed)) { reinterpret_cast<__nop_in__ *>(pdu_bytes) };
 
@@ -543,7 +543,7 @@ public:
 		uint32_t R2TSN     : 32;
 		uint32_t bufferoff : 32;
 		uint32_t DDTF      : 32;  // desired data transfer length
-	};
+	} __attribute__((packed));
 
 	__pdu_scsi_r2t__ *pdu_scsi_r2t __attribute__((packed)) { reinterpret_cast<__pdu_scsi_r2t__ *>(pdu_bytes) };
 
@@ -586,7 +586,7 @@ public:
 		uint32_t CmdSN     : 32;
 		uint32_t ExpStatSN : 32;
 		uint8_t  filler3[16];
-	};
+	} __attribute__((packed));
 
 	__text_req__ *text_req __attribute__((packed)) { reinterpret_cast<__text_req__ *>(pdu_bytes) };
 
@@ -631,7 +631,7 @@ public:
 		uint32_t ExpCmdSN  : 32;
 		uint32_t MaxCmdSN  : 32;
 		uint8_t  filler3[12];
-	};
+	} __attribute__((packed));
 
 	__text_reply__ *text_reply __attribute__((packed)) =  { reinterpret_cast<__text_reply__ *>(pdu_bytes) };
 
@@ -667,7 +667,7 @@ public:
 		uint32_t CmdSN     : 32;
 		uint32_t ExpStatSN : 32;
 		uint8_t  filler4[16];
-	};
+	} __attribute__((packed));
 
 	__logout_req__ *logout_req __attribute__((packed)) { reinterpret_cast<__logout_req__ *>(pdu_bytes) };
 
@@ -711,7 +711,7 @@ public:
 		uint16_t Time2Wait : 16;
 		uint16_t Time2Ret  : 16;
 		uint32_t filler6   : 32;
-	};
+	} __attribute__((packed));
 
 	__logout_reply__ *logout_reply __attribute__((packed)) =  { reinterpret_cast<__logout_reply__ *>(pdu_bytes) };
 
@@ -751,7 +751,7 @@ public:
 		uint32_t RefCmdSN  : 32;
 		uint32_t ExpDatSN  : 32;
 		uint8_t  filler3[8];
-	};
+	} __attribute__((packed));
 
 	__taskman_req__ *taskman_req __attribute__((packed)) { reinterpret_cast<__taskman_req__ *>(pdu_bytes) };
 
@@ -792,7 +792,7 @@ public:
 		uint32_t ExpCmdSN  : 32;
 		uint32_t MaxCmdSN  : 32;
 		uint8_t  filler4[12];
-	};
+	} __attribute__((packed));
 
 	__taskman_reply__ *taskman_reply __attribute__((packed)) =  { reinterpret_cast<__taskman_reply__ *>(pdu_bytes) };
 

@@ -14,5 +14,6 @@ set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 
+add_compile_options(-mno-ms-bitfields)
 link_libraries(ws2_32)
 set(CMAKE_EXE_LINKER_FLAGS "-lws2_32 -static -static-libgcc -static-libstdc++ -Wl,-Bstatic -lstdc++ -lpthread -lwinpthread -Wl,-Bdynamic")
