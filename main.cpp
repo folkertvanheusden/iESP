@@ -196,7 +196,7 @@ int main(int argc, char *argv[])
 
 	com_sockets c(ip_address, port, &stop);
 	if (c.begin() == false) {
-		fprintf(stderr, "Failed to communication layer\n");
+		fprintf(stderr, "Failed to setup communication layer\n");
 		return 1;
 	}
 
