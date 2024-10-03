@@ -1,12 +1,12 @@
 what it is
 ----------
 iESP is an iSCSI target that was originally designed for the ESP32 and Teensy 4.1 microcontroller. This allows you to boot your VMWare cluster from an SD-card :-)
-Since then it was ported to Linux, \*BSD and microsoft windows.
+Since then it was ported to Linux, \*BSD and Microsoft Windows.
 
 
 requirements
 ------------
-* a Linux/\*BSD/windows system or a supported microcontroller with an SD-card reader connected to it.
+* a Linux/\*BSD/Windows system or a supported microcontroller with an SD-card reader connected to it.
 * platformio (for microcontrollers)
 * cmake (for the other systems)
 
@@ -70,7 +70,7 @@ test tools
 disclaimer
 ----------
 Things are not stable/reliable yet for microcontrollers: it may destroy the contents of your SD-card.
-On other systems it should run fine. Tested with "test-blockdevice.py".
+On other systems it should run fine. Tested with "test-blockdevice.py" and 'FSX' by Apple (the rust version from https://github.com/asomers/fsx-rs ).
 
 
 license
