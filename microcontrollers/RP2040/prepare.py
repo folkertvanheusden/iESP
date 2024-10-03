@@ -13,3 +13,22 @@ def get_git_hash():
 fh = open('version.cpp', 'w')
 fh.write('const char *version_str = "' + get_git_hash() + '";\n')
 fh.close()
+
+
+###
+
+Import("env")
+from os.path import join
+platform = env.PioPlatform()
+FRAMEWORK_DIR = platform.get_package_dir("framework-arduinopico")
+env.Append(CPPPATH=[
+    join(FRAMEWORK_DIR, "pico-sdk", "src", "rp2_common", "pico_aon_timer", "include")
+])
+env.BuildSources(
+    join("$BUILD_DIR", "PicoAON"),
+    join(FRAMEWORK_DIR, "pico-sdk", "src", "rp2_common", "pico_aon_timer")
+)
+
+###
+
+print('prepare.py finished')

@@ -8,7 +8,7 @@
 #include <WiFi.h>
 #include <hardware/watchdog.h>
 
-#include "backend-sdcard.h"
+#include "backend-sdcard-rp2040w.h"
 #include "com-arduino.h"
 #include "random.h"
 #include "server.h"
@@ -18,7 +18,7 @@
 
 std::atomic_bool stop { false   };
 com             *c    { nullptr };
-backend_sdcard  *bs   { nullptr };
+backend_sdcard_rp2040w *bs   { nullptr };
 scsi            *sd   { nullptr };
 server          *s    { nullptr };
 iscsi_stats_t    is;
@@ -58,7 +58,7 @@ void setup()
 		init_my_getrandom();
 
 		Serial.println(F("Init SD card"));
-		bs = new backend_sdcard(-1, -1);
+		bs = new backend_sdcard_rp2040w(-1, -1);
 		bs->begin();
 
 		Serial.println(F("Create SCSI instance"));
