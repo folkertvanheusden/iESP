@@ -78,8 +78,6 @@ For this:
 * 2 instances of FSX(-rs) are started and monitored for error messages
 * 1 instance of test-blockdevice.py with 3 threads is started with trim/discard/unmap and deduplication-support set to 81% and trim to 9%
 
-To do: run the above using multipath iSCSI.
-
 
 disclaimer
 ----------
