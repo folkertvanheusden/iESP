@@ -67,10 +67,23 @@ test tools
 * block-speed-randread.py  measures the bandwidth/iops for random reads. use plot.sh to create png-files of the output.
 
 
+test methodology
+----------------
+Tested with "test-blockdevice.py" and 'FSX' by Apple (using the rust version from https://github.com/asomers/fsx-rs the original version is at https://github.com/apple/fstools/ ).
+For this:
+* a disk-image is created on a ramdisk
+* that disk-image is given as a backend to iesp
+* the resulting iSCSI target is mounted under a mountpoint (ext4 filesyste with journal and discard-mountoption)
+* 4 instances of FSX(-rs) are started and monitored for error messages
+* 1 instance of test-blockdevice.py with 3 threads is started with dedup. set to 81% and trim to 9%
+
+To do: run the above using multipath iSCSI.
+
+
 disclaimer
 ----------
 Things are not stable/reliable yet for microcontrollers: it may destroy the contents of your SD-card.
-On other systems it should run fine. Tested with "test-blockdevice.py" and 'FSX' by Apple (using the rust version from https://github.com/asomers/fsx-rs the original version is at https://github.com/apple/fstools/ ).
+On other systems it should run fine, see "test methodology" above.
 
 
 license
