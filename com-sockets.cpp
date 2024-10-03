@@ -147,10 +147,33 @@ com_client_sockets::~com_client_sockets()
 
 bool com_client_sockets::send(const uint8_t *const from, const size_t n)
 {
+#if defined(__MINGW32__)
+	size_t offset = 0;
+	size_t todo   = n;
+
+	while(todo) {
+		int n_written = ::send(fd, reinterpret_cast<const char *>(&from[offset]), todo, 0);
+		if (n_written == -1) {
+			DOLOG(logging::ll_error, "com_client_sockets::send", get_endpoint_name(), "send failed with error %s", strerror(errno));
+			break;
+		}
+
+		if (n_written == 0) {
+			DOLOG(logging::ll_info, "com_client_sockets::send", get_endpoint_name(), "socket closed");
+			break;
+		}
+
+		offset += n_written;
+		todo   -= n_written;
+	}
+
+	return todo == 0;
+#else
 	auto rc = WRITE(fd, from, n);
 	if (rc == -1)
 		DOLOG(logging::ll_error, "com_client_sockets::send", get_endpoint_name(), "write failed with error %s", strerror(errno));
 	return rc == ssize_t(n);
+#endif
 }
 
 bool com_client_sockets::recv(uint8_t *const to, const size_t n)
