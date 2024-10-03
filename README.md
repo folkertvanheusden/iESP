@@ -1,14 +1,14 @@
 what it is
 ----------
-iESP is an iSCSI target for the ESP32 and Teensy 4.1 microcontroller (altough it runs fine on Linux as well).
-In theory this allows you to boot your VMWare cluster from an SD-card.
+iESP is an iSCSI target that was originally designed for the ESP32 and Teensy 4.1 microcontroller. This allows you to boot your VMWare cluster from an SD-card :-)
+Since then it was ported to Linux, \*BSD and microsoft windows.
 
 
 requirements
 ------------
-* Either a Linux/FreeBSD-box or a supported microcontroller (from now on uC) with an SD-card reader connected to it.
+* a Linux/\*BSD/windows system or a supported microcontroller with an SD-card reader connected to it.
 * platformio (for microcontrollers)
-* cmake (for Linux/FreeBSD)
+* cmake (for the other systems)
 
 
 compiling
@@ -23,7 +23,7 @@ For Linux/FreeBSD:
 * cmake ..
 * make
 
-For windows:
+For Windows:
 * mkdir buildMingw64 && cd buildMingw64
 * cmake -DCMAKE_TOOLCHAIN_FILE=../mingw64.cmake ..
 If you copy the result (iesp.exe) to an other windows system, make sure to include:
@@ -36,11 +36,11 @@ When crosscompiling under Debian, they are under /usr/lib/gcc/x86_64-w64-mingw32
 
 using
 -----
-On the uC it uses the connected SD-card. Make sure it is formatted in 'exfat' format (because of the file size). Create a test.dat file on the SD-card of the size you want your iSCSI target to be. The uC version needs to be configured first: under microcontrollers/data there's a file called cfg-iESP.json.example. Rename this to cfg-iESP.json and enter e.g. appropriate WiFi settings (if applicable). Leave "syslog-host" empty to not send error logging to a syslog server.
+On the microcontroller it uses the connected SD-card. Make sure it is formatted in 'exfat' format (because of the file size). Create a test.dat file on the SD-card of the size you want your iSCSI target to be. The microcontroller version needs to be configured first: under microcontrollers/data there's a file called cfg-iESP.json.example. Rename this to cfg-iESP.json and enter e.g. appropriate WiFi settings (if applicable). Leave "syslog-host" empty to not send error logging to a syslog server.
 
-On Linux/FreeBSD, it assumes you have a test.dat file of appropriate size in the current directory. Run iESP with '-h' to see a list of switches. You probably need to change the listen-address for example. You can also use an NBD-backend making iESP in an iSCSI-NBD proxy.
+On non-microcontrollers, run iESP with '-h' to see a list of switches. You probably want to set the backend file/device and to set the listen-address for example. You can also use an NBD-backend, making iESP in an iSCSI-NBD proxy.
 
-This software has a custom SNMP library.
+This software has a custom SNMP library (SNMP agent).
 * .1.3.6.1.2.1.142.1.10.2.1.1   - PDUs received
 * .1.3.6.1.2.1.142.1.10.2.1.3   - number of bytes transmitted
 * .1.3.6.1.2.1.142.1.10.2.1.4   - number of bytes received
@@ -70,6 +70,7 @@ test tools
 disclaimer
 ----------
 Things are not stable/reliable yet for microcontrollers: it may destroy the contents of your SD-card.
+On other systems it should run fine. Tested with "test-blockdevice.py".
 
 
 license
