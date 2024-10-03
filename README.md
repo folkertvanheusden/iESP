@@ -79,12 +79,6 @@ For this:
 * 1 instance of test-blockdevice.py with 3 threads is started with trim/discard/unmap and deduplication-support set to 81% and trim to 9%
 
 
-disclaimer
-----------
-Things are not stable/reliable yet for microcontrollers: it may destroy the contents of your SD-card.
-On other systems it should run fine, see "test methodology" above.
-
-
 license
 -------
 It is licensed under the MIT license.
