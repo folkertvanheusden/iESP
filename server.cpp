@@ -445,7 +445,7 @@ void server::handler()
 			continue;
 		}
 
-#if !defined(TEENSY4_1)
+#if !defined(TEENSY4_1) && !defined(RP2040W)
 		for(size_t i=0; i<threads.size();) {
 			if (*threads.at(i).second) {
 				DOLOG(logging::ll_debug, "server::handler", "-", "thread cleaned up");
@@ -546,7 +546,7 @@ void server::handler()
 				}
 			}
 			while(ok);
-#if defined(ESP32) || defined(RP2040W)
+#if defined(ESP32)
 			Serial.printf("session finished: %d\r\n", WiFi.status());
 #else
 			DOLOG(logging::ll_debug, "server::handler", endpoint, "session finished");
@@ -561,7 +561,7 @@ void server::handler()
 			delete cc;
 			delete ses;
 
-#if !defined(TEENSY4_1)
+#if !defined(TEENSY4_1) && !defined(RP2040W)
 			*flag = true;
 		});
 
@@ -573,7 +573,7 @@ void server::handler()
 #endif
 	}
 
-#if !defined(TEENSY4_1)
+#if !defined(TEENSY4_1) && !defined(RP2040W)
 	for(auto &e: threads) {
 		if (e.second) {
 			e.first->join();

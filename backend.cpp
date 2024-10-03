@@ -76,7 +76,7 @@ uint8_t backend::get_free_space_percentage()
 
 std::set<size_t> backend::lock_range(const uint64_t block_nr, const uint32_t block_n)
 {
-#if defined(ARDUINO) || defined(TEENSY4_1)
+#if defined(ARDUINO) || defined(TEENSY4_1) || defined(RP2040W)
 	return { };  // no-op
 #else
 	std::set<size_t> indexes;
@@ -93,7 +93,7 @@ std::set<size_t> backend::lock_range(const uint64_t block_nr, const uint32_t blo
 
 void backend::unlock_range(const std::set<size_t> & locked_locks)
 {
-#if defined(ARDUINO) || defined(TEENSY4_1)
+#if defined(ARDUINO) || defined(TEENSY4_1) || defined(RP2040W)
 	// no-op
 #else
 	for(auto nr: locked_locks)

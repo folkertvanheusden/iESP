@@ -33,6 +33,9 @@ backend_sdcard::backend_sdcard(const int led_read, const int led_write):
 	led_read(led_read),
 	led_write(led_write)
 {
+#if defined(RP2040W)
+	mutex_init(&serial_access_lock);
+#endif
 }
 
 bool backend_sdcard::begin()
@@ -58,7 +61,11 @@ bool backend_sdcard::reinit(const bool close_first)
 		Serial.println(F("Init SD-card backend..."));
 	}
 
+#if defined(RP2040W)
+	SPI.begin();
+#else
 	SPI.begin(SD_SCLK, SD_MISO, SD_MOSI, SD_CS);
+#endif
 
 	bool ok = false;
 	for(int sp=50; sp>=14; sp -= 4) {
@@ -112,10 +119,18 @@ bool backend_sdcard::sync()
 
 	n_syncs++;
 
+#if defined(RP2040W)
+	mutex_enter_blocking(&serial_access_lock);
+#else
 	std::lock_guard<std::mutex> lck(serial_access_lock);
+#endif
 
 	if (file.sync() == false)
 		DOLOG(logging::ll_error, "backend_sdcard::sync", "-", "Cannot sync data to SD-card");
+
+#if defined(RP2040W)
+	mutex_exit(&serial_access_lock);
+#endif
 
 	write_led(led_write, LOW);
 
@@ -142,11 +157,18 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 	uint64_t iscsi_block_size = get_block_size();
 	uint64_t byte_address     = block_nr * iscsi_block_size;  // iSCSI to bytes
 
+#if defined(RP2040W)
+	mutex_enter_blocking(&serial_access_lock);
+#else
 	std::lock_guard<std::mutex> lck(serial_access_lock);
+#endif
 
 	if (file.seekSet(byte_address) == false) {
 		DOLOG(logging::ll_error, "backend_sdcard::write", "-", "Cannot seek to position");
 		write_led(led_write, LOW);
+#if defined(RP2040W)
+		mutex_exit(&serial_access_lock);
+#endif
 		return false;
 	}
 
@@ -169,6 +191,9 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 			reinit(true);
 	}
 ok:
+#if defined(RP2040W)
+	mutex_exit(&serial_access_lock);
+#endif
 	if (!rc)
 		DOLOG(logging::ll_error, "backend_sdcard::write", "-", "Cannot write: %d", file.getError());
 
@@ -204,11 +229,18 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 	uint64_t iscsi_block_size = get_block_size();
 	uint64_t byte_address     = block_nr * iscsi_block_size;  // iSCSI to bytes
 
+#if defined(RP2040W)
+	mutex_enter_blocking(&serial_access_lock);
+#else
 	std::lock_guard<std::mutex> lck(serial_access_lock);
+#endif
 
 	if (file.seekSet(byte_address) == false) {
 		DOLOG(logging::ll_error, "backend_sdcard::read", "-", "Cannot seek to position");
 		write_led(led_read, LOW);
+#if defined(RP2040W)
+		mutex_exit(&serial_access_lock);
+#endif
 		return false;
 	}
 
@@ -231,6 +263,9 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 			reinit(true);
 	}
 ok:
+#if defined(RP2040W)
+	mutex_exit(&serial_access_lock);
+#endif
 	if (!rc)
 		DOLOG(logging::ll_error, "backend_sdcard::read", "-", "Cannot read: %d", file.getError());
 	write_led(led_read, LOW);
@@ -242,7 +277,11 @@ backend::cmpwrite_result_t backend_sdcard::cmpwrite(const uint64_t block_nr, con
 {
 	write_led(led_read, HIGH);
 
+#if defined(RP2040W)
+	mutex_enter_blocking(&serial_access_lock);
+#else
 	auto lock_list  = lock_range(block_nr, n_blocks);
+#endif
 	auto block_size = get_block_size();
 
 	cmpwrite_result_t result = cmpwrite_result_t::CWR_OK;
@@ -292,7 +331,11 @@ backend::cmpwrite_result_t backend_sdcard::cmpwrite(const uint64_t block_nr, con
 
 	delete [] buffer;
 
+#if defined(RP2040W)
+	mutex_exit(&serial_access_lock);
+#else
 	unlock_range(lock_list);
+#endif
 
 	write_led(led_read, LOW);
 

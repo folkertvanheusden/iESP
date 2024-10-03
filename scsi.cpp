@@ -938,7 +938,7 @@ scsi::scsi_rw_result scsi::cmpwrite(const uint64_t block_nr, const uint32_t n_bl
 
 scsi::scsi_lock_status scsi::reserve_device()
 {
-#if !defined(TEENSY4_1)
+#if !defined(TEENSY4_1) && !defined(RP2040W)
 	std::unique_lock lck(locked_by_lock);
 
 	auto cur_id = std::this_thread::get_id();
@@ -957,7 +957,7 @@ scsi::scsi_lock_status scsi::reserve_device()
 
 bool scsi::unlock_device()
 {
-#if defined(TEENSY4_1)
+#if defined(TEENSY4_1) || defined(RP2040W)
 	return true;
 #else
 	std::unique_lock lck(locked_by_lock);
@@ -980,7 +980,7 @@ bool scsi::unlock_device()
 
 scsi::scsi_lock_status scsi::locking_status()
 {
-#if defined(TEENSY4_1)
+#if defined(TEENSY4_1) || defined(RP2040W)
 	return l_not_locked;  // TODO
 #else
 	std::unique_lock lck(locked_by_lock);

@@ -15,7 +15,11 @@ private:
 	const int led_read    { -1 };
 	const int led_write   { -1 };
 
+#if defined(RP2040W)
+	mutex_t    serial_access_lock;
+#else
 	std::mutex serial_access_lock;
+#endif
 
 	bool reinit(const bool close_first);
 

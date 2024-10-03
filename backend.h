@@ -27,7 +27,7 @@ protected:
 	uint64_t n_trims       { 0 };
 	uint64_t ts_last_acces { 0 };
 
-#if !(defined(ARDUINO) || defined(TEENSY4_1))
+#if !(defined(ARDUINO) || defined(TEENSY4_1) || defined(RP2040W))
 	std::array<std::mutex, N_BACKEND_LOCKS> locks;
 #endif
 

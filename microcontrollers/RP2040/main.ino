@@ -19,7 +19,15 @@
 std::atomic_bool stop { false   };
 com             *c    { nullptr };
 backend_sdcard  *bs   { nullptr };
+scsi            *sd   { nullptr };
 server          *s    { nullptr };
+iscsi_stats_t    is;
+io_stats_t       ios;
+
+void write_led(const int gpio, const int state) {
+	if (gpio != -1)
+		digitalWrite(gpio, state);
+}
 
 void setup()
 {
@@ -50,10 +58,13 @@ void setup()
 		init_my_getrandom();
 
 		Serial.println(F("Init SD card"));
-		bs = new backend_sdcard();
+		bs = new backend_sdcard(-1, -1);
+
+		Serial.println(F("Create SCSI instance"));
+		sd = new scsi(bs, 1, &ios);
 
 		Serial.println(F("Instantiate iSCSI server"));
-		s = new server(bs, c);
+		s = new server(sd, c, &is, "test");
 
 		Serial.print(F("Free memory after full init: "));
 		Serial.println(rp2040.getFreeHeap());

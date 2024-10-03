@@ -56,7 +56,7 @@ private:
 	std::atomic_uint64_t cmd_use_count[256] { };
 #endif
 
-#if !defined(TEENSY4_1)
+#if !(defined(TEENSY4_1) || defined(RP2040W))
 	std::mutex locked_by_lock;
 	std::optional<std::thread::id> locked_by;
 #endif
