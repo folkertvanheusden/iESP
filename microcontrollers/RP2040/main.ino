@@ -59,6 +59,7 @@ void setup()
 
 		Serial.println(F("Init SD card"));
 		bs = new backend_sdcard(-1, -1);
+		bs->begin();
 
 		Serial.println(F("Create SCSI instance"));
 		sd = new scsi(bs, 1, &ios);
