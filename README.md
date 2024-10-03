@@ -59,7 +59,7 @@ This software has a custom SNMP library (SNMP agent).
 * .1.3.6.1.4.1.2021.13.15.1.1.4 - number of bytes written
 * .1.3.6.1.4.1.2021.13.15.1.1.5 - number of reads
 * .1.3.6.1.4.1.2021.13.15.1.1.6 - number of writes
-* .1.3.6.1.4.1.2021.4.11.0      - free RAM (kB heap space)       (not in Posix version)
+* .1.3.6.1.4.1.2021.4.11.0      - free RAM (kB heap space, only on microcontrollers)
 * .1.3.6.1.4.1.2021.9.1.9.1     - disk free estimate (will only work when using TRIM/UNMAP/DISCARD)
 
 
