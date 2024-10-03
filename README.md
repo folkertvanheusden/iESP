@@ -73,9 +73,10 @@ Tested with "test-blockdevice.py" and 'FSX' by Apple (using the rust version fro
 For this:
 * a disk-image is created on a ramdisk
 * that disk-image is given as a backend to iesp
-* the resulting iSCSI target is mounted under a mountpoint (ext4 filesyste with journal and discard-mountoption)
-* 4 instances of FSX(-rs) are started and monitored for error messages
-* 1 instance of test-blockdevice.py with 3 threads is started with dedup. set to 81% and trim to 9%
+* in a virtual machine, a multipath setup (2 paths) is created
+* in the virtual machine, the resulting iSCSI target is mounted under a mountpoint (ext4 filesyste with journal and discard-mountoption)
+* 2 instances of FSX(-rs) are started and monitored for error messages
+* 1 instance of test-blockdevice.py with 3 threads is started with trim/discard/unmap and deduplication-support set to 81% and trim to 9%
 
 To do: run the above using multipath iSCSI.
 
