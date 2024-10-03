@@ -273,8 +273,10 @@ void loopw(void *)
 {
 	Serial.println(F("Thread started"));
 
-	int  cu_count = 0;
+	int           cu_count             = 0;
 	unsigned long last_diskfree_update = 0;
+	unsigned long prev_disk_act        = 0;
+
 	for(;;) {
 		auto now = millis();
 		if (now - draw_status_ts > 5000) {
@@ -283,9 +285,14 @@ void loopw(void *)
 			draw_status_ts = now;
 		}
 
-		if (now - last_diskfree_update >= update_df_interval * 1000 && update_df_interval != 0 && bs->is_idle()) {
-			percentage_diskspace = bs->get_free_space_percentage();
-			last_diskfree_update = now;
+		if (now - last_diskfree_update >= update_df_interval * 1000 && update_df_interval != 0) {
+			auto disk_act_pars = bs->get_idle_state();
+
+			if (disk_act_pars.first > prev_disk_act && now - disk_act_pars.first >= disk_act_pars.second) {
+				percentage_diskspace = bs->get_free_space_percentage();
+				last_diskfree_update = now;
+				prev_disk_act        = micros();
+			}
 		}
 
 		ntp.update();
