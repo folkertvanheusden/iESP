@@ -51,6 +51,8 @@ bool backend_sdcard::begin()
 
 bool backend_sdcard::reinit(const bool close_first)
 {
+	std::lock_guard<std::mutex> lck(serial_access_lock);
+
 	write_led(led_read,  HIGH);
 	write_led(led_write, HIGH);
 	if (close_first) {
@@ -68,7 +70,7 @@ bool backend_sdcard::reinit(const bool close_first)
 
 	for(int sp=50; sp>=14; sp -= 4) {
 		Serial.printf("Trying %d MHz...\r\n", sp);
-		if (sd.begin(SdSpiConfig(pin_SD_CS, DEDICATED_SPI, SD_SCK_MHZ(sp)))) {
+		if (sd.begin(SdSpiConfig(pin_SD_CS, SHARED_SPI, SD_SCK_MHZ(sp)))) {
 			ok = true;
 			Serial.printf("Accessing SD card at %d MHz\r\n", sp);
 			break;
