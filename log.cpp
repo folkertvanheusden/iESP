@@ -123,7 +123,7 @@ namespace logging {
 			Serial.println(err_log_buf);
 		}
 
-		if (ll >= ll_warning)
+		if (ll >= ll_error)
 			write_led(led_red, LOW);
 	}
 }
