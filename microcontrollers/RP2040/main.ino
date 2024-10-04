@@ -24,9 +24,9 @@ server          *s    { nullptr };
 iscsi_stats_t    is;
 io_stats_t       ios;
 volatile bool    wifi_connected { false };
-int              led_green  {  4 };
-int              led_yellow {  5 };
-int              led_red    { 35 };
+int              led_green  {  17 };
+int              led_yellow {  18 };
+int              led_red    { -1  };
 
 bool is_network_up()
 {
@@ -59,6 +59,13 @@ void setup()
 	if (watchdog_caused_reboot())
 		Serial.println(F("Rebooted by watchdog"));
 
+	if (led_green != -1)
+		pinMode(led_green, OUTPUT);
+	if (led_yellow != -1)
+		pinMode(led_yellow, OUTPUT);
+	if (led_red != -1)
+		pinMode(led_red, OUTPUT);
+
 	try {
 		c = new com_arduino(3260);
 		wifi_connected = c->begin();
@@ -68,7 +75,7 @@ void setup()
 		init_my_getrandom();
 
 		Serial.println(F("Init SD card"));
-		bs = new backend_sdcard_rp2040w(-1, -1);
+		bs = new backend_sdcard_rp2040w(led_green, led_yellow);
 		bs->begin();
 
 		Serial.println(F("Create SCSI instance"));
