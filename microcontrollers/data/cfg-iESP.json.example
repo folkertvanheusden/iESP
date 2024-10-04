@@ -7,5 +7,12 @@
 	"syslog-host" : "94.142.246.161",
 	"trim-level": 2,
 	"eth-wait-time": 10,
-	"update-df-interval": 0
+	"update-df-interval": 0,
+	"led-green": -1,
+	"led-yellow": -1,
+	"led-red": -1,
+	"SD_MISO": 19,
+	"SD_MOSI": 23,
+	"SD_SCLK": 18,
+	"SD_CS": 5
 }

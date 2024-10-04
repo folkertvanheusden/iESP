@@ -21,17 +21,16 @@
 
 #define FILENAME "test.dat"
 
-#define SD_MISO     2       // SD-Card, IO2
-#define SD_MOSI    15       // SD-Card, TD0
-#define SD_SCLK    14       // SD-Card, TMS
-#define SD_CS      12       // SD-Card, TDI
-
 extern void write_led(const int gpio, const int state);
 
-backend_sdcard::backend_sdcard(const int led_read, const int led_write):
+backend_sdcard::backend_sdcard(const int led_read, const int led_write, const int pin_SD_MISO, const int pin_SD_MOSI, const int pin_SD_SCLK, const int pin_SD_CS):
 	backend("SD-card"),
 	led_read(led_read),
-	led_write(led_write)
+	led_write(led_write),
+	pin_SD_MISO(pin_SD_MISO),
+	pin_SD_MOSI(pin_SD_MOSI),
+	pin_SD_SCLK(pin_SD_SCLK),
+	pin_SD_CS(pin_SD_CS)
 {
 #if defined(RP2040W)
 	mutex_init(&serial_access_lock);
@@ -45,6 +44,8 @@ bool backend_sdcard::begin()
 			return true;
 	}
 
+	Serial.println(F("SD-card init failed"));
+
 	return false;
 }
 
@@ -57,20 +58,17 @@ bool backend_sdcard::reinit(const bool close_first)
 		sd.end();
 		Serial.println(F("Re-init SD-card backend..."));
 	}
-	else {
-		Serial.println(F("Init SD-card backend..."));
-	}
 
 #if defined(RP2040W)
 	SPI.begin();
+	bool ok = true;
 #else
-	SPI.begin(SD_SCLK, SD_MISO, SD_MOSI, SD_CS);
-#endif
-
 	bool ok = false;
+	SPI.begin(pin_SD_SCLK, pin_SD_MISO, pin_SD_MOSI, pin_SD_CS);
+
 	for(int sp=50; sp>=14; sp -= 4) {
 		Serial.printf("Trying %d MHz...\r\n", sp);
-		if (sd.begin(SdSpiConfig(SD_CS, DEDICATED_SPI, SD_SCK_MHZ(sp)))) {
+		if (sd.begin(SdSpiConfig(pin_SD_CS, DEDICATED_SPI, SD_SCK_MHZ(sp)))) {
 			ok = true;
 			Serial.printf("Accessing SD card at %d MHz\r\n", sp);
 			break;
@@ -78,12 +76,13 @@ bool backend_sdcard::reinit(const bool close_first)
 	}
 
 	if (ok == false) {
-		Serial.printf("SD-card mount failed (assuming CS is on pin %d)\r\n", SD_CS);
+		Serial.printf("SD-card mount failed (assuming CS is on pin %d)\r\n", pin_SD_CS);
 		sd.initErrorPrint(&Serial);
 		write_led(led_read,  LOW);
 		write_led(led_write, LOW);
 		return false;
 	}
+#endif
 
 	sd.ls(LS_DATE | LS_SIZE);
 
