@@ -122,7 +122,7 @@ bool progress_indicator(const int nr, const int mx, const std::string & which)
 	return true;
 }
 
-void setup_wifi()
+bool setup_wifi()
 {
 	write_led(led_green,  HIGH);
 	write_led(led_yellow, HIGH);
@@ -185,5 +185,7 @@ void setup_wifi()
 
 	draw_status(25);
 	esp_wifi_set_ps(WIFI_PS_NONE);
+
+	return cs == CS_CONNECTED;
 }
 

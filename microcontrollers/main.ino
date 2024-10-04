@@ -230,6 +230,9 @@ bool load_configuration() {
 	if (cfg.containsKey("SD-CS"))
 		pin_SD_CS = cfg["SD-CS"].as<int>();
 
+	if (cfg.containsKey("log-level"))
+		logging::log_level_syslog = logging::parse_ll(cfg["log-level"].as<std::string>());
+
 	data_file.close();
 
 #if !defined(TEENSY4_1)
@@ -278,10 +281,11 @@ void enable_OTA() {
 #endif
 
 volatile bool eth_connected = false;
+volatile bool wifi_connected = false;
 
 bool is_network_up()
 {
-	return eth_connected;
+	return eth_connected || wifi_connected;
 }
 
 #ifndef TEENSY4_1
@@ -516,7 +520,7 @@ void setup() {
 	qn::Ethernet.setHostname(name);
 #else
 	set_hostname(name);
-	setup_wifi();
+	wifi_connected = setup_wifi();
 #endif
 #if defined(WEMOS32_ETH)
 	//begin(int MISO_GPIO, int MOSI_GPIO, int SCLK_GPIO, int CS_GPIO, int INT_GPIO, int SPI_CLOCK_MHZ, int SPI_HOST, bool use_mac_from_efuse=false)
