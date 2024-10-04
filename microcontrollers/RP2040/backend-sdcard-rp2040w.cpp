@@ -25,7 +25,7 @@ bool backend_sdcard_rp2040w::begin()
 ///
 	static spi_t spi = {
 		.hw_inst = spi1,  // RP2040 SPI component
-		.miso_gpio = 12,   // GPIO number (not Pico pin number)
+		.miso_gpio = 8,   // GPIO number (not Pico pin number)
 		.mosi_gpio = 11,
 		.sck_gpio = 10,
 		.baud_rate = 12 * 1000 * 1000,  // Actual frequency: 10416666
@@ -34,10 +34,10 @@ bool backend_sdcard_rp2040w::begin()
 		.sck_gpio_drive_strength = GPIO_DRIVE_STRENGTH_12MA
 	};
 
-
+	// Hardware Configuration of SPI Interface object:
 	static sd_spi_if_t spi_if = {
 		.spi = &spi,   // Pointer to the SPI driving this card
-		.ss_gpio = 13  // The SPI slave select GPIO for this SD card
+		.ss_gpio = 12  // The SPI slave select GPIO for this SD card
 	};
 
 	// Hardware Configuration of the SD Card object:
@@ -52,20 +52,20 @@ bool backend_sdcard_rp2040w::begin()
 		.card_detect_pull_hi = false
 	};
 
-	Serial.println(F("add card"));
+	Serial.println(F(" - add card"));
 	FatFsNs::SdCard* card_p(FatFsNs::FatFs::add_sd_card(&sd_card));
 
 	// The H/W config must be set up before this is called:
-	Serial.println(F("sd_init_driver"));
+	Serial.println(F(" - sd_init_driver"));
 	sd_init_driver(); 
 
-	Serial.println(F("mount"));
+	Serial.println(F(" - mount"));
 	card_p->mount();
 
-	FRESULT frc = file.open(FILENAME, FA_OPEN_APPEND | FA_WRITE);
-	if (!frc)
+	FRESULT frc = file.open(FILENAME, FA_OPEN_APPEND | FA_WRITE | FA_READ);
+	if (frc != FR_OK)
 	{
-		DOLOG(logging::ll_error, "backend_sdcard_rp2040w::begin", "-", "Cannot access test.dat on SD-card");
+		DOLOG(logging::ll_error, "backend_sdcard_rp2040w::begin", "-", "Cannot access " FILENAME " on SD-card");
 		write_led(led_read,  LOW);
 		write_led(led_write, LOW);
 		return false;
@@ -93,7 +93,7 @@ bool backend_sdcard_rp2040w::sync()
 
 	n_syncs++;
 
-	if (file.sync() == false)
+	if (file.sync() != FR_OK)
 		DOLOG(logging::ll_error, "backend_sdcard_rp2040w::sync", "-", "Cannot sync data to SD-card");
 
 	write_led(led_write, LOW);
@@ -121,7 +121,7 @@ bool backend_sdcard_rp2040w::write(const uint64_t block_nr, const uint32_t n_blo
 	uint64_t iscsi_block_size = get_block_size();
 	uint64_t byte_address     = block_nr * iscsi_block_size;  // iSCSI to bytes
 
-	if (file.lseek(byte_address) == false) {
+	if (file.lseek(byte_address) != FR_OK) {
 		DOLOG(logging::ll_error, "backend_sdcard_rp2040w::write", "-", "Cannot seek to %" PRIu64, byte_address);
 		write_led(led_write, LOW);
 		return false;
@@ -176,7 +176,7 @@ bool backend_sdcard_rp2040w::read(const uint64_t block_nr, const uint32_t n_bloc
 	uint64_t iscsi_block_size = get_block_size();
 	uint64_t byte_address     = block_nr * iscsi_block_size;  // iSCSI to bytes
 
-	if (file.lseek(byte_address) == false) {
+	if (file.lseek(byte_address) != FR_OK) {
 		DOLOG(logging::ll_error, "backend_sdcard_rp2040w::read", "-", "Cannot seek to %" PRIu64, byte_address);
 		write_led(led_read, LOW);
 		return false;
@@ -217,7 +217,7 @@ backend::cmpwrite_result_t backend_sdcard_rp2040w::cmpwrite(const uint64_t block
 	for(uint32_t i=0; i<n_blocks; i++) {
 		uint64_t  offset = (block_nr + i) * block_size;
 
-		if (file.lseek(offset) == false) {
+		if (file.lseek(offset) != FR_OK) {
 			DOLOG(logging::ll_error, "backend_sdcard_rp2040w::cmpwrite", "-", "Cannot seek to %" PRIu64 " (read)", offset);
 			result = cmpwrite_result_t::CWR_READ_ERROR;
 			break;
@@ -240,7 +240,7 @@ backend::cmpwrite_result_t backend_sdcard_rp2040w::cmpwrite(const uint64_t block
 		}
 
 		// write
-		if (file.lseek(offset) == false) {
+		if (file.lseek(offset) != FR_OK) {
 			DOLOG(logging::ll_error, "backend_sdcard_rp2040w::cmpwrite", "-", "Cannot seek to %" PRIu64 " (write)", offset);
 			result = cmpwrite_result_t::CWR_READ_ERROR;
 			break;
