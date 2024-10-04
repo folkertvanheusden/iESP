@@ -267,7 +267,8 @@ std::string com_client_sockets::get_local_address() const
 
 #ifdef ESP32
 	inet_ntop(addr.sin_family, &addr.sin_addr.s_addr, host, sizeof host);
-	return host + myformat(":%d", addr.sin_port);
+	//return host + myformat(":%d", addr.sin_port);
+	return host + std::string(":3260");  // ESP32 SDK2 returns peer port?!
 #else
 	getnameinfo(reinterpret_cast<sockaddr *>(&addr), addr_len, host, sizeof(host), serv, sizeof(serv), NI_NUMERICHOST | NI_NUMERICSERV);
 	return myformat("%s:%s", host, serv);
