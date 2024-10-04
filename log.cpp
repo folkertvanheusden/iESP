@@ -84,7 +84,7 @@ void initlogger()
 
 namespace logging {
 #if defined(RP2040W)
-	log_level_t log_level_syslog = logging::ll_debug;
+	log_level_t log_level_syslog = logging::ll_info;
 #else
 	log_level_t log_level_syslog = logging::ll_error;
 #endif
