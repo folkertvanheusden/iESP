@@ -62,9 +62,9 @@ int led_green  = 4;
 int led_yellow = 5;
 int led_red    = 35;
 #elif defined(WEMOS32_ETH) || defined(WEMOS32)
-int led_green  = 17;
-int led_yellow = 16;
-int led_red    = 32;
+int led_green  = -1;
+int led_yellow = -1;
+int led_red    = -1;
 #elif defined(TEENSY4_1)
 int led_green  = 7;
 int led_yellow = 6;
@@ -74,6 +74,10 @@ int led_green  = -1;
 int led_yellow = -1;
 int led_red    = -1;
 #endif
+int pin_SD_MISO= 19;
+int pin_SD_MOSI= 23;
+int pin_SD_SCLK= 18;
+int pin_SD_CS  =  5;
 
 snmp      *snmp_      { nullptr };
 snmp_data *snmp_data_ { nullptr };
@@ -204,6 +208,27 @@ bool load_configuration() {
 
 	if (cfg.containsKey("update-df-interval"))
 		update_df_interval = cfg["update-df-interval"].as<int>();
+
+	if (cfg.containsKey("led-green"))
+		led_green = cfg["led-green"].as<int>();
+
+	if (cfg.containsKey("led-yellow"))
+		led_yellow = cfg["led-yellow"].as<int>();
+
+	if (cfg.containsKey("led-red"))
+		led_red = cfg["led-red"].as<int>();
+
+	if (cfg.containsKey("SD-MISO"))
+		pin_SD_MISO = cfg["SD-MISO"].as<int>();
+
+	if (cfg.containsKey("SD-MOSI"))
+		pin_SD_MOSI = cfg["SD-MOSI"].as<int>();
+
+	if (cfg.containsKey("SD-SCLK"))
+		pin_SD_SCLK = cfg["SD-SCLK"].as<int>();
+
+	if (cfg.containsKey("SD-CS"))
+		pin_SD_CS = cfg["SD-CS"].as<int>();
 
 	data_file.close();
 
@@ -552,7 +577,7 @@ void setup() {
 #if defined(TEENSY4_1)
 	bs = new backend_sdcard_teensy41(led_green, led_yellow);
 #else
-	bs = new backend_sdcard(led_green, led_yellow);
+	bs = new backend_sdcard(led_green, led_yellow, pin_SD_MISO, pin_SD_MOSI, pin_SD_SCLK, pin_SD_CS);
 #endif
 	draw_status(14);
 	if (bs->begin() == false) {

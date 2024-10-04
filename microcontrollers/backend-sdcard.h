@@ -14,6 +14,10 @@ private:
 	size_t    sector_size { 0  };
 	const int led_read    { -1 };
 	const int led_write   { -1 };
+	const int pin_SD_MISO { -1 };
+	const int pin_SD_MOSI { -1 };
+	const int pin_SD_SCLK { -1 };
+	const int pin_SD_CS   { -1 };
 
 #if defined(RP2040W)
 	mutex_t    serial_access_lock;
@@ -24,7 +28,7 @@ private:
 	bool reinit(const bool close_first);
 
 public:
-	backend_sdcard(const int led_read, const int led_write);
+	backend_sdcard(const int led_read, const int led_write, const int pin_SD_MISO, const int pin_SD_MOSI, const int pin_SD_SCLK, const int pin_SD_CS);
 	virtual ~backend_sdcard();
 
 	bool begin() override;
