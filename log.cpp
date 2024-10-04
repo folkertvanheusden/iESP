@@ -109,12 +109,8 @@ namespace logging {
 		(void)vsnprintf(&err_log_buf[offset], sizeof(err_log_buf) - offset, fmt, ap);
 		va_end(ap);
 
-		write_led(led_red, HIGH);
-
-#if !defined(RP2040W)
-		Serial.printf("%04d-%02d-%02d %02d:%02d:%02d ", ntp.year(), ntp.month(), ntp.day(), ntp.hours(), ntp.minutes(), ntp.seconds());
-#endif
-		Serial.println(err_log_buf);
+		if (ll >= ll_warning)
+			write_led(led_red, HIGH);
 
 		if (syslog_host.has_value() && is_network_up()) {
 			IPAddress ip;
@@ -130,7 +126,15 @@ namespace logging {
 				UDP_socket.endPacket();
 			}
 		}
-		write_led(led_red, LOW);
+		else {
+#if !defined(RP2040W)
+			Serial.printf("%04d-%02d-%02d %02d:%02d:%02d ", ntp.year(), ntp.month(), ntp.day(), ntp.hours(), ntp.minutes(), ntp.seconds());
+#endif
+			Serial.println(err_log_buf);
+		}
+
+		if (ll >= ll_error)
+			write_led(led_red, LOW);
 	}
 }
 #else

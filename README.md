@@ -81,6 +81,11 @@ For this:
 * 1 instance of test-blockdevice.py with 3 threads is started with trim/discard/unmap and deduplication-support set to 81% and trim to 9%
 
 
+notes
+-----
+The RP2040W (raspberry pi pico) version is not working yet.
+
+
 license
 -------
 It is licensed under the MIT license.
