@@ -50,11 +50,8 @@ void init_my_getrandom()
 
 bool my_getrandom(void *const tgt, const size_t n)
 {
-	size_t i=0;
-	for(; i<n; i += 4)
-		reinterpret_cast<uint32_t *>(tgt)[i] = get_rand_32();
-	while(i<n)
-		reinterpret_cast<uint8_t *>(tgt)[i++] = get_rand_32();
+	for(size_t i=0; i<n; i++)
+		reinterpret_cast<uint8_t *>(tgt)[i] = get_rand_32();
 
 	return true;
 }
@@ -85,11 +82,8 @@ void init_my_getrandom()
 
 bool my_getrandom(void *const tgt, const size_t n)
 {
-	size_t i=0;
-	for(; i<n; i += 4)
-		reinterpret_cast<uint32_t *>(tgt)[i] = ec.random();
-	while(i<n)
-		reinterpret_cast<uint8_t *>(tgt)[i++] = ec.random();
+	for(size_t i=0; i<n; i++)
+		reinterpret_cast<uint8_t *>(tgt)[i] = ec.random();
 
 	return true;
 }
