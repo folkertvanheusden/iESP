@@ -3,6 +3,6 @@ buildMingw64/
 microcontrollers/.pio
 microcontrollers/data/cfg-iESP.json
 microcontrollers/version.cpp
-microcontrollers/RP2040/.pio/
-microcontrollers/RP2040/version.cpp
+microcontrollers/RP2040W/.pio/
+microcontrollers/RP2040W/version.cpp
 test.dat

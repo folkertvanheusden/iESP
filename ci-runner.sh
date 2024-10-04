@@ -40,6 +40,6 @@ cp -a microcontrollers/.pio/libdeps $P/microcontrollers/.pio
 (cd $P/microcontrollers/ ; pio run -e Teensy4_1)
 
 # Arduino: RP2040W (Raspberry Pi Pico)
-mkdir -p $P/microcontrollers/RP2040/.pio
-cp -a microcontrollers/RP2040/.pio/libdeps $P/microcontrollers/RP2040/.pio
-(cd $P/microcontrollers/RP2040 ; pio run)
+mkdir -p $P/microcontrollers/RP2040W/.pio
+cp -a microcontrollers/RP2040W/.pio/libdeps $P/microcontrollers/RP2040W/.pio
+(cd $P/microcontrollers/RP2040W ; pio run)
