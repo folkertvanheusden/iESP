@@ -83,8 +83,6 @@ namespace logging {
 
 	void sendsyslog(const logging::log_level_t ll, const char *const component, const std::string context, const char *fmt, ...)
 	{
-		thread_local char err_log_buf[192];
-
 		int sl_nr = 3 /* "system daemons" */ * 8;  // see https://www.ietf.org/rfc/rfc3164.txt
 
 		if (ll == ll_info)
@@ -103,10 +101,8 @@ namespace logging {
 		(void)vsnprintf(&err_log_buf[offset], sizeof(err_log_buf) - offset, fmt, ap);
 		va_end(ap);
 
-		write_led(led_red, HIGH);
-
-		Serial.printf("%04d-%02d-%02d %02d:%02d:%02d ", ntp.year(), ntp.month(), ntp.day(), ntp.hours(), ntp.minutes(), ntp.seconds());
-		Serial.println(err_log_buf);
+		if (ll >= ll_warning)
+			write_led(led_red, HIGH);
 
 		if (syslog_host.has_value() && is_network_up()) {
 			IPAddress ip;
@@ -122,7 +118,13 @@ namespace logging {
 				UDP.endPacket();
 			}
 		}
-		write_led(led_red, LOW);
+		else {
+			Serial.printf("%04d-%02d-%02d %02d:%02d:%02d ", ntp.year(), ntp.month(), ntp.day(), ntp.hours(), ntp.minutes(), ntp.seconds());
+			Serial.println(err_log_buf);
+		}
+
+		if (ll >= ll_warning)
+			write_led(led_red, LOW);
 	}
 }
 #else
