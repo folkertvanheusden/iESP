@@ -45,6 +45,30 @@ extern void write_led(const int gpio, const int state);
 extern int led_red;
 extern bool is_network_up();
 
+namespace logging {
+	log_level_t parse_ll(const std::string & str)
+	{
+		if (str == "debug")
+			return logging::ll_debug;
+
+		if (str == "info")
+			return logging::ll_info;
+
+		if (str == "warning")
+			return logging::ll_warning;
+
+		if (str == "error")
+			return logging::ll_error;
+
+#if !defined(ARDUINO)
+		fprintf(stderr, "Log level \"%s\" not understood\n", str.c_str());
+		exit(1);
+#endif
+
+		return logging::ll_debug;
+	}
+}
+
 #if defined(ARDUINO) && !defined(RP2040W)
 void initlogger()
 {
@@ -55,6 +79,8 @@ void initlogger()
 }
 
 namespace logging {
+	log_level_t log_level_syslog = logging::ll_error;
+
 	void sendsyslog(const logging::log_level_t ll, const char *const component, const std::string context, const char *fmt, ...)
 	{
 		thread_local char err_log_buf[192];
@@ -104,28 +130,6 @@ namespace logging {
 	static const char *logfile          = strdup("/tmp/iesp.log");
 	log_level_t        log_level_file   = logging::ll_debug;
 	log_level_t        log_level_screen = logging::ll_error;
-
-	log_level_t parse_ll(const std::string & str)
-	{
-		if (str == "debug")
-			return logging::ll_debug;
-
-		if (str == "info")
-			return logging::ll_info;
-
-		if (str == "warning")
-			return logging::ll_warning;
-
-		if (str == "error")
-			return logging::ll_error;
-
-#if !defined(ARDUINO)
-		fprintf(stderr, "Log level \"%s\" not understood\n", str.c_str());
-		exit(1);
-#endif
-
-		return logging::ll_debug;
-	}
 
 	void initlogger()
 	{
