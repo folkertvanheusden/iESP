@@ -215,7 +215,7 @@ bool iscsi_pdu_login_request::set_data(std::pair<const uint8_t *, std::size_t> d
 			initiator = parts[1];
 		else if (parts[0] == "TargetName")
 			target_name = parts[1];
-		else if (parts[0] == " SessionType")
+		else if (parts[0] == "SessionType")
 			discovery = parts[1] == "Discovery";
 	}
 
