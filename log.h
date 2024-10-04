@@ -9,7 +9,7 @@ namespace logging {
 
 	log_level_t parse_ll(const std::string & str);
 
-#if defined(ARDUINO) && !defined(RP2040W)
+#if defined(ARDUINO)
         extern log_level_t log_level_syslog;
 
 	void sendsyslog(const logging::log_level_t ll, const char *const component, const std::string context, const char *fmt, ...);

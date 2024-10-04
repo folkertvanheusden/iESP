@@ -23,6 +23,15 @@ scsi            *sd   { nullptr };
 server          *s    { nullptr };
 iscsi_stats_t    is;
 io_stats_t       ios;
+volatile bool    wifi_connected { false };
+int              led_green  {  4 };
+int              led_yellow {  5 };
+int              led_red    { 35 };
+
+bool is_network_up()
+{
+	return wifi_connected;
+}
 
 void write_led(const int gpio, const int state) {
 	if (gpio != -1)
@@ -52,7 +61,8 @@ void setup()
 
 	try {
 		c = new com_arduino(3260);
-		if (c->begin() == false)
+		wifi_connected = c->begin();
+		if (wifi_connected == false)
 			Serial.println(F("Failed to initialize com-layer"));
 
 		init_my_getrandom();

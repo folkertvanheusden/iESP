@@ -27,9 +27,9 @@ namespace qn = qindesign::network;
 #if defined(ARDUINO)
 std::optional<std::string> syslog_host;
 #if defined(TEENSY4_1)
-qn::EthernetUDP UDP;
+qn::EthernetUDP UDP_socket;
 #else
-WiFiUDP UDP;
+WiFiUDP UDP_socket;
 #endif
 #endif
 std::string name { "?" };
@@ -38,7 +38,11 @@ std::string name { "?" };
 extern NTP ntp;
 #endif
 
+#if defined(RP2040W)
+char err_log_buf[192];
+#else
 thread_local char err_log_buf[192];
+#endif
 
 // TODO: into headerfile
 extern void write_led(const int gpio, const int state);
@@ -69,22 +73,24 @@ namespace logging {
 	}
 }
 
-#if defined(ARDUINO) && !defined(RP2040W)
+#if defined(ARDUINO)
 void initlogger()
 {
 #if defined(ESP32)
-	if (UDP.begin(514) == 0)
-		Serial.println(F("UDP.begin(514) failed"));
+	if (UDP_socket.begin(514) == 0)
+		Serial.println(F("UDP_socket.begin(514) failed"));
 #endif
 }
 
 namespace logging {
+#if defined(RP2040W)
+	log_level_t log_level_syslog = logging::ll_debug;
+#else
 	log_level_t log_level_syslog = logging::ll_error;
+#endif
 
 	void sendsyslog(const logging::log_level_t ll, const char *const component, const std::string context, const char *fmt, ...)
 	{
-		thread_local char err_log_buf[192];
-
 		int sl_nr = 3 /* "system daemons" */ * 8;  // see https://www.ietf.org/rfc/rfc3164.txt
 
 		if (ll == ll_info)
@@ -105,7 +111,9 @@ namespace logging {
 
 		write_led(led_red, HIGH);
 
+#if !defined(RP2040W)
 		Serial.printf("%04d-%02d-%02d %02d:%02d:%02d ", ntp.year(), ntp.month(), ntp.day(), ntp.hours(), ntp.minutes(), ntp.seconds());
+#endif
 		Serial.println(err_log_buf);
 
 		if (syslog_host.has_value() && is_network_up()) {
@@ -117,9 +125,9 @@ namespace logging {
 			}
 
 			if (!failed) {
-				UDP.beginPacket(ip, 514);
-				UDP.printf(err_log_buf);
-				UDP.endPacket();
+				UDP_socket.beginPacket(ip, 514);
+				UDP_socket.printf(err_log_buf);
+				UDP_socket.endPacket();
 			}
 		}
 		write_led(led_red, LOW);
