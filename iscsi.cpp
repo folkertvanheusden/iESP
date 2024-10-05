@@ -62,12 +62,12 @@ uint32_t crc32_0x11EDC6F41(const uint8_t *data, const size_t len)
 {
 	uint32_t r = ~0;
 
-	for(size_t i=0; i<len; i++) {
-		r ^= data[i];
+	for(size_t k=0; k<len; k++) {
+		r ^= data[k];
 
 		for(int i = 0; i < 8; i++) {
 			uint32_t t = ~((r & 1) - 1);
-			r = (r >> 1) ^ (0x11EDC6F41 & t);
+			r = (r >> 1) ^ (0x82f63b78 & t);  // 0x82f63b78 = 0x11EDC6F41 in reverse bit order
 		}
 	}
 
