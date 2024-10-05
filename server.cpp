@@ -361,7 +361,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 		delete pdu_out;
 	}
 
-	// e.g. for READ_xx (as buffering may be RAM-wise too costly (on the ESP32))
+	// e.g. for READ_xx (as buffering may be RAM-wise too costly (on microcontrollers))
 	if (response_set.value().to_stream.has_value()) {
 		auto & stream_parameters = response_set.value().to_stream.value();
 
