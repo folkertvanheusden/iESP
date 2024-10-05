@@ -83,10 +83,12 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 #if !defined(ARDUINO) && !defined(NDEBUG)
 	cmd_use_count[opcode]++;
 #endif
+	bool           has_digest = true;
 
 	switch(opcode) {
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_login_req:
 			pdu_obj = new iscsi_pdu_login_request(*ses);
+			has_digest = false;
 			break;
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_cmd:
 			pdu_obj = new iscsi_pdu_scsi_cmd(*ses);
@@ -140,6 +142,20 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 		if (bhs.get_opcode() == iscsi_pdu_bhs::iscsi_bhs_opcode::o_logout_req)
 			is->iscsiTgtLogoutNormals++;
 
+		if ((*ses)->get_header_digest() && has_digest) {
+			uint32_t remote_header_digest = 0;
+
+			if (cc->recv(reinterpret_cast<uint8_t *>(&remote_header_digest), sizeof remote_header_digest) == false) {
+				ok = false;
+				DOLOG(logging::ll_info, "server::receive_pdu", cc->get_endpoint_name(), "header digest receive error");
+			}
+			else {
+				// TODO verify digest
+
+				is->iscsiSsnRxDataOctets += sizeof remote_header_digest;
+			}
+		}
+
 		size_t ahs_len = pdu_obj->get_ahs_length();
 		if (ahs_len) {
 			DOLOG(logging::ll_debug, "server::receive_pdu", cc->get_endpoint_name(), "read %zu ahs bytes", ahs_len);
@@ -176,6 +192,20 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 
 			(*ses)->add_bytes_rx(padded_data_length);
 			is->iscsiSsnRxDataOctets += padded_data_length;
+
+			if ((*ses)->get_data_digest() && has_digest) {
+				uint32_t remote_data_digest = 0;
+
+				if (cc->recv(reinterpret_cast<uint8_t *>(&remote_data_digest), sizeof remote_data_digest) == false) {
+					ok = false;
+					DOLOG(logging::ll_info, "server::receive_pdu", cc->get_endpoint_name(), "data digest receive error");
+				}
+				else {
+					// TODO verify digest
+
+					is->iscsiSsnRxDataOctets += sizeof remote_data_digest;
+				}
+			}
 		}
 		
 		if (!ok) {

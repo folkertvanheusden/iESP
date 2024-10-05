@@ -57,9 +57,11 @@ iscsi_pdu_bhs::~iscsi_pdu_bhs()
 std::vector<blob_t> iscsi_pdu_bhs::get_helper(const void *const header, const uint8_t *const data, const size_t data_len, const bool allow_digest) const
 {
 	size_t                  header_size   = sizeof(__bhs__);
+	assert(header_size == 48);
 	size_t                  out_size      = header_size;
 	std::optional<uint32_t> header_digest;
 	size_t                  header_digest_offset = header_size;
+	assert(header_digest_offset == 48);
 	size_t                  data_offset          = 0;
 	size_t                  data_digest_offset   = 0;
 	size_t                  data_padded_length   = 0;
