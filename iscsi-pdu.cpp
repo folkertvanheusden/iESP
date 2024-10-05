@@ -77,7 +77,7 @@ std::vector<blob_t> iscsi_pdu_bhs::get_helper(const void *const header, const ui
 	data_padded_length = (data_len + 3) & ~3;
 	out_size          += data_padded_length;
 	data_digest_offset = out_size;
-	if (ses->get_data_digest() && allow_digest)
+	if (ses->get_data_digest() && allow_digest && data_len > 0)
 		out_size += digest_length;
 
 	uint8_t *out = new uint8_t[out_size];
@@ -85,7 +85,7 @@ std::vector<blob_t> iscsi_pdu_bhs::get_helper(const void *const header, const ui
 	memcpy(&out[0], header, header_size);
 	if (header_digest.has_value())
 		memcpy(&out[header_digest_offset], &header_digest.value(), digest_length);
-	if (data_len) {
+	if (data_len > 0) {
 		if (ses->get_data_digest() && allow_digest) {
 			memset(&out[out_size] - (4 /* data padding */ + digest_length), 0x00, 4);  // make sure padding is 0x00
 			memcpy(&out[data_offset], data, data_len);
