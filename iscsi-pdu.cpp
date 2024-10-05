@@ -228,6 +228,17 @@ iscsi_pdu_login_request::~iscsi_pdu_login_request()
 {
 }
 
+bool has_CRC32C(const std::string & value)
+{
+	auto parts = split(value, ",");
+	for(auto & part: parts) {
+		if (part == "CRC32C")
+			return true;
+	}
+
+	return false;
+}
+
 bool iscsi_pdu_login_request::set_data(std::pair<const uint8_t *, std::size_t> data_in)
 {
 	if (iscsi_pdu_bhs::set_data(data_in) == false) {
@@ -257,9 +268,9 @@ bool iscsi_pdu_login_request::set_data(std::pair<const uint8_t *, std::size_t> d
 		else if (parts[0] == "SessionType")
 			discovery = parts[1] == "Discovery";
 		else if (parts[0] == "HeaderDigest")
-			ses->set_header_digest(parts[1] == "CRC32");
+			ses->set_header_digest(has_CRC32C(parts[1]));
 		else if (parts[0] == "DataDigest")
-			ses->set_data_digest(parts[1] == "CRC32");
+			ses->set_data_digest(has_CRC32C(parts[1]));
 	}
 
 	if (max_burst < uint32_t(~0)) {
@@ -326,8 +337,8 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 		DOLOG(logging::ll_debug, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "login mode");
 
 		const std::vector<std::string> kvs {
-			ses->get_header_digest() ? "HeaderDigest=CRC32" : "HeaderDigest=None",
-			ses->get_data_digest  () ? "DataDigest=CRC32"   : "DataDigest=None",
+			ses->get_header_digest() ? "HeaderDigest=CRC32C" : "HeaderDigest=None",
+			ses->get_data_digest  () ? "DataDigest=CRC32C"   : "DataDigest=None",
 			"DefaultTime2Wait=2",
 			"DefaultTime2Retain=20",
 			"ErrorRecoveryLevel=0",
