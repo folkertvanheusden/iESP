@@ -84,7 +84,8 @@ protected:
 	std::vector<iscsi_pdu_ahs *> ahs_list;
 	std::pair<uint8_t *, size_t> data     { nullptr, 0 };
 
-	std::vector<blob_t> get_helper(const void *const header, const uint8_t *const data, const size_t data_len) const;
+	// allow_digest: login reply shall not include a digest
+	std::vector<blob_t> get_helper(const void *const header, const uint8_t *const data, const size_t data_len, const bool allow_digest = true) const;
 
 public:
 	iscsi_pdu_bhs(session *const ses);

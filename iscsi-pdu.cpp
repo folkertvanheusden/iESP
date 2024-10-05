@@ -54,7 +54,7 @@ iscsi_pdu_bhs::~iscsi_pdu_bhs()
 	delete [] data.first;
 }
 
-std::vector<blob_t> iscsi_pdu_bhs::get_helper(const void *const header, const uint8_t *const data, const size_t data_len) const
+std::vector<blob_t> iscsi_pdu_bhs::get_helper(const void *const header, const uint8_t *const data, const size_t data_len, const bool allow_digest) const
 {
 	size_t                  header_size   = sizeof(__bhs__);
 	size_t                  out_size      = header_size;
@@ -65,7 +65,7 @@ std::vector<blob_t> iscsi_pdu_bhs::get_helper(const void *const header, const ui
 	size_t                  data_padded_length   = 0;
 	size_t                  digest_length = sizeof(uint32_t);
 
-	if (ses->get_header_digest()) {
+	if (ses->get_header_digest() && allow_digest) {
 		uint32_t crc32 = htonl(crc32_0x11EDC6F41(reinterpret_cast<const uint8_t *>(header), header_size));
 		out_size += digest_length;
 		header_digest = crc32;
@@ -75,7 +75,7 @@ std::vector<blob_t> iscsi_pdu_bhs::get_helper(const void *const header, const ui
 	data_padded_length = (data_len + 3) & ~3;
 	out_size          += data_padded_length;
 	data_digest_offset = out_size;
-	if (ses->get_data_digest())
+	if (ses->get_data_digest() && allow_digest)
 		out_size += digest_length;
 
 	uint8_t *out = new uint8_t[out_size];
@@ -84,7 +84,7 @@ std::vector<blob_t> iscsi_pdu_bhs::get_helper(const void *const header, const ui
 	if (header_digest.has_value())
 		memcpy(&out[header_digest_offset], &header_digest.value(), digest_length);
 	if (data_len) {
-		if (ses->get_data_digest()) {
+		if (ses->get_data_digest() && allow_digest) {
 			memset(&out[out_size] - (4 /* data padding */ + digest_length), 0x00, 4);  // make sure padding is 0x00
 
 			uint32_t data_digest = htonl(crc32_0x11EDC6F41(data, data_padded_length));
@@ -288,7 +288,7 @@ bool iscsi_pdu_login_request::set_data(std::pair<const uint8_t *, std::size_t> d
 
 std::vector<blob_t> iscsi_pdu_login_request::get() const
 {
-	return get_helper(login_req, nullptr, 0);
+	return get_helper(login_req, nullptr, 0, false);
 }
 
 std::optional<iscsi_response_set> iscsi_pdu_login_request::get_response(scsi *const sd)
@@ -390,7 +390,7 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 
 std::vector<blob_t> iscsi_pdu_login_reply::get() const
 {
-	return get_helper(login_reply, login_reply_reply_data.first, login_reply_reply_data.second);
+	return get_helper(login_reply, login_reply_reply_data.first, login_reply_reply_data.second, false);
 }
 
 /*--------------------------------------------------------------------------*/
