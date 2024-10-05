@@ -68,7 +68,7 @@ std::vector<blob_t> iscsi_pdu_bhs::get_helper(const void *const header, const ui
 	size_t                  digest_length = sizeof(uint32_t);
 
 	if (ses->get_header_digest() && allow_digest) {
-		uint32_t crc32 = htonl(crc32_0x11EDC6F41(reinterpret_cast<const uint8_t *>(header), header_size));
+		uint32_t crc32 = crc32_0x11EDC6F41(reinterpret_cast<const uint8_t *>(header), header_size);
 		out_size += digest_length;
 		header_digest = crc32;
 	}
@@ -89,7 +89,7 @@ std::vector<blob_t> iscsi_pdu_bhs::get_helper(const void *const header, const ui
 		if (ses->get_data_digest() && allow_digest) {
 			memset(&out[out_size] - (4 /* data padding */ + digest_length), 0x00, 4);  // make sure padding is 0x00
 
-			uint32_t data_digest = htonl(crc32_0x11EDC6F41(data, data_padded_length));
+			uint32_t data_digest = crc32_0x11EDC6F41(data, data_padded_length);
 			memcpy(&out[data_digest_offset], &data_digest, digest_length);
 		}
 		else {
