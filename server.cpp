@@ -142,20 +142,6 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 		if (bhs.get_opcode() == iscsi_pdu_bhs::iscsi_bhs_opcode::o_logout_req)
 			is->iscsiTgtLogoutNormals++;
 
-		if ((*ses)->get_header_digest() && has_digest) {
-			uint32_t remote_header_digest = 0;
-
-			if (cc->recv(reinterpret_cast<uint8_t *>(&remote_header_digest), sizeof remote_header_digest) == false) {
-				ok = false;
-				DOLOG(logging::ll_info, "server::receive_pdu", cc->get_endpoint_name(), "header digest receive error");
-			}
-			else {
-				// TODO verify digest
-
-				is->iscsiSsnRxDataOctets += sizeof remote_header_digest;
-			}
-		}
-
 		size_t ahs_len = pdu_obj->get_ahs_length();
 		if (ahs_len) {
 			DOLOG(logging::ll_debug, "server::receive_pdu", cc->get_endpoint_name(), "read %zu ahs bytes", ahs_len);
@@ -172,6 +158,20 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 
 			(*ses)->add_bytes_rx(ahs_len);
 			is->iscsiSsnRxDataOctets += ahs_len;
+		}
+
+		if ((*ses)->get_header_digest() && has_digest) {
+			uint32_t remote_header_digest = 0;
+
+			if (cc->recv(reinterpret_cast<uint8_t *>(&remote_header_digest), sizeof remote_header_digest) == false) {
+				ok = false;
+				DOLOG(logging::ll_info, "server::receive_pdu", cc->get_endpoint_name(), "header digest receive error");
+			}
+			else {
+				// TODO verify digest
+
+				is->iscsiSsnRxDataOctets += sizeof remote_header_digest;
+			}
 		}
 
 		size_t data_length = pdu_obj->get_data_length();
