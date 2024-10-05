@@ -44,7 +44,6 @@ ssize_t WRITE(const int fd, const uint8_t *whereto, size_t len)
 
 	while(len > 0) {
 		ssize_t rc = write(fd, whereto, len);
-
 		if (rc <= 0)
 			return -1;
 
