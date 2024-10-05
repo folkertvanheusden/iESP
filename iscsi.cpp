@@ -57,3 +57,19 @@ uint8_t get_bits(const uint8_t from, const int bit_nr, const int length)
 	uint16_t mask = (1 << length) - 1;
 	return (from >> bit_nr) & mask; 
 }
+
+uint32_t crc32_0x11EDC6F41(const uint8_t *data, const size_t len)
+{
+	uint32_t r = ~0;
+
+	for(size_t i=0; i<len; i++) {
+		r ^= data[i];
+
+		for(int i = 0; i < 8; i++) {
+			uint32_t t = ~((r & 1) - 1);
+			r = (r >> 1) ^ (0x11EDC6F41 & t);
+		}
+	}
+
+	return ~r;
+}

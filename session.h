@@ -12,14 +12,17 @@ class iscsi_pdu_scsi_cmd;
 class session
 {
 private:
-	com_client *const connected_to { nullptr };  // e.g. for retrieving the local address
+	com_client *const connected_to  { nullptr };  // e.g. for retrieving the local address
 	const std::string target_name;
-	uint32_t          data_sn_itt  { 0       };  // itt == initiator transfer tag
-	uint32_t          data_sn      { 0       };
-	uint32_t          block_size   { 0       };
+	uint32_t          data_sn_itt   { 0       };  // itt == initiator transfer tag
+	uint32_t          data_sn       { 0       };
+	uint32_t          block_size    { 0       };
 
-	uint64_t          bytes_rx     { 0       };
-	uint64_t          bytes_tx     { 0       };
+	uint64_t          bytes_rx      { 0       };
+	uint64_t          bytes_tx      { 0       };
+
+	bool              header_digest { false   };
+	bool              data_digest   { false   };
 
 	std::optional<uint32_t> ack_interval;
 
@@ -32,6 +35,11 @@ public:
 	std::string get_target_name  () const { return target_name;                       }
 	std::string get_local_address() const { return connected_to->get_local_address(); }
 	std::string get_endpoint_name() const { return connected_to->get_endpoint_name(); }
+
+	void     set_header_digest(const bool v) { header_digest = v; }
+	void     set_data_digest  (const bool v) { data_digest   = v; }
+	bool     get_header_digest() const { return header_digest; }
+	bool     get_data_digest  () const { return data_digest;   }
 
 	void     add_bytes_rx(const uint64_t n) { bytes_rx += n; }
 	uint64_t get_bytes_rx() const { return bytes_rx; }

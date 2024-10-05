@@ -84,7 +84,7 @@ protected:
 	std::vector<iscsi_pdu_ahs *> ahs_list;
 	std::pair<uint8_t *, size_t> data     { nullptr, 0 };
 
-	std::vector<blob_t> return_helper(void *const data, size_t n) const;
+	std::vector<blob_t> get_helper(const void *const header, const uint8_t *const data, const size_t data_len) const;
 
 public:
 	iscsi_pdu_bhs(session *const ses);

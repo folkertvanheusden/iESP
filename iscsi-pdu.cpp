@@ -54,11 +54,52 @@ iscsi_pdu_bhs::~iscsi_pdu_bhs()
 	delete [] data.first;
 }
 
-std::vector<blob_t> iscsi_pdu_bhs::return_helper(void *const data, size_t n) const
+std::vector<blob_t> iscsi_pdu_bhs::get_helper(const void *const header, const uint8_t *const data, const size_t data_len) const
 {
-	std::vector<blob_t> out;
-	out.push_back({ reinterpret_cast<uint8_t *>(data), n });
-	return out;
+	size_t                  header_size   = sizeof(__bhs__);
+	size_t                  out_size      = header_size;
+	std::optional<uint32_t> header_digest;
+	size_t                  header_digest_offset = header_size;
+	size_t                  data_offset          = 0;
+	size_t                  data_digest_offset   = 0;
+	size_t                  data_padded_length   = 0;
+	size_t                  digest_length = sizeof(uint32_t);
+
+	if (ses->get_header_digest()) {
+		uint32_t crc32 = htonl(crc32_0x11EDC6F41(reinterpret_cast<const uint8_t *>(header), header_size));
+		out_size += digest_length;
+		header_digest = crc32;
+	}
+
+	data_offset        = out_size;
+	data_padded_length = (data_len + 3) & ~3;
+	out_size          += data_padded_length;
+	data_digest_offset = out_size;
+	if (ses->get_data_digest())
+		out_size += digest_length;
+
+	uint8_t *out = new uint8_t[out_size];
+
+	memcpy(&out[0], header, header_size);
+	if (header_digest.has_value())
+		memcpy(&out[header_digest_offset], &header_digest.value(), digest_length);
+	if (data_len) {
+		if (ses->get_data_digest()) {
+			memset(&out[out_size] - (4 /* data padding */ + digest_length), 0x00, 4);  // make sure padding is 0x00
+
+			uint32_t data_digest = htonl(crc32_0x11EDC6F41(data, data_padded_length));
+			memcpy(&out[data_digest_offset], &data_digest, digest_length);
+		}
+		else {
+			memset(&out[out_size] - 4 /* data padding */, 0x00, 4);
+		}
+
+		memcpy(&out[data_offset], data, data_len);
+	}
+
+	std::vector<blob_t> out_vector;
+	out_vector.push_back({ out, out_size });
+	return out_vector;
 }
 
 bool iscsi_pdu_bhs::set(const uint8_t *const in, const size_t n)
@@ -118,9 +159,7 @@ std::optional<std::pair<const uint8_t *, size_t> > iscsi_pdu_bhs::get_data() con
 
 std::vector<blob_t> iscsi_pdu_bhs::get() const
 {
-	void *out = duplicate_new(bhs, sizeof *bhs);
-
-	return return_helper(out, sizeof *bhs);
+	return get_helper(bhs, nullptr, 0);
 }
 
 std::optional<iscsi_response_set> iscsi_pdu_bhs::get_response(scsi *const sd)
@@ -171,7 +210,7 @@ blob_t iscsi_pdu_ahs::get()
 {
 	uint16_t expected_size = NTOHS(reinterpret_cast<const __ahs_header__ *>(ahs)->length);
 	uint32_t out_size      = sizeof(__ahs_header__) + expected_size;
-	uint8_t *out = duplicate_new(ahs, out_size);
+	uint8_t *out           = duplicate_new(ahs, out_size);
 
 	return { out, out_size };
 }
@@ -201,7 +240,7 @@ bool iscsi_pdu_login_request::set_data(std::pair<const uint8_t *, std::size_t> d
 	std::string target_name;
 	bool        discovery   = false;
 	for(auto & kv: kvs_in) {
-		DOLOG(logging::ll_debug, "iscsi_pdu_login_request::get_response", ses->get_endpoint_name(), "kv %s", kv.c_str());
+		DOLOG(logging::ll_debug, "iscsi_pdu_login_request::set_data", ses->get_endpoint_name(), "kv %s", kv.c_str());
 
 		auto parts = split(kv, "=");
 		if (parts.size() < 2)
@@ -217,15 +256,19 @@ bool iscsi_pdu_login_request::set_data(std::pair<const uint8_t *, std::size_t> d
 			target_name = parts[1];
 		else if (parts[0] == "SessionType")
 			discovery = parts[1] == "Discovery";
+		else if (parts[0] == "HeaderDigest")
+			ses->set_header_digest(parts[1] == "CRC32");
+		else if (parts[0] == "DataDigest")
+			ses->set_data_digest(parts[1] == "CRC32");
 	}
 
 	if (max_burst < uint32_t(~0)) {
-		DOLOG(logging::ll_debug, "iscsi_pdu_login_request::get_response", ses->get_endpoint_name(), "set max-burst to %u", max_burst);
+		DOLOG(logging::ll_debug, "iscsi_pdu_login_request::set_data", ses->get_endpoint_name(), "set max-burst to %u", max_burst);
 		ses->set_ack_interval(max_burst);
 	}
 
 	if (target_name != ses->get_target_name() && discovery == false) {
-		DOLOG(logging::ll_warning, "iscsi_pdu_login_request::get_response", ses->get_endpoint_name(), "invalid target name \"%s\", expecting \"%s\"", target_name.c_str(), ses->get_target_name().c_str());
+		DOLOG(logging::ll_warning, "iscsi_pdu_login_request::set_data", ses->get_endpoint_name(), "invalid target name \"%s\", expecting \"%s\"", target_name.c_str(), ses->get_target_name().c_str());
 		return false;
 	}
 
@@ -234,9 +277,7 @@ bool iscsi_pdu_login_request::set_data(std::pair<const uint8_t *, std::size_t> d
 
 std::vector<blob_t> iscsi_pdu_login_request::get() const
 {
-	void *out = duplicate_new(login_req, sizeof *login_req);
-
-	return return_helper(out, sizeof *login_req);
+	return get_helper(login_req, nullptr, 0);
 }
 
 std::optional<iscsi_response_set> iscsi_pdu_login_request::get_response(scsi *const sd)
@@ -285,8 +326,8 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 		DOLOG(logging::ll_debug, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "login mode");
 
 		const std::vector<std::string> kvs {
-			"HeaderDigest=None",
-			"DataDigest=None",
+			ses->get_header_digest() ? "HeaderDigest=CRC32" : "HeaderDigest=None",
+			ses->get_data_digest  () ? "DataDigest=CRC32"   : "DataDigest=None",
 			"DefaultTime2Wait=2",
 			"DefaultTime2Retain=20",
 			"ErrorRecoveryLevel=0",
@@ -338,16 +379,7 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 
 std::vector<blob_t> iscsi_pdu_login_reply::get() const
 {
-	// round for padding
-	size_t data_size_padded = (login_reply_reply_data.second + 3) & ~3;
-
-	size_t   out_size = sizeof(*login_reply) + data_size_padded;
-	uint8_t *out      = new uint8_t[out_size]();
-	memcpy(out, login_reply, sizeof *login_reply);
-	memcpy(&out[sizeof *login_reply], login_reply_reply_data.first, login_reply_reply_data.second);
-
-	assert((out_size & 3) == 0);
-	return return_helper(out, out_size);
+	return get_helper(login_reply, login_reply_reply_data.first, login_reply_reply_data.second);
 }
 
 /*--------------------------------------------------------------------------*/
@@ -378,10 +410,7 @@ bool iscsi_pdu_scsi_cmd::set(const uint8_t *const in, const size_t n)
 
 std::vector<blob_t> iscsi_pdu_scsi_cmd::get() const
 {
-	size_t out_size = sizeof *cdb_pdu_req;
-	void  *out      = duplicate_new(cdb_pdu_req, sizeof *cdb_pdu_req);
-
-	return return_helper(out, out_size);
+	return get_helper(cdb_pdu_req, nullptr, 0);
 }
 
 std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(scsi *const sd, const uint8_t status)
@@ -533,15 +562,7 @@ bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std
 
 std::vector<blob_t> iscsi_pdu_scsi_response::get() const
 {
-	size_t   out_size = sizeof(*pdu_response) + pdu_response_data.second;
-	out_size = (out_size + 3) & ~3;
-
-	uint8_t *out      = new uint8_t[out_size]();
-	memcpy(out, pdu_response, sizeof *pdu_response);
-	if (pdu_response_data.second)
-		memcpy(&out[sizeof *pdu_response], pdu_response_data.first, pdu_response_data.second);
-
-	return return_helper(out, out_size);
+	return get_helper(pdu_response, pdu_response_data.first, pdu_response_data.second);
 }
 
 /*--------------------------------------------------------------------------*/
@@ -621,15 +642,8 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get() const
 		pdu_data_in->bufferoff  = HTONL(i);
 		pdu_data_in->ResidualCt = HTONL(use_pdu_data_size - i);
 
-		size_t out_size = sizeof(*pdu_data_in) + cur_len;
-		out_size = (out_size + 3) & ~3;
-
-		uint8_t *out = new uint8_t[out_size]();
-		memcpy(out, pdu_data_in, sizeof *pdu_data_in);
-		if (cur_len)
-			memcpy(&out[sizeof(*pdu_data_in)], pdu_data_in_data.first + i, cur_len);
-
-		v_out.push_back({ out, out_size });
+		auto temp_out = get_helper(pdu_data_in, pdu_data_in_data.first + i, cur_len);
+		v_out.push_back(temp_out.at(0));
 	}
 
 	DOLOG(logging::ll_debug, "iscsi_pdu_scsi_data_in::get", ses->get_endpoint_name(), "returning %zu PDUs", v_out.size());
@@ -714,8 +728,7 @@ bool iscsi_pdu_scsi_data_out::set(const iscsi_pdu_scsi_cmd & reply_to, const std
 
 std::vector<blob_t> iscsi_pdu_scsi_data_out::get() const
 {
-	std::vector<blob_t> out;
-	return out;
+	return { };
 }
 
 /*--------------------------------------------------------------------------*/
@@ -775,10 +788,7 @@ bool iscsi_pdu_nop_in::set(const iscsi_pdu_nop_out & reply_to)
 
 std::vector<blob_t> iscsi_pdu_nop_in::get() const
 {
-	size_t   out_size = sizeof *nop_in;
-	uint8_t *out      = duplicate_new(nop_in, sizeof *nop_in);
-
-	return return_helper(out, out_size);
+	return get_helper(nop_in, nullptr, 0);
 }
 
 /*--------------------------------------------------------------------------*/
@@ -812,10 +822,7 @@ bool iscsi_pdu_scsi_r2t::set(const iscsi_pdu_scsi_cmd & reply_to, const uint32_t
 
 std::vector<blob_t> iscsi_pdu_scsi_r2t::get() const
 {
-	size_t   out_size = sizeof *pdu_scsi_r2t;
-	uint8_t *out      = duplicate_new(pdu_scsi_r2t, sizeof *pdu_scsi_r2t);
-
-	return return_helper(out, out_size);
+	return get_helper(pdu_scsi_r2t, nullptr, 0);
 }
 
 /*--------------------------------------------------------------------------*/
@@ -843,10 +850,7 @@ bool iscsi_pdu_text_request::set(const uint8_t *const in, const size_t n)
 
 std::vector<blob_t> iscsi_pdu_text_request::get() const
 {
-	size_t out_size = sizeof *text_req;
-	void  *out      = duplicate_new(text_req, sizeof *text_req);
-
-	return return_helper(out, out_size);
+	return get_helper(text_req, nullptr, 0);
 }
 
 std::optional<iscsi_response_set> iscsi_pdu_text_request::get_response(scsi *const sd)
@@ -922,16 +926,7 @@ bool iscsi_pdu_text_reply::set(const iscsi_pdu_text_request & reply_to, scsi *co
 
 std::vector<blob_t> iscsi_pdu_text_reply::get() const
 {
-	// round for padding
-	size_t   data_size_padded = (text_reply_reply_data.second + 3) & ~3;
-
-	size_t   out_size = sizeof(*text_reply) + data_size_padded;
-	uint8_t *out      = new uint8_t[out_size]();
-	memcpy(out, text_reply, sizeof *text_reply);
-	if (text_reply_reply_data.second)
-		memcpy(&out[sizeof *text_reply], text_reply_reply_data.first, text_reply_reply_data.second);
-
-	return { { out, out_size } };
+	return get_helper(text_reply, text_reply_reply_data.first, text_reply_reply_data.second);
 }
 
 /*--------------------------------------------------------------------------*/
@@ -959,10 +954,7 @@ bool iscsi_pdu_logout_request::set(const uint8_t *const in, const size_t n)
 
 std::vector<blob_t> iscsi_pdu_logout_request::get() const
 {
-	size_t out_size = sizeof *logout_req;
-	void  *out      = duplicate_new(logout_req, sizeof *logout_req);
-
-	return return_helper(out, out_size);
+	return get_helper(logout_req, nullptr, 0);
 }
 
 std::optional<iscsi_response_set> iscsi_pdu_logout_request::get_response(scsi *const sd)
@@ -1005,10 +997,7 @@ bool iscsi_pdu_logout_reply::set(const iscsi_pdu_logout_request & reply_to)
 
 std::vector<blob_t> iscsi_pdu_logout_reply::get() const
 {
-	size_t   out_size = sizeof(*logout_reply);
-	uint8_t *out      = duplicate_new(logout_reply, sizeof *logout_reply);
-
-	return { { out, out_size } };
+	return get_helper(logout_reply, nullptr, 0);
 }
 
 /*--------------------------------------------------------------------------*/
@@ -1036,10 +1025,7 @@ bool iscsi_pdu_taskman_request::set(const uint8_t *const in, const size_t n)
 
 std::vector<blob_t> iscsi_pdu_taskman_request::get() const
 {
-	size_t out_size = sizeof *taskman_req;
-	void  *out      = duplicate_new(taskman_req, sizeof *taskman_req);
-
-	return return_helper(out, out_size);
+	return get_helper(taskman_req, nullptr, 0);
 }
 
 std::optional<iscsi_response_set> iscsi_pdu_taskman_request::get_response(scsi *const sd)
@@ -1081,10 +1067,7 @@ bool iscsi_pdu_taskman_reply::set(const iscsi_pdu_taskman_request & reply_to)
 
 std::vector<blob_t> iscsi_pdu_taskman_reply::get() const
 {
-	size_t   out_size = sizeof(*taskman_reply);
-	uint8_t *out      = duplicate_new(taskman_reply, sizeof *taskman_reply);
-
-	return { { out, out_size } };
+	return get_helper(taskman_reply, nullptr, 0);
 }
 
 std::optional<blob_t> generate_reject_pdu(const iscsi_pdu_bhs & about)
