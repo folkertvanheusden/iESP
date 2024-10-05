@@ -171,7 +171,7 @@ bool com_client_sockets::send(const uint8_t *const from, const size_t n)
 #else
 	auto rc = WRITE(fd, from, n);
 	if (rc == -1)
-		DOLOG(logging::ll_error, "com_client_sockets::send", get_endpoint_name(), "write failed with error %s", strerror(errno));
+		DOLOG(logging::ll_error, "com_client_sockets::send", "-", "write failed with error %s", strerror(errno));
 	return rc == ssize_t(n);
 #endif
 }
