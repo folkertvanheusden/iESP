@@ -425,12 +425,17 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 			DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "reading %u block(s) nr %zu from backend", do_n, size_t(cur_block_nr));
 			if (buffer_n > 0) {
 				auto rc = s->read(cur_block_nr, do_n, data_pointer);
-
 				if (rc != scsi::rw_ok) {
 					delete [] out.data;
 					DOLOG(logging::ll_error, "server::push_response", cc->get_endpoint_name(), "reading %u block(s) %zu from backend failed (%d)", do_n, size_t(cur_block_nr), rc);
 					ok = false;
 					break;
+				}
+
+				if (ses->get_data_digest()) {
+					size_t   n_bytes = do_n * s->get_block_size();
+					uint32_t crc32   = crc32_0x11EDC6F41(reinterpret_cast<const uint8_t *>(data_pointer), n_bytes);
+					memcpy(&data_pointer[n_bytes], &crc32, sizeof crc32);
 				}
 			}
 

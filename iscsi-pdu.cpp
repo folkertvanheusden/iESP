@@ -706,13 +706,31 @@ std::pair<blob_t, uint8_t *> iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *co
 	size_t out_size = sizeof(pdu_data_in) + data_is_n_bytes;
 	out_size = (out_size + 3) & ~3;
 
-	uint8_t *out = new (std::nothrow) uint8_t[out_size]();
-	if (out)
-		memcpy(out, &pdu_data_in, sizeof pdu_data_in);  // data is filled by caller! (to reduce memcpy's)
-	else
-		out_size = 0;
+	if (ses->get_header_digest())
+		out_size += sizeof(uint32_t);
+	if (ses->get_data_digest())
+		out_size += sizeof(uint32_t);
 
-	return { { out, out_size }, &out[sizeof(pdu_data_in)] };
+	uint8_t *out      = new (std::nothrow) uint8_t[out_size]();
+	uint8_t *out_data = nullptr;
+	if (out) {
+		const size_t pdu_size = sizeof pdu_data_in;
+		memcpy(out, &pdu_data_in, pdu_size);  // data is set by caller! (to reduce memcpy's)
+
+		if (ses->get_header_digest()) {
+			uint32_t crc32 = crc32_0x11EDC6F41(reinterpret_cast<const uint8_t *>(&pdu_data_in), pdu_size);
+			memcpy(&out[pdu_size], &crc32, sizeof crc32);
+			out_data = &out[pdu_size + sizeof crc32];
+		}
+		else {
+			out_data = &out[pdu_size];
+		}
+	}
+	else {
+		out_size = 0;
+	}
+
+	return { { out, out_size }, out_data };
 }
 
 /*--------------------------------------------------------------------------*/
