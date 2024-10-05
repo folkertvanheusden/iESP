@@ -88,15 +88,15 @@ std::vector<blob_t> iscsi_pdu_bhs::get_helper(const void *const header, const ui
 	if (data_len) {
 		if (ses->get_data_digest() && allow_digest) {
 			memset(&out[out_size] - (4 /* data padding */ + digest_length), 0x00, 4);  // make sure padding is 0x00
+			memcpy(&out[data_offset], data, data_len);
 
-			uint32_t data_digest = crc32_0x11EDC6F41(data, data_padded_length);
+			uint32_t data_digest = crc32_0x11EDC6F41(&out[data_offset], data_padded_length);
 			memcpy(&out[data_digest_offset], &data_digest, digest_length);
 		}
 		else {
 			memset(&out[out_size] - 4 /* data padding */, 0x00, 4);
+			memcpy(&out[data_offset], data, data_len);
 		}
-
-		memcpy(&out[data_offset], data, data_len);
 	}
 
 	std::vector<blob_t> out_vector;
