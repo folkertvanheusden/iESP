@@ -10,6 +10,8 @@
 #include "utils.h"
 
 
+constexpr int max_msg_depth = 128;
+
 std::string pdu_opcode_to_string(const iscsi_pdu_bhs::iscsi_bhs_opcode opcode)
 {
 	switch(opcode) {
@@ -549,7 +551,7 @@ bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std
 	pdu_response->Itasktag   = reply_to.get_Itasktag();
 	pdu_response->StatSN     = HTONL(reply_to.get_ExpStatSN());
 	pdu_response->ExpCmdSN   = HTONL(reply_to.get_CmdSN() + 1);
-	pdu_response->MaxCmdSN   = HTONL(reply_to.get_CmdSN() + 1);
+	pdu_response->MaxCmdSN   = HTONL(reply_to.get_CmdSN() + max_msg_depth);
 	pdu_response->ExpDataSN  = HTONL(0);
 	if (ResidualCt.has_value()) {
 		set_bits(&pdu_response->b2, 1, 1, true);  // U (residual underflow)
@@ -650,7 +652,7 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get() const
 		pdu_data_in->Itasktag   = reply_to_copy->get_Itasktag();
 		pdu_data_in->StatSN     = HTONL(reply_to_copy->get_ExpStatSN());
 		pdu_data_in->ExpCmdSN   = HTONL(reply_to_copy->get_CmdSN() + 1);  // TODO?
-		pdu_data_in->MaxCmdSN   = HTONL(reply_to_copy->get_CmdSN() + 128);  // TODO?
+		pdu_data_in->MaxCmdSN   = HTONL(reply_to_copy->get_CmdSN() + max_msg_depth);  // TODO?
 		pdu_data_in->DataSN     = HTONL(ses->get_inc_datasn(reply_to_copy->get_Itasktag()));
 		pdu_data_in->bufferoff  = HTONL(i);
 		pdu_data_in->ResidualCt = HTONL(use_pdu_data_size - i);
@@ -694,7 +696,7 @@ std::pair<blob_t, uint8_t *> iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *co
 	pdu_data_in.Itasktag   = reply_to.get_Itasktag();
 	pdu_data_in.StatSN     = HTONL(reply_to.get_ExpStatSN());
 	pdu_data_in.ExpCmdSN   = HTONL(reply_to.get_CmdSN() + 1);  // TODO?
-	pdu_data_in.MaxCmdSN   = HTONL(reply_to.get_CmdSN() + 128);  // TODO?
+	pdu_data_in.MaxCmdSN   = HTONL(reply_to.get_CmdSN() + max_msg_depth);  // TODO?
 	pdu_data_in.DataSN     = HTONL(ses->get_inc_datasn(reply_to.get_Itasktag()));
 	pdu_data_in.bufferoff  = HTONL(offset_in_data);
 
@@ -812,7 +814,7 @@ bool iscsi_pdu_nop_in::set(const iscsi_pdu_nop_out & reply_to)
 	nop_in->TTT        = reply_to.get_TTT();
 	nop_in->StatSN     = HTONL(reply_to.get_ExpStatSN());
 	nop_in->ExpCmdSN   = HTONL(reply_to.get_CmdSN() + 1);
-	nop_in->MaxCmdSN   = HTONL(reply_to.get_CmdSN() + 1);
+	nop_in->MaxCmdSN   = HTONL(reply_to.get_CmdSN() + max_msg_depth);
 
 	return true;
 }
@@ -844,7 +846,7 @@ bool iscsi_pdu_scsi_r2t::set(const iscsi_pdu_scsi_cmd & reply_to, const uint32_t
 	pdu_scsi_r2t->TTT        = TTT;
 	pdu_scsi_r2t->StatSN     = HTONL(reply_to.get_ExpStatSN());
 	pdu_scsi_r2t->ExpCmdSN   = HTONL(reply_to.get_CmdSN() + 1);
-	pdu_scsi_r2t->MaxCmdSN   = HTONL(reply_to.get_CmdSN() + 128);
+	pdu_scsi_r2t->MaxCmdSN   = HTONL(reply_to.get_CmdSN() + max_msg_depth);
 	pdu_scsi_r2t->bufferoff  = HTONL(buffer_offset);
 	pdu_scsi_r2t->DDTF       = HTONL(data_length);
 
@@ -950,7 +952,7 @@ bool iscsi_pdu_text_reply::set(const iscsi_pdu_text_request & reply_to, scsi *co
 	text_reply->Itasktag   = reply_to.get_Itasktag();
 	text_reply->StatSN     = HTONL(reply_to.get_ExpStatSN());
 	text_reply->ExpCmdSN   = HTONL(reply_to.get_CmdSN() + 1);
-	text_reply->MaxCmdSN   = HTONL(reply_to.get_CmdSN() + 1);
+	text_reply->MaxCmdSN   = HTONL(reply_to.get_CmdSN() + max_msg_depth);
 
 	return true;
 }
@@ -1091,7 +1093,7 @@ bool iscsi_pdu_taskman_reply::set(const iscsi_pdu_taskman_request & reply_to)
 	taskman_reply->Itasktag = reply_to.get_Itasktag();
 	taskman_reply->StatSN   = HTONL(reply_to.get_ExpStatSN());
 	taskman_reply->ExpCmdSN = HTONL(reply_to.get_CmdSN() + 1);
-	taskman_reply->MaxCmdSN = HTONL(reply_to.get_CmdSN() + 1);
+	taskman_reply->MaxCmdSN = HTONL(reply_to.get_CmdSN() + max_msg_depth);
 
 	return true;
 }
