@@ -139,7 +139,7 @@ struct iscsi_response_set
 	std::optional<data_descriptor> to_stream;
 };
 
-std::string pdu_opcode_to_string(const iscsi_pdu_bhs::iscsi_bhs_opcode opcode);
+std::optional<std::string> pdu_opcode_to_string(const iscsi_pdu_bhs::iscsi_bhs_opcode opcode);
 
 std::optional<blob_t> generate_reject_pdu(const iscsi_pdu_bhs & about);
 

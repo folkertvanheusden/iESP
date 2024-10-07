@@ -39,8 +39,13 @@ server::~server()
 {
 #if !defined(ARDUINO) && !defined(NDEBUG)
 	DOLOG(logging::ll_info, "~server()", "-", "iSCSI opcode usage counts:");
-	for(int opcode=0; opcode<64; opcode++)
-		DOLOG(logging::ll_info, "~server()", "-", "  %02x: %" PRIu64, opcode, cmd_use_count[opcode].load());
+	for(int opcode=0; opcode<64; opcode++) {
+		auto     descr   = pdu_opcode_to_string(iscsi_pdu_bhs::iscsi_bhs_opcode(opcode));
+		uint64_t u_count = cmd_use_count[opcode];
+
+		if (descr.has_value() || u_count > 0)
+			DOLOG(logging::ll_info, "~server()", "-", "  %02x: %" PRIu64 " (%s)", opcode, u_count, descr.has_value() ? descr.value().c_str() : "?");
+	}
 #endif
 }
 
@@ -74,7 +79,8 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 //	Serial.print(' ');
 //	Serial.println(pdu_opcode_to_string(bhs.get_opcode()).c_str());
 #else
-	DOLOG(logging::ll_debug, "server::receive_pdu", cc->get_endpoint_name(), "opcode: %02xh / %s", bhs.get_opcode(), pdu_opcode_to_string(bhs.get_opcode()).c_str());
+	auto  descr = pdu_opcode_to_string(iscsi_pdu_bhs::iscsi_bhs_opcode(bhs.get_opcode()));
+	DOLOG(logging::ll_debug, "server::receive_pdu", cc->get_endpoint_name(), "opcode: %02xh / %s", bhs.get_opcode(), descr.has_value() ? descr.value().c_str() : "?");
 #endif
 
 	iscsi_pdu_bhs *pdu_obj   = nullptr;
