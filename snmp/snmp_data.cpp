@@ -109,6 +109,21 @@ snmp_elem * snmp_data_type_stats_int::get_data()
 	return new snmp_integer(snmp_integer::snmp_integer_type::si_integer, *counter);
 }
 
+snmp_data_type_stats_int_callback::snmp_data_type_stats_int_callback(std::function<int(void *)> & function, void *const context):
+	cb(function),
+	context(context)
+{
+}
+
+snmp_data_type_stats_int_callback::~snmp_data_type_stats_int_callback()
+{
+}
+
+snmp_elem * snmp_data_type_stats_int_callback::get_data()
+{
+	return new snmp_integer(snmp_integer::snmp_integer_type::si_integer, cb(context));
+}
+
 snmp_data_type_stats_uint32_t::snmp_data_type_stats_uint32_t(uint32_t *const counter) : counter(counter)
 {
 }

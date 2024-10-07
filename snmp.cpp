@@ -7,7 +7,7 @@
 #include "snmp/snmp.h"
 
 
-void init_snmp(snmp **const snmp_, snmp_data **const snmp_data_, io_stats_t *const ios, iscsi_stats_t *const is, int *const percentage_diskspace, int *const cpu_usage, int *const ram_free_kb, std::atomic_bool *const stop)
+void init_snmp(snmp **const snmp_, snmp_data **const snmp_data_, io_stats_t *const ios, iscsi_stats_t *const is, std::function<int(void *)> get_percentage_diskspace, void *const gpd_context, int *const cpu_usage, int *const ram_free_kb, std::atomic_bool *const stop)
 {
 	*snmp_data_ = new snmp_data();
 	(*snmp_data_)->register_oid("1.3.6.1.4.1.2021.13.15.1.1.2", "iESP"  );
@@ -37,7 +37,7 @@ void init_snmp(snmp **const snmp_, snmp_data **const snmp_data_, io_stats_t *con
 	(*snmp_data_)->register_oid("1.3.6.1.2.1.142.1.10.2.1.3",   new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &is->iscsiSsnTxDataOctets));
 	(*snmp_data_)->register_oid("1.3.6.1.2.1.142.1.10.2.1.4",   new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &is->iscsiSsnRxDataOctets));
 	(*snmp_data_)->register_oid("1.3.6.1.2.1.142.1.1.2.1.3",    new snmp_data_type_stats_uint32_t(&is->iscsiInstSsnFormatErrors));
-	(*snmp_data_)->register_oid("1.3.6.1.4.1.2021.9.1.9.1",     new snmp_data_type_stats_int(percentage_diskspace));
+	(*snmp_data_)->register_oid("1.3.6.1.4.1.2021.9.1.9.1",     new snmp_data_type_stats_int_callback(get_percentage_diskspace, gpd_context));
 	(*snmp_data_)->register_oid("1.3.6.1.4.1.2021.11.9.0",      new snmp_data_type_stats_int(cpu_usage));
 	(*snmp_data_)->register_oid("1.3.6.1.4.1.2021.4.11.0",      new snmp_data_type_stats_int(ram_free_kb));
 

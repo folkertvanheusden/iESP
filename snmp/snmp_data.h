@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #if !defined(TEENSY4_1)  // does not do threading
 #include <mutex>
 #endif
@@ -69,6 +70,19 @@ private:
 public:
 	snmp_data_type_stats_int(int *const counter);
 	virtual ~snmp_data_type_stats_int();
+
+	snmp_elem * get_data() override;
+};
+
+class snmp_data_type_stats_int_callback: public snmp_data_type
+{
+private:
+	std::function<int(void *)> cb;
+	void *const context;
+
+public:
+	snmp_data_type_stats_int_callback(std::function<int(void *)> & function, void *const context);
+	virtual ~snmp_data_type_stats_int_callback();
 
 	snmp_elem * get_data() override;
 };
