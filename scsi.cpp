@@ -358,28 +358,32 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		}
 	}
 	else if (opcode == o_write_6 || opcode == o_write_10 || opcode == o_write_verify_10 || opcode == o_write_16) {
-		uint64_t lba             = 0;
-		uint32_t transfer_length = 0;
+		uint64_t    lba             = 0;
+		uint32_t    transfer_length = 0;
+		const char *name            = "?";
 
 		if (opcode == o_write_6) {
 			lba             = ((CDB[1] & 31) << 16) | (CDB[2] << 8) | CDB[3];
 			transfer_length = CDB[4];
 			if (transfer_length == 0)
 				transfer_length = 256;
+			name = "6";
 		}
 		else if (opcode == o_write_10 || opcode == o_write_verify_10) {
 			// NOTE: the verify part is not implemented, o_write_verify_10 is just a dumb write
 			lba             = get_uint32_t(&CDB[2]);
 			transfer_length = (CDB[7] << 8) | CDB[8];
+			name = opcode == o_write_verify_10 ? "verify-10" : "10";
 		}
 		else if (opcode == o_write_16) {
 			lba             = get_uint64_t(&CDB[2]);
 			transfer_length = get_uint32_t(&CDB[10]);
+			name = "16";
 		}
 
 		response.fua = CDB[1] & 8;
 
-		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE_1%c, offset %" PRIu64 ", %u sectors", opcode == o_write_10 ? '0' : '6', lba, transfer_length);
+		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE_%s, offset %" PRIu64 ", %u sectors", name, lba, transfer_length);
 
 		auto vr = validate_request(lba, transfer_length, CDB);
 		if (vr.has_value()) {

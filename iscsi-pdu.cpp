@@ -12,7 +12,7 @@
 
 constexpr int max_msg_depth = 128;
 
-std::string pdu_opcode_to_string(const iscsi_pdu_bhs::iscsi_bhs_opcode opcode)
+std::optional<std::string> pdu_opcode_to_string(const iscsi_pdu_bhs::iscsi_bhs_opcode opcode)
 {
 	switch(opcode) {
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_nop_out:       return "I: NOP-Out";
@@ -35,7 +35,7 @@ std::string pdu_opcode_to_string(const iscsi_pdu_bhs::iscsi_bhs_opcode opcode)
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_reject:        return "T: Reject";
 	}
 
-	return "???";
+	return { };
 }
 
 /*--------------------------------------------------------------------------*/
