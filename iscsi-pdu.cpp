@@ -666,22 +666,19 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get() const
 	return v_out;
 }
 
-std::pair<blob_t, uint8_t *> iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *const ses, const iscsi_pdu_scsi_cmd & reply_to, const uint32_t offset, const uint32_t data_is_n_bytes, const bool last_block, const uint32_t is_n_disk_bytes)
+std::pair<blob_t, uint8_t *> iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *const ses, const iscsi_pdu_scsi_cmd & reply_to, const uint32_t offset, const uint32_t n_blocks, const uint32_t data_is_n_bytes, const bool is_last_block, const residual r, const uint32_t residual_length)
 {
-	uint64_t offset_after_block      = offset + data_is_n_bytes;
-	uint64_t offset_after_block_disk = offset + is_n_disk_bytes;
-
 	__pdu_data_in__ pdu_data_in { };
 
 	set_bits(&pdu_data_in.b1, 0, 6, o_scsi_data_in);  // 0x25
-	if (last_block) {
+	if (is_last_block) {
 		set_bits(&pdu_data_in.b2, 7, 1, true);  // F
-		if (is_n_disk_bytes < reply_to.get_ExpDatLen()) {
+
+		if (r == residual::iSR_UNDERFLOW)
 			set_bits(&pdu_data_in.b2, 1, 1, true);  // U
-		}
-		else if (is_n_disk_bytes > reply_to.get_ExpDatLen()) {
+		else if (r == residual::iSR_OVERFLOW)
 			set_bits(&pdu_data_in.b2, 2, 1, true);  // O
-		}
+
 		set_bits(&pdu_data_in.b2, 0, 1, true);  // S
 	}
 	pdu_data_in.datalenH   = data_is_n_bytes >> 16;
@@ -690,17 +687,14 @@ std::pair<blob_t, uint8_t *> iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *co
 	memcpy(pdu_data_in.LUN, reply_to.get_LUN(), sizeof pdu_data_in.LUN);
 	pdu_data_in.Itasktag   = reply_to.get_Itasktag();
 	pdu_data_in.StatSN     = HTONL(reply_to.get_ExpStatSN());
-	pdu_data_in.ExpCmdSN   = HTONL(reply_to.get_CmdSN() + 1);  // TODO?
-	pdu_data_in.MaxCmdSN   = HTONL(reply_to.get_CmdSN() + max_msg_depth);  // TODO?
+	pdu_data_in.ExpCmdSN   = HTONL(reply_to.get_CmdSN() + 1);
+	pdu_data_in.MaxCmdSN   = HTONL(reply_to.get_CmdSN() + max_msg_depth);
 	pdu_data_in.DataSN     = HTONL(ses->get_inc_datasn(reply_to.get_Itasktag()));
 	pdu_data_in.bufferoff  = HTONL(offset);
+	pdu_data_in.ResidualCt = HTONL(residual_length);
 
-	if (reply_to.get_ExpDatLen() < offset_after_block_disk)
-		pdu_data_in.ResidualCt = HTONL(offset_after_block_disk - reply_to.get_ExpDatLen());
-	else
-		pdu_data_in.ResidualCt = HTONL(reply_to.get_ExpDatLen() - offset_after_block_disk);
-
-	size_t out_size = sizeof(pdu_data_in) + is_n_disk_bytes;
+	auto   block_size = ses->get_block_size();
+	size_t out_size   = sizeof(pdu_data_in) + n_blocks * block_size;
 	out_size = (out_size + 3) & ~3;
 
 	if (ses->get_header_digest())
@@ -708,9 +702,11 @@ std::pair<blob_t, uint8_t *> iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *co
 	if (ses->get_data_digest())
 		out_size += sizeof(uint32_t);
 
-	uint8_t *out      = new (std::nothrow) uint8_t[out_size]();
+	uint8_t *out      = new (std::nothrow) uint8_t[out_size];
 	uint8_t *out_data = nullptr;
 	if (out) {
+		memset(&out[out_size - 8], 0x00, 8);  // zero padding for + possible digest
+
 		const size_t pdu_size = sizeof pdu_data_in;
 		memcpy(out, &pdu_data_in, pdu_size);  // data is set by caller! (to reduce memcpy's)
 

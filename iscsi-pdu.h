@@ -350,7 +350,9 @@ public:
 	std::vector<blob_t> get() const override;
         uint32_t get_TTT() const { return pdu_data_in->TTT; }
 
-	static std::pair<blob_t, uint8_t *> gen_data_in_pdu(session *const ses, const iscsi_pdu_scsi_cmd & reply_to, const uint32_t offset, const uint32_t data_is_n_bytes, const bool last_block, const uint32_t is_n_disk_bytes);
+	enum residual { iSR_OVERFLOW, iSR_UNDERFLOW, iSR_OK };  // iSR: iS(CSI) Residual
+
+	static std::pair<blob_t, uint8_t *> gen_data_in_pdu(session *const ses, const iscsi_pdu_scsi_cmd & reply_to, const uint32_t offset, const uint32_t n_blocks, const uint32_t data_is_n_bytes, const bool is_last_block, const residual r, const uint32_t residual_length);
 };
 
 class iscsi_pdu_scsi_data_out : public iscsi_pdu_bhs  // 0x05

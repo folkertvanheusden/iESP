@@ -372,12 +372,6 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 		reply_to.set(temp.data, temp.n);
 		delete [] temp.data;
 
-	        uint64_t use_pdu_data_size  = uint64_t(stream_parameters.n_sectors) * s->get_block_size();
-		uint64_t iscsi_exp_data_len = reply_to.get_ExpDatLen();
-		if (use_pdu_data_size > iscsi_exp_data_len) {
-			DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "requested less (%u) than wat is available (%" PRIu64 ")", iscsi_exp_data_len, use_pdu_data_size);
-		}
-
 		// buffer_n is the maximum buffer size
 		size_t buffer_n     = 0;
 		auto   ack_interval = ses->get_ack_interval();
@@ -410,20 +404,49 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 		if (buffer_n < s->get_block_size())
 			buffer_n = s->get_block_size();
 
+	        uint32_t use_pdu_data_size  = uint64_t(stream_parameters.n_sectors) * s->get_block_size();
+		uint32_t iscsi_exp_data_len = reply_to.get_ExpDatLen();
+		if (use_pdu_data_size > iscsi_exp_data_len) {
+			DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "requested amount (%u) mismatch with what is available (%u)", use_pdu_data_size, iscsi_exp_data_len);
+		}
+
 		uint32_t buffer_n_blocks  = buffer_n / s->get_block_size();
 		uint64_t device_block_nr  = stream_parameters.lba;
 		uint32_t offset           = 0;
 
+		uint32_t process_n        = std::min(use_pdu_data_size, iscsi_exp_data_len);
+
 		do {
-			uint32_t n_bytes_left  = iscsi_exp_data_len - offset;
-			uint32_t n_blocks_left = std::max(uint64_t(1), n_bytes_left / s->get_block_size());
+			uint32_t n_bytes_left    = process_n - offset;
+			uint32_t n_blocks_left   = std::max(uint64_t(1), n_bytes_left / s->get_block_size());
 
-			uint32_t do_n_blocks   = std::min(buffer_n_blocks, n_blocks_left);
-			uint32_t do_n_bytes    = do_n_blocks < n_blocks_left ? do_n_blocks * s->get_block_size() : n_bytes_left;
+			uint32_t do_n_blocks     = std::min(buffer_n_blocks, n_blocks_left);
+			uint32_t do_n_bytes      = do_n_blocks < n_blocks_left ? do_n_blocks * s->get_block_size() : n_bytes_left;
 
-			bool     is_last_block = offset + do_n_bytes >= iscsi_exp_data_len;
+			DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "sending %u bytes (%u blocks) for offset %u", do_n_bytes, do_n_blocks, offset);
 
-			auto [ out, data_pointer ] = iscsi_pdu_scsi_data_in::gen_data_in_pdu(ses, reply_to, offset, do_n_bytes, is_last_block, do_n_blocks * s->get_block_size());
+			bool     is_last_block   = offset + do_n_bytes >= process_n;
+			iscsi_pdu_scsi_data_in::residual r = iscsi_pdu_scsi_data_in::residual::iSR_OK;
+			uint32_t residual_length = 0;
+
+			if (is_last_block) {
+				const char *r_name = "-";
+
+				if (process_n < use_pdu_data_size) {
+					r = iscsi_pdu_scsi_data_in::residual::iSR_OVERFLOW;
+					residual_length = use_pdu_data_size - process_n;
+					r_name = "underflow";
+				}
+				else if (process_n > use_pdu_data_size) {
+					r = iscsi_pdu_scsi_data_in::residual::iSR_UNDERFLOW;
+					residual_length = process_n - use_pdu_data_size;
+					r_name = "overflow";
+				}
+
+				DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "last_block, residual length: %u, %s", residual_length, r_name);
+			}
+
+			auto [ out, data_pointer ] = iscsi_pdu_scsi_data_in::gen_data_in_pdu(ses, reply_to, offset, do_n_blocks, do_n_bytes, is_last_block, r, residual_length);
 
 			if (out.n == 0) {
 				DOLOG(logging::ll_warning, "server::push_response", cc->get_endpoint_name(), "out of memory (for %u bytes)", do_n_bytes);
@@ -467,7 +490,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 			offset                   += do_n_bytes;
 			device_block_nr          += do_n_blocks;
 		}
-		while (offset < iscsi_exp_data_len);
+		while (offset < process_n);
 	}
 
 	DOLOG(logging::ll_debug, "server::push_response", "-", "---");
