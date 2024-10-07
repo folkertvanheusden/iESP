@@ -45,28 +45,16 @@ uint64_t get_cpu_usage_us()
 	return 0;
 }
 
-void maintenance_thread(std::atomic_bool *const stop, backend *const bf, int *const df_percentage, int *const cpu_usage, int *const ram_free_kb)
+void maintenance_thread(std::atomic_bool *const stop, int *const cpu_usage, int *const ram_free_kb)
 {
-	uint64_t prev_df_poll  = 0;
 	uint64_t prev_w_poll   = 0;
-	uint64_t prev_disk_act = 0;
 
 	int prev_cpu_usage = get_cpu_usage_us();
 
 	while(!*stop) {
-		usleep(101000);
+		usleep(499000);
 
 		uint64_t now = get_micros();
-
-		if (now - prev_df_poll >= 30000000) {
-			auto disk_act_pars = bf->get_idle_state();
-
-			if (disk_act_pars.first > prev_disk_act && now - disk_act_pars.first >= disk_act_pars.second) {
-				prev_df_poll   = now;
-				*df_percentage = bf->get_free_space_percentage();
-				prev_disk_act  = get_micros();
-			}
-		}
 
 		if (now - prev_w_poll >= 1000000) {
 			int current_cpu_usage = get_cpu_usage_us();
@@ -85,6 +73,13 @@ void maintenance_thread(std::atomic_bool *const stop, backend *const bf, int *co
 			prev_w_poll = now;
 		}
 	}
+}
+
+int get_diskspace(void *const context)
+{
+	backend *const bf = reinterpret_cast<backend *>(context);
+
+	return bf->get_free_space_percentage();
 }
 
 void help()
@@ -177,15 +172,6 @@ int main(int argc, char *argv[])
 	io_stats_t    ios { };
 	iscsi_stats_t is  { };
 
-	int cpu_usage            = 0;
-	int percentage_diskspace = 0;
-	int ram_free_kb          = 0;
-
-	snmp      *snmp_      { nullptr };
-	snmp_data *snmp_data_ { nullptr };
-	if (use_snmp)
-		init_snmp(&snmp_, &snmp_data_, &ios, &is, &percentage_diskspace, &cpu_usage, &ram_free_kb, &stop);
-
 	backend *b = nullptr;
 
 	if (bt == backend_type_t::BT_FILE)
@@ -212,7 +198,14 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	std::thread *mth = new std::thread(maintenance_thread, &stop, b, &percentage_diskspace, &cpu_usage, &ram_free_kb);
+	int        cpu_usage   { 0       };
+	int        ram_free_kb { 0       };
+	snmp      *snmp_       { nullptr };
+	snmp_data *snmp_data_  { nullptr };
+	if (use_snmp)
+		init_snmp(&snmp_, &snmp_data_, &ios, &is, get_diskspace, b, &cpu_usage, &ram_free_kb, &stop);
+
+	std::thread *mth = new std::thread(maintenance_thread, &stop, &cpu_usage, &ram_free_kb);
 
 	server s(&sd, &c, &is, target_name);
 	printf("Go!\n");
