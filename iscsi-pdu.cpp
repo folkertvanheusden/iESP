@@ -666,25 +666,20 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get() const
 	return v_out;
 }
 
-std::pair<blob_t, uint8_t *> iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *const ses, const iscsi_pdu_scsi_cmd & reply_to, const size_t use_pdu_data_size, const size_t offset_in_data, const size_t data_is_n_bytes)
+std::pair<blob_t, uint8_t *> iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *const ses, const iscsi_pdu_scsi_cmd & reply_to, const uint32_t offset, const uint32_t data_is_n_bytes, const bool last_block, const uint32_t is_n_disk_bytes)
 {
-	uint64_t offset_after_block = offset_in_data + data_is_n_bytes;
-	bool     last_block         = offset_after_block >= use_pdu_data_size;  // > in case iSCSI transfer length is less
-
-	if (last_block)
-		DOLOG(logging::ll_debug, "iscsi_pdu_scsi_data_in::gen_data_in_pdu", ses->get_endpoint_name(), "last block");
-	else
-		DOLOG(logging::ll_warning, "iscsi_pdu_scsi_data_in::gen_data_in_pdu", ses->get_endpoint_name(), "offset %zu + %zu != %zu", offset_in_data, data_is_n_bytes, use_pdu_data_size);
+	uint64_t offset_after_block      = offset + data_is_n_bytes;
+	uint64_t offset_after_block_disk = offset + is_n_disk_bytes;
 
 	__pdu_data_in__ pdu_data_in { };
 
 	set_bits(&pdu_data_in.b1, 0, 6, o_scsi_data_in);  // 0x25
 	if (last_block) {
 		set_bits(&pdu_data_in.b2, 7, 1, true);  // F
-		if (use_pdu_data_size < reply_to.get_ExpDatLen()) {
+		if (is_n_disk_bytes < reply_to.get_ExpDatLen()) {
 			set_bits(&pdu_data_in.b2, 1, 1, true);  // U
 		}
-		else if (offset_after_block > reply_to.get_ExpDatLen()) {
+		else if (is_n_disk_bytes > reply_to.get_ExpDatLen()) {
 			set_bits(&pdu_data_in.b2, 2, 1, true);  // O
 		}
 		set_bits(&pdu_data_in.b2, 0, 1, true);  // S
@@ -698,14 +693,14 @@ std::pair<blob_t, uint8_t *> iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *co
 	pdu_data_in.ExpCmdSN   = HTONL(reply_to.get_CmdSN() + 1);  // TODO?
 	pdu_data_in.MaxCmdSN   = HTONL(reply_to.get_CmdSN() + max_msg_depth);  // TODO?
 	pdu_data_in.DataSN     = HTONL(ses->get_inc_datasn(reply_to.get_Itasktag()));
-	pdu_data_in.bufferoff  = HTONL(offset_in_data);
+	pdu_data_in.bufferoff  = HTONL(offset);
 
-	if (reply_to.get_ExpDatLen() < offset_after_block)
-		pdu_data_in.ResidualCt = HTONL(offset_after_block - reply_to.get_ExpDatLen());
+	if (reply_to.get_ExpDatLen() < offset_after_block_disk)
+		pdu_data_in.ResidualCt = HTONL(offset_after_block_disk - reply_to.get_ExpDatLen());
 	else
-		pdu_data_in.ResidualCt = HTONL(reply_to.get_ExpDatLen() - (offset_in_data + data_is_n_bytes));
+		pdu_data_in.ResidualCt = HTONL(reply_to.get_ExpDatLen() - offset_after_block_disk);
 
-	size_t out_size = sizeof(pdu_data_in) + data_is_n_bytes;
+	size_t out_size = sizeof(pdu_data_in) + is_n_disk_bytes;
 	out_size = (out_size + 3) & ~3;
 
 	if (ses->get_header_digest())
