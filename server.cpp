@@ -418,7 +418,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 
 		do {
 			uint32_t n_bytes_left    = process_n - offset;
-			uint32_t n_blocks_left   = std::max(uint64_t(1), n_bytes_left / s->get_block_size());
+			uint32_t n_blocks_left   = (n_bytes_left + s->get_block_size() - 1) / s->get_block_size();
 
 			uint32_t do_n_blocks     = std::min(buffer_n_blocks, n_blocks_left);
 			uint32_t do_n_bytes      = do_n_blocks < n_blocks_left ? do_n_blocks * s->get_block_size() : n_bytes_left;
