@@ -61,7 +61,7 @@ private:
 	std::optional<std::thread::id> locked_by;
 #endif
 
-	std::optional<std::vector<uint8_t> > validate_request(const uint64_t lba, const uint32_t n_blocks) const;
+	std::optional<std::vector<uint8_t> > validate_request(const uint64_t lba, const uint32_t n_blocks, const uint8_t *const CDB) const;
 	std::optional<std::vector<uint8_t> > validate_request(const uint64_t lba) const;
 
 	std::vector<uint8_t> error_reservation_conflict_1()  const;
@@ -71,6 +71,7 @@ private:
 	std::vector<uint8_t> error_compare_and_write_count() const;
 	std::vector<uint8_t> error_out_of_range()            const;
 	std::vector<uint8_t> error_miscompare()              const;
+	std::vector<uint8_t> error_invalid_field()           const;
 
 public:
 	scsi(backend *const b, const int trim_level, io_stats_t *const is);

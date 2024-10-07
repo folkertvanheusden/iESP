@@ -381,7 +381,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 
 		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE_1%c, offset %" PRIu64 ", %u sectors", opcode == o_write_10 ? '0' : '6', lba, transfer_length);
 
-		auto vr = validate_request(lba, transfer_length);
+		auto vr = validate_request(lba, transfer_length, CDB);
 		if (vr.has_value()) {
 			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE_1x parameters invalid");
 			response.sense_data = vr.value();
@@ -462,7 +462,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "READ_6, LBA %" PRIu64 ", %u sectors", lba, transfer_length);
 		}
 
-		auto vr = validate_request(lba, transfer_length);
+		auto vr = validate_request(lba, transfer_length, CDB);
 		if (vr.has_value()) {
 			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "READ_1x parameters invalid");
 			response.sense_data = vr.value();
@@ -564,7 +564,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		if (expected_data_size != data.second)
 			DOLOG(logging::ll_warning, "scsi::send", lun_identifier, "COMPARE AND WRITE: data count mismatch (%zu versus %zu)", size_t(expected_data_size), data.second);
 
-		auto vr = validate_request(lba, block_count);
+		auto vr = validate_request(lba, block_count, CDB);
 		if (vr.has_value()) {
 			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "COMPARE AND WRITE parameters invalid");
 			response.sense_data = vr.value();
@@ -606,7 +606,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "PREFETCH_10, LBA %" PRIu64 ", %u sectors", lba, transfer_length);
 		}
 
-		auto vr = validate_request(lba, transfer_length);
+		auto vr = validate_request(lba, transfer_length, nullptr);
 		if (vr.has_value()) {
 			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "PREFETCH parameters invalid");
 			response.sense_data = vr.value();
@@ -642,7 +642,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			uint64_t lba             = get_uint64_t(&pd[i]);
 			uint32_t transfer_length = get_uint32_t(&pd[i + 8]);
 
-			auto vr = validate_request(lba, transfer_length);
+			auto vr = validate_request(lba, transfer_length, nullptr);
 			if (vr.has_value() || transfer_length > MAX_UNMAP_BLOCKS) {
 				if (vr.has_value()) {
 					DOLOG(logging::ll_debug, "scsi::send", lun_identifier,"UNMAP parameters invalid");
@@ -699,7 +699,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		auto   backend_block_size = b->get_block_size();
 		size_t expected_size      = backend_block_size;
 
-		auto vr = validate_request(lba, transfer_length);
+		auto vr = validate_request(lba, transfer_length, CDB);
 		if (vr.has_value()) {
 			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE_SAME parameters invalid");
 			response.sense_data = vr.value();
@@ -772,7 +772,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 }
 
 // returns sense data in case of a problem
-std::optional<std::vector<uint8_t> > scsi::validate_request(const uint64_t lba, const uint32_t n_blocks) const
+std::optional<std::vector<uint8_t> > scsi::validate_request(const uint64_t lba, const uint32_t n_blocks, const uint8_t *const CDB) const
 {
 	auto size_in_blocks = get_size_in_blocks();
 
@@ -784,6 +784,11 @@ std::optional<std::vector<uint8_t> > scsi::validate_request(const uint64_t lba, 
 	if (lba + n_blocks < lba) {
 		DOLOG(logging::ll_debug, "scsi::validate_request", "-", "lba %" PRIu64 " + n_blocks %u wraps" PRIu64, lba, n_blocks);
 		return error_out_of_range();
+	}
+
+	if (CDB && (CDB[1] >> 5)) {  // RDPROTECT / WRPROTECT
+		DOLOG(logging::ll_debug, "scsi::validate_request", "-", "RD/WR PROTECT not supported");
+		return error_invalid_field();
 	}
 
 	return { };  // no error
@@ -1040,4 +1045,10 @@ std::vector<uint8_t> scsi::error_miscompare() const
 	// sense key 0x0e, asc 0x1d, ascq 0x00
 	return { 0x70, 0x00, 0x0e, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x1d, 0x00, 0x00, 0x00, 0x00, 0x00 };
 	//                   ^^^^                                                        ^^^^  ^^^^
+}
+
+std::vector<uint8_t> scsi::error_invalid_field() const
+{
+	// ILLEGAL_REQUEST(0x05)/INVALID FIELD(0x2400)
+	return { 0x70, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x24, 0x00, 0x00, 0x00, 0x00, 0x00 };
 }
