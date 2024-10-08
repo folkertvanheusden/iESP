@@ -1,0 +1,12 @@
+Source: iesp
+Maintainer: Folkert van Heusden <mail@vanheusden.com>
+Section: net
+Priority: optional
+Standards-Version: 4.5.0
+Build-Depends: debhelper-compat (= 12)
+Homepage: https://github.com/folkertvanheusden/iesp
+
+Package: iesp
+Architecture: all
+Depends: ${python3:Depends}, ${shlibs:Depends}, ${misc:Depends}
+Description: A simple iSCSI target server application.
