@@ -36,10 +36,12 @@ uint8_t * duplicate_new(const void *const in, const size_t n);
 
 std::string to_hex(const uint8_t *const in, const size_t n);
 
+#if !defined(__APPLE__)
 uint32_t NTOHL(const uint32_t x);
 uint16_t NTOHS(const uint16_t x);
 uint32_t HTONL(const uint32_t x);
 uint16_t HTONS(const uint16_t x);
+#endif
 
 void socket_set_nodelay(const int fd);
 

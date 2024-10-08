@@ -241,6 +241,7 @@ void encode_lun(uint8_t *const target, const uint64_t lun_nr)
 	}
 }
 
+#if !defined(__APPLE__)
 uint16_t HTONS(const uint16_t x)
 {
 	constexpr const uint16_t e = 1;
@@ -268,6 +269,7 @@ uint32_t NTOHL(const uint32_t x)
 {
 	return HTONL(x);
 }
+#endif
 
 uint8_t * duplicate_new(const void *const in, const size_t n)
 {
@@ -316,7 +318,7 @@ void socket_set_nodelay(const int fd)
 {
 #if !defined(TEENSY4_1) && !defined(RP2040W)
 	int flags = 1;
-#if defined(__FreeBSD__) || defined(ESP32) || defined(__MINGW32__)
+#if defined(__FreeBSD__) || defined(ESP32) || defined(__MINGW32__) || defined(__APPLE__)
 	if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&flags, sizeof(flags)) == -1)
 #else
 	if (setsockopt(fd, SOL_TCP, TCP_NODELAY, (void *)&flags, sizeof(flags)) == -1)
