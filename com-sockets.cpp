@@ -131,13 +131,7 @@ com_client *com_sockets::accept()
 
 com_client_sockets::com_client_sockets(const int fd, std::atomic_bool *const stop): com_client(stop), fd(fd)
 {
-	int flags = 1;
-#if defined(__FreeBSD__) || defined(ESP32) || defined(__MINGW32__)
-	if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&flags, sizeof(flags)) == -1)
-#else
-	if (setsockopt(fd, SOL_TCP, TCP_NODELAY, (void *)&flags, sizeof(flags)) == -1)
-#endif
-		DOLOG(logging::ll_error, "com_client_sockets", get_endpoint_name(), "cannot disable Nagle algorithm");
+	socket_set_nodelay(fd);
 }
 
 com_client_sockets::~com_client_sockets()

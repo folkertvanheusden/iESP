@@ -16,6 +16,13 @@
 #endif
 #include <time.h>
 #include <sys/types.h>
+#if !defined(__MINGW32__)
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#endif
 
 #include "log.h"
 #include "utils.h"
@@ -302,3 +309,14 @@ int asprintf(char *strp[], const char *fmt, ...) {
     return r;}
 #endif // asprintf
 #endif
+
+void socket_set_nodelay(const int fd)
+{
+	int flags = 1;
+#if defined(__FreeBSD__) || defined(ESP32) || defined(__MINGW32__)
+	if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&flags, sizeof(flags)) == -1)
+#else
+	if (setsockopt(fd, SOL_TCP, TCP_NODELAY, (void *)&flags, sizeof(flags)) == -1)
+#endif
+		DOLOG(logging::ll_error, "com_client_sockets", "-", "cannot disable Nagle algorithm");
+}
