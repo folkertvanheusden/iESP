@@ -190,14 +190,16 @@ namespace logging {
 		va_end(ap);
 #else
 		char *ts_str = nullptr;
-		asprintf(&ts_str, "%04d-%02d-%02d %02d:%02d:%02d.%06d %s | %s | %s | ",
+		if (asprintf(&ts_str, "%04d-%02d-%02d %02d:%02d:%02d.%06d %s | %s | %s | ",
 				tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, int(now % 1000000),
-				ll_names[ll], component, context.c_str());
+				ll_names[ll], component, context.c_str()) == -1)
+			ts_str = strdup("[???]");
 
 		char *str = nullptr;
 		va_list ap;
 		va_start(ap, fmt);
-		(void)vasprintf(&str, fmt, ap);
+		if (vasprintf(&str, fmt, ap) == -1)
+			str = strdup(fmt);
 		va_end(ap);
 #endif
 
