@@ -1,9 +1,11 @@
 #if defined(__MINGW32__)
 #include <cstdint>
 #include <cstdlib>
+#include <ctime>
 
 void init_my_getrandom()
 {
+	srand(time(nullptr));
 }
 
 bool my_getrandom(void *const tgt, const size_t n)
@@ -29,7 +31,6 @@ bool my_getrandom(void *const tgt, const size_t n)
 
 	while(todo > 0) {
 		ssize_t rc = getrandom(workp, todo, 0);
-
 		if (rc == -1)
 			return false;
 

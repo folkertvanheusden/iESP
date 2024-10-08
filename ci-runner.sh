@@ -29,6 +29,9 @@ EOF
 # C++
 (cd $P ; (mkdir build ; cd build ; cmake .. ; make -j6) )
 
+# windows
+(cd $P ; (mkdir buildMingw64 ; cd buildMingw64 ; cmake -DCMAKE_TOOLCHAIN_FILE=../mingw64.cmake .. ; make -j6) )
+
 # Arduino prepare
 mkdir -p $P/microcontrollers/.pio
 cp -a microcontrollers/.pio/libdeps $P/microcontrollers/.pio

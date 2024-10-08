@@ -118,15 +118,8 @@ bool backend_nbd::connect(const bool retry)
 			fd = -1;
 		}
 
-		if (fd != -1) {
-			int flags = 1;
-#if defined(__MINGW32__)
-			if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&flags, sizeof(flags)) == -1)
-#else
-			if (setsockopt(fd, SOL_TCP, TCP_NODELAY, (void *)&flags, sizeof(flags)) == -1)
-#endif
-				DOLOG(logging::ll_error, "backend_nbd::connect", identifier, "TCP_NODELAY failed");
-		}
+		if (fd != -1)
+			socket_set_nodelay(fd);
 	}
 	while(fd == -1 && retry);
 
