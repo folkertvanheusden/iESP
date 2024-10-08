@@ -16,6 +16,6 @@ jobs:
           install: git mingw-w64-ucrt-x86_64-libgcrypt mingw-w64-ucrt-x86_64-gcc make cmake
       - name: CI-Build
         run: |
-          echo 'Running in MSYS2!'
-          cmake -B build
+          echo 'Running in MSYS2'
+          cmake -B build -DCMAKE_TOOLCHAIN_FILE=mingw64.cmake
           make -C build
