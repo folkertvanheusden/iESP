@@ -58,6 +58,9 @@ bool backend_file::sync()
 #if defined(__MINGW32__)
 	if (_commit(fd) == 0)
 		return true;
+#elif defined(__APPLE__)
+	if (fsync(fd) == 0)
+		return true;
 #else
 	if (fdatasync(fd) == 0)
 		return true;
