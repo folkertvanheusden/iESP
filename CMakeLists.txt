@@ -43,3 +43,8 @@ set(CMAKE_BUILD_TYPE RelWithDebInfo)
 #set(CMAKE_BUILD_TYPE Debug)
 #target_link_libraries(iesp -fsanitize=address)
 #target_link_libraries(iesp -fsanitize=undefined)
+
+include(GNUInstallDirs)
+install(TARGETS ${PROJECT_NAME}
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
