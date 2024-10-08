@@ -402,21 +402,28 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 
 			bool ok = true;
 			if (received_blocks > 0) {
-				auto rc = write(lba, received_blocks, data.first);
+				if (received_size <= expected_size) {
+					auto rc = write(lba, received_blocks, data.first);
 
-				if (rc == scsi_rw_result::rw_fail_rw) {
-					DOLOG(logging::ll_error, "scsi::send", lun_identifier, "WRITE_xx, general write error");
-					response.sense_data = error_write_error();
-					ok = false;
-				}
-				else if (rc == rw_fail_locked) {
-					DOLOG(logging::ll_error, "scsi::send", lun_identifier, "WRITE_xx, failed writing due to reservations");
-					response.sense_data = error_reservation_conflict_1();
-					ok = false;
-				}
+					if (rc == scsi_rw_result::rw_fail_rw) {
+						DOLOG(logging::ll_error, "scsi::send", lun_identifier, "WRITE_xx, general write error");
+						response.sense_data = error_write_error();
+						ok = false;
+					}
+					else if (rc == rw_fail_locked) {
+						DOLOG(logging::ll_error, "scsi::send", lun_identifier, "WRITE_xx, failed writing due to reservations");
+						response.sense_data = error_reservation_conflict_1();
+						ok = false;
+					}
 
-				if (response.fua)
-					this->sync();
+					if (response.fua)
+						this->sync();
+				}
+				else {
+					DOLOG(logging::ll_warning, "scsi::send", lun_identifier, "initiator sent more data than specified");
+					ok = false;
+					response.sense_data = error_invalid_field();
+				}
 			}
 
 			if (ok) {
