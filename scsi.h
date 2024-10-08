@@ -29,6 +29,7 @@ struct scsi_response
 	iscsi_reacion_t              type;
 	std::vector<uint8_t>         sense_data;  // error data
 	enum { iSR_OVERFLOW, iSR_UNDERFLOW, iSR_OK } residual_error;
+	uint32_t                     residual_amount;
 	bool                         data_is_meta;  // scsi command reply data
 	bool                         fua;  // force unit access
 
@@ -72,7 +73,6 @@ private:
 	std::vector<uint8_t> error_compare_and_write_count() const;
 	std::vector<uint8_t> error_out_of_range()            const;
 	std::vector<uint8_t> error_miscompare()              const;
-	std::vector<uint8_t> error_invalid_field()           const;
 
 public:
 	scsi(backend *const b, const int trim_level, io_stats_t *const is);
@@ -134,6 +134,8 @@ public:
 	scsi_rw_result trim    (const uint64_t block_nr, const uint32_t n_blocks);
 	scsi_rw_result read    (const uint64_t block_nr, const uint32_t n_blocks,       uint8_t *const data);
 	scsi_rw_result cmpwrite(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const write_data, const uint8_t *const compare_data);
+
+	std::vector<uint8_t> error_invalid_field() const;
 
 	std::optional<scsi_response> send(const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
 };

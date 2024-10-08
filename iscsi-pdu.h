@@ -123,6 +123,7 @@ public:
 	uint64_t         get_LUN_nr()      const { return *reinterpret_cast<const uint64_t *>(bhs->lunfields);          }
 
 	iscsi_bhs_opcode get_opcode()      const { return iscsi_bhs_opcode(get_bits(bhs->b1, 0, 6));                    }
+	bool             get_I()           const { return iscsi_bhs_opcode(get_bits(bhs->b1, 6, 1));                    }
 	blob_t           get_raw()         const;
 	size_t           get_data_length() const { return (bhs->datalenH << 16) | (bhs->datalenM << 8) | bhs->datalenL; }
 	std::optional<std::pair<const uint8_t *, size_t> > get_data() const;
@@ -447,6 +448,7 @@ public:
 	bool set(const iscsi_pdu_scsi_cmd & reply_to, const std::vector<uint8_t> & scsi_sense_data, std::optional<uint32_t> ResidualCt);
 	void set_overflow_flag()  { set_bits(&pdu_response->b2, 2, 1, true); }
 	void set_underflow_flag() { set_bits(&pdu_response->b2, 1, 1, true); }
+	void set_residual_amount(const uint32_t a) { pdu_response->ResidualCt = a; }
 	std::vector<blob_t> get() const override;
 };
 

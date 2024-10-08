@@ -101,9 +101,10 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 	DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "CDB contents: %s", to_hex(CDB, size).c_str());
 
 	scsi_response response { };
-	response.type           = ir_as_is;
-	response.data_is_meta   = true;
-	response.residual_error = scsi_response::iSR_OK;
+	response.type            = ir_as_is;
+	response.data_is_meta    = true;
+	response.residual_error  = scsi_response::iSR_OK;
+	response.residual_amount = 0;
 
 	if (opcode == o_test_unit_ready) {
 		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "TEST UNIT READY");
@@ -359,27 +360,28 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		}
 	}
 	else if (opcode == o_write_6 || opcode == o_write_10 || opcode == o_write_verify_10 || opcode == o_write_16) {
-		uint64_t    lba             = 0;
-		uint32_t    transfer_length = 0;
-		const char *name            = "?";
+		uint64_t    lba                = 0;
+		uint32_t    transfer_length    = 0;
+		const char *name               = "?";
+		auto        backend_block_size = b->get_block_size();
 
 		if (opcode == o_write_6) {
 			lba             = ((CDB[1] & 31) << 16) | (CDB[2] << 8) | CDB[3];
 			transfer_length = CDB[4];
 			if (transfer_length == 0)
 				transfer_length = 256;
-			name = "6";
+			name            = "6";
 		}
 		else if (opcode == o_write_10 || opcode == o_write_verify_10) {
 			// NOTE: the verify part is not implemented, o_write_verify_10 is just a dumb write
 			lba             = get_uint32_t(&CDB[2]);
 			transfer_length = (CDB[7] << 8) | CDB[8];
-			name = opcode == o_write_verify_10 ? "verify-10" : "10";
+			name            = opcode == o_write_verify_10 ? "verify-10" : "10";
 		}
 		else if (opcode == o_write_16) {
 			lba             = get_uint64_t(&CDB[2]);
 			transfer_length = get_uint32_t(&CDB[10]);
-			name = "16";
+			name            = "16";
 		}
 
 		response.fua = CDB[1] & 8;
@@ -394,7 +396,6 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		else if (data.first) {
 			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "write command includes data (%zu bytes)", data.second);
 
-			auto   backend_block_size = b->get_block_size();
 			size_t expected_size      = transfer_length * backend_block_size;
 			size_t received_size      = data.second;
 			size_t received_blocks    = received_size / backend_block_size;
@@ -423,8 +424,9 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				else {
 					DOLOG(logging::ll_warning, "scsi::send", lun_identifier, "initiator sent more data than specified");
 					ok = false;
-					response.sense_data     = error_invalid_field();
-					response.residual_error = scsi_response::iSR_OVERFLOW;
+					response.sense_data      = error_invalid_field();
+					response.residual_error  = scsi_response::iSR_OVERFLOW;
+					response.residual_amount = received_size - expected_size;
 				}
 			}
 
@@ -445,11 +447,16 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		else {
 			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE without data");
 
-			if (transfer_length)
-				response.type = ir_r2t;  // allow R2T packets to come in
+			if (transfer_length) {
+				response.type           = ir_r2t;  // allow R2T packets to come in
+				response.r2t.buffer_lba = lba;
+				response.r2t.bytes_left = transfer_length * backend_block_size;
+				response.r2t.bytes_done = 0;
+			}
 			else {
-				response.type = ir_empty_sense;
-				response.residual_error = scsi_response::iSR_UNDERFLOW;
+				response.type            = ir_empty_sense;
+				response.residual_error  = scsi_response::iSR_UNDERFLOW;
+				response.residual_amount = transfer_length * backend_block_size;
 				DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE with 0 transfer_length");
 			}
 		}

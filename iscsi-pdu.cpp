@@ -460,58 +460,84 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(scsi *const s
 	}
 
 	iscsi_response_set response;
-	bool               ok       { true };
+	bool               ok                { true    };
+	iscsi_pdu_bhs     *pdu_scsi_response { nullptr };
 
-	if (scsi_reply.value().io.is_inline) {
-		auto pdu_data_in = new iscsi_pdu_scsi_data_in(ses);  // 0x25
-		DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "sending SCSI DATA-IN with %zu payload bytes, is meta: %d", scsi_reply.value().io.what.data.second, scsi_reply.value().data_is_meta);
+	if (ok) {
+		if (scsi_reply.value().io.is_inline) {
+			auto pdu_data_in = new iscsi_pdu_scsi_data_in(ses);  // 0x25
+			DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "sending SCSI DATA-IN with %zu payload bytes, is meta: %d", scsi_reply.value().io.what.data.second, scsi_reply.value().data_is_meta);
 
-		if (pdu_data_in->set(*this, scsi_reply.value().io.what.data, scsi_reply.value().data_is_meta) == false) {
-			ok = false;
-			DOLOG(logging::ll_error, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "iscsi_pdu_scsi_data_in::set returned error state");
-		}
-		response.responses.push_back(pdu_data_in);
-		delete [] scsi_reply.value().io.what.data.first;
-	}
-	else {
-		assert(scsi_reply.value().io.what.data.first == nullptr);
-	}
-
-	bool send_empty_sense = cdb_pdu_req->expdatlen == 0;
-
-	iscsi_pdu_bhs *pdu_scsi_response = nullptr;
-	if (scsi_reply.value().type == ir_as_is || scsi_reply.value().type == ir_empty_sense || send_empty_sense) {
-		if (scsi_reply.value().sense_data.empty() == false || scsi_reply.value().type == ir_empty_sense || send_empty_sense) {
-			auto *temp = new iscsi_pdu_scsi_response(ses) /* 0x21 */;
-			DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "sending SCSI response with %zu sense bytes", scsi_reply.value().sense_data.size());
-
-			bool rc = temp->set(*this, scsi_reply.value().sense_data, { });
-			if (rc == false) {
+			if (pdu_data_in->set(*this, scsi_reply.value().io.what.data, scsi_reply.value().data_is_meta) == false) {
 				ok = false;
-				DOLOG(logging::ll_info, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "iscsi_pdu_scsi_response::set returned error");
+				DOLOG(logging::ll_error, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "iscsi_pdu_scsi_data_in::set returned error state");
 			}
+			response.responses.push_back(pdu_data_in);
+			delete [] scsi_reply.value().io.what.data.first;
+		}
+		else {
+			assert(scsi_reply.value().io.what.data.first == nullptr);
+		}
+	}
 
-			if (scsi_reply.value().residual_error == scsi_response::iSR_OVERFLOW)
-				temp->set_overflow_flag();
-			else if (scsi_reply.value().residual_error == scsi_response::iSR_UNDERFLOW)
+	if (ok) {
+		bool send_empty_sense = cdb_pdu_req->expdatlen == 0;
+
+		if (scsi_reply.value().type == ir_as_is || scsi_reply.value().type == ir_empty_sense || send_empty_sense) {
+			if (scsi_reply.value().sense_data.empty() == false || scsi_reply.value().type == ir_empty_sense || send_empty_sense) {
+				auto *temp = new iscsi_pdu_scsi_response(ses) /* 0x21 */;
+				DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "sending SCSI response with %zu sense bytes", scsi_reply.value().sense_data.size());
+
+				bool rc = temp->set(*this, scsi_reply.value().sense_data, { });
+				if (rc == false) {
+					ok = false;
+					DOLOG(logging::ll_info, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "iscsi_pdu_scsi_response::set returned error");
+				}
+
+				if (scsi_reply.value().residual_error == scsi_response::iSR_OVERFLOW)
+					temp->set_overflow_flag();
+				else if (scsi_reply.value().residual_error == scsi_response::iSR_UNDERFLOW)
+					temp->set_underflow_flag();
+				if (scsi_reply.value().residual_error != scsi_response::iSR_OK)
+					temp->set_residual_amount(scsi_reply.value().residual_amount);
+
+				pdu_scsi_response = temp;
+			}
+		}
+		else if (scsi_reply.value().type == ir_r2t) {
+			// immediate data without any data is an error
+			if (get_I() && data.second == 0) {
+				DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "I-flag set without data");
+
+				auto *temp = new iscsi_pdu_scsi_response(ses) /* 0x21 */;
+
+				bool rc = temp->set(*this, sd->error_invalid_field(), { });
+				if (rc == false) {
+					ok = false;
+					DOLOG(logging::ll_info, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "iscsi_pdu_scsi_response::set returned error");
+				}
+
 				temp->set_underflow_flag();
+				temp->set_residual_amount(scsi_reply.value().r2t.bytes_left);
+				pdu_scsi_response = temp;
+			}
+			else {
+				auto *temp = new iscsi_pdu_scsi_r2t(ses) /* 0x31 */;
+				DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "sending R2T with %zu sense bytes", scsi_reply.value().sense_data.size());
 
-			pdu_scsi_response = temp;
+				uint32_t TTT = ses->init_r2t_session(scsi_reply.value().r2t, scsi_reply.value().fua, this);
+				DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "TTT is %08x", TTT);
+
+				if (temp->set(*this, TTT, scsi_reply.value().r2t.bytes_done, scsi_reply.value().r2t.bytes_left) == false) {
+					ok = false;
+					DOLOG(logging::ll_info, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "iscsi_pdu_scsi_response::set returned error");
+				}
+
+				pdu_scsi_response = temp;
+			}
 		}
 	}
-	else if (scsi_reply.value().type == ir_r2t) {
-		auto *temp = new iscsi_pdu_scsi_r2t(ses) /* 0x31 */;
-		DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "sending R2T with %zu sense bytes", scsi_reply.value().sense_data.size());
 
-		uint32_t TTT = ses->init_r2t_session(scsi_reply.value().r2t, scsi_reply.value().fua, this);
-		DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "TTT is %08x", TTT);
-
-		if (temp->set(*this, TTT, scsi_reply.value().r2t.bytes_done, scsi_reply.value().r2t.bytes_left) == false) {
-			ok = false;
-			DOLOG(logging::ll_info, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "iscsi_pdu_scsi_response::set returned error");
-		}
-		pdu_scsi_response = temp;
-	}
 	if (pdu_scsi_response)
 		response.responses.push_back(pdu_scsi_response);
 
