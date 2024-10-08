@@ -34,11 +34,13 @@ For Linux/FreeBSD/Apple:
 * cmake ..
 * make
 
-On Debian systems you can also run:
+On Debian systems you can also run the following to create an installable .deb-package file:
 
 * dpkg-buildpackage -us -uc
 
-That will create a .deb-package file which you can install.
+For RedHat (Fedora etc.):
+
+* rpmbuild -ba iesp.spec
 
 For Windows:
 * mkdir buildMingw64 && cd buildMingw64
