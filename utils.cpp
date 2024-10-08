@@ -180,7 +180,11 @@ uint32_t get_uint32_t(const uint8_t *const p)
 uint64_t get_micros()
 {
 #if defined(ARDUINO)
+#if defined(ESP32)
+	return esp_timer_get_time();
+#else
 	return micros();
+#endif
 #else
         struct timespec tv { };
         if (clock_gettime(CLOCK_REALTIME, &tv) == -1) {
@@ -194,17 +198,7 @@ uint64_t get_micros()
 
 uint64_t get_millis()
 {
-#if defined(ARDUINO)
-	return millis();
-#else
-        struct timespec tv { };
-        if (clock_gettime(CLOCK_REALTIME, &tv) == -1) {
-		DOLOG(logging::ll_error, "get_millis", "-", "clock_gettime failed: %s", strerror(errno));
-		return 0;
-	}
-
-        return uint64_t(tv.tv_sec) * uint64_t(1000) + uint64_t(tv.tv_nsec / 1000000);
-#endif
+	return get_micros() / 1000;
 }
 
 #if defined(TEENSY4_1)
