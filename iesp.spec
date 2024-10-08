@@ -20,7 +20,7 @@ A simple iSCSI target server application.
 %cmake_install
 
 %files
-/usr/local/bin/iesp
+/usr/bin/iesp
 
 %changelog
 * Tue Oct 08 2024 Folkert van Heusden <mail@vanheusden.com>
