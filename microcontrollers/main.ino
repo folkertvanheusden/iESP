@@ -129,6 +129,13 @@ void draw_status(const uint32_t v) {
 	}
 }
 
+int get_diskspace(void *const context)
+{
+	backend *const bf = reinterpret_cast<backend *>(context);
+
+	return bf->get_free_space_percentage();
+}
+
 #if !defined(TEENSY4_1)
 bool idle_task_0() {
 	core0_idle++;
@@ -575,14 +582,15 @@ void setup() {
 #endif
 
 	draw_status(11);
-	init_snmp(&snmp_, &snmp_data_, &ios, &is, &percentage_diskspace, &cpu_usage, &ram_free_kb, &stop);
-
-	draw_status(13);
 #if defined(TEENSY4_1)
 	bs = new backend_sdcard_teensy41(led_green, led_yellow);
 #else
 	bs = new backend_sdcard(led_green, led_yellow, pin_SD_MISO, pin_SD_MOSI, pin_SD_SCLK, pin_SD_CS);
 #endif
+
+	draw_status(13);
+	init_snmp(&snmp_, &snmp_data_, &ios, &is, get_diskspace, bs, &cpu_usage, &ram_free_kb, &stop);
+
 	draw_status(14);
 	if (bs->begin() == false) {
 		DOLOG(logging::ll_error, "setup", "-", "Failed to load initialize storage backend!");

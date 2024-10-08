@@ -17,11 +17,13 @@
 #include <time.h>
 #include <sys/types.h>
 #if !defined(__MINGW32__)
+#if !defined(TEENSY4_1)
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#endif
 #endif
 
 #include "log.h"
@@ -312,11 +314,13 @@ int asprintf(char *strp[], const char *fmt, ...) {
 
 void socket_set_nodelay(const int fd)
 {
+#if !defined(TEENSY4_1)
 	int flags = 1;
 #if defined(__FreeBSD__) || defined(ESP32) || defined(__MINGW32__)
 	if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&flags, sizeof(flags)) == -1)
 #else
 	if (setsockopt(fd, SOL_TCP, TCP_NODELAY, (void *)&flags, sizeof(flags)) == -1)
+#endif
 #endif
 		DOLOG(logging::ll_error, "com_client_sockets", "-", "cannot disable Nagle algorithm");
 }
