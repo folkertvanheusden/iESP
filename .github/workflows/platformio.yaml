@@ -4,7 +4,7 @@ on: [push]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
       - uses: actions/checkout@v4
@@ -23,4 +23,5 @@ jobs:
       - name: Build PlatformIO Project
         run: |
           cd microcontrollers
+          cp data/cfg-iESP.json.example data/cfg-iESP.json
           pio run -e ESP32-wemos
