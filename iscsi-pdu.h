@@ -445,7 +445,8 @@ public:
 	virtual ~iscsi_pdu_scsi_response();
 
 	bool set(const iscsi_pdu_scsi_cmd & reply_to, const std::vector<uint8_t> & scsi_sense_data, std::optional<uint32_t> ResidualCt);
-
+	void set_overflow_flag()  { set_bits(&pdu_response->b2, 2, 1, true); }
+	void set_underflow_flag() { set_bits(&pdu_response->b2, 1, 1, true); }
 	std::vector<blob_t> get() const override;
 };
 

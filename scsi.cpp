@@ -101,8 +101,9 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 	DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "CDB contents: %s", to_hex(CDB, size).c_str());
 
 	scsi_response response { };
-	response.type         = ir_as_is;
-	response.data_is_meta = true;
+	response.type           = ir_as_is;
+	response.data_is_meta   = true;
+	response.residual_error = scsi_response::iSR_OK;
 
 	if (opcode == o_test_unit_ready) {
 		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "TEST UNIT READY");
@@ -422,7 +423,8 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				else {
 					DOLOG(logging::ll_warning, "scsi::send", lun_identifier, "initiator sent more data than specified");
 					ok = false;
-					response.sense_data = error_invalid_field();
+					response.sense_data     = error_invalid_field();
+					response.residual_error = scsi_response::iSR_OVERFLOW;
 				}
 			}
 
@@ -447,6 +449,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				response.type = ir_r2t;  // allow R2T packets to come in
 			else {
 				response.type = ir_empty_sense;
+				response.residual_error = scsi_response::iSR_UNDERFLOW;
 				DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE with 0 transfer_length");
 			}
 		}

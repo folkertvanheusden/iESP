@@ -477,7 +477,6 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(scsi *const s
 		assert(scsi_reply.value().io.what.data.first == nullptr);
 	}
 
-	// special case: only(?) for testcases
 	bool send_empty_sense = cdb_pdu_req->expdatlen == 0;
 
 	iscsi_pdu_bhs *pdu_scsi_response = nullptr;
@@ -486,17 +485,16 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(scsi *const s
 			auto *temp = new iscsi_pdu_scsi_response(ses) /* 0x21 */;
 			DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "sending SCSI response with %zu sense bytes", scsi_reply.value().sense_data.size());
 
-			bool rc = false;
-
-			if (scsi_reply.value().sense_data.empty() && send_empty_sense)
-				rc = temp->set(*this, { }, { });
-			else
-				rc = temp->set(*this, scsi_reply.value().sense_data, { });
-
+			bool rc = temp->set(*this, scsi_reply.value().sense_data, { });
 			if (rc == false) {
 				ok = false;
 				DOLOG(logging::ll_info, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "iscsi_pdu_scsi_response::set returned error");
 			}
+
+			if (scsi_reply.value().residual_error == scsi_response::iSR_OVERFLOW)
+				temp->set_overflow_flag();
+			else if (scsi_reply.value().residual_error == scsi_response::iSR_UNDERFLOW)
+				temp->set_underflow_flag();
 
 			pdu_scsi_response = temp;
 		}

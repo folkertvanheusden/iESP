@@ -28,6 +28,7 @@ struct scsi_response
 {
 	iscsi_reacion_t              type;
 	std::vector<uint8_t>         sense_data;  // error data
+	enum { iSR_OVERFLOW, iSR_UNDERFLOW, iSR_OK } residual_error;
 	bool                         data_is_meta;  // scsi command reply data
 	bool                         fua;  // force unit access
 
