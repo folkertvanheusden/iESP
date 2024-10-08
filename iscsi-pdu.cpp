@@ -651,8 +651,8 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get() const
 		memcpy(pdu_data_in->LUN, reply_to_copy->get_LUN(), sizeof pdu_data_in->LUN);
 		pdu_data_in->Itasktag   = reply_to_copy->get_Itasktag();
 		pdu_data_in->StatSN     = HTONL(reply_to_copy->get_ExpStatSN());
-		pdu_data_in->ExpCmdSN   = HTONL(reply_to_copy->get_CmdSN() + 1);  // TODO?
-		pdu_data_in->MaxCmdSN   = HTONL(reply_to_copy->get_CmdSN() + max_msg_depth);  // TODO?
+		pdu_data_in->ExpCmdSN   = HTONL(reply_to_copy->get_CmdSN() + 1);
+		pdu_data_in->MaxCmdSN   = HTONL(reply_to_copy->get_CmdSN() + max_msg_depth);
 		pdu_data_in->DataSN     = HTONL(ses->get_inc_datasn(reply_to_copy->get_Itasktag()));
 		pdu_data_in->bufferoff  = HTONL(i);
 		pdu_data_in->ResidualCt = HTONL(use_pdu_data_size - i);
@@ -695,8 +695,8 @@ std::pair<blob_t, uint8_t *> iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *co
 	memcpy(pdu_data_in.LUN, reply_to.get_LUN(), sizeof pdu_data_in.LUN);
 	pdu_data_in.Itasktag   = reply_to.get_Itasktag();
 	pdu_data_in.StatSN     = HTONL(reply_to.get_ExpStatSN());
-	pdu_data_in.ExpCmdSN   = HTONL(reply_to.get_CmdSN() + 1);  // TODO?
-	pdu_data_in.MaxCmdSN   = HTONL(reply_to.get_CmdSN() + max_msg_depth);  // TODO?
+	pdu_data_in.ExpCmdSN   = HTONL(reply_to.get_CmdSN() + 1);
+	pdu_data_in.MaxCmdSN   = HTONL(reply_to.get_CmdSN() + max_msg_depth);
 	pdu_data_in.DataSN     = HTONL(ses->get_inc_datasn(reply_to.get_Itasktag()));
 	pdu_data_in.bufferoff  = HTONL(offset_in_data);
 
