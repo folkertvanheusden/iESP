@@ -35,6 +35,7 @@ EOF
 # Arduino prepare
 mkdir -p $P/microcontrollers/.pio
 cp -a microcontrollers/.pio/libdeps $P/microcontrollers/.pio
+cp -a microcontrollers/RP2040W/.pio/libdeps $P/microcontrollers/RP2040W/.pio
 
 # Arduino: Wemos32
 (cd $P/microcontrollers/ ; pio run -e ESP32-wemos)
@@ -44,5 +45,4 @@ cp -a microcontrollers/.pio/libdeps $P/microcontrollers/.pio
 
 # Arduino: RP2040W (Raspberry Pi Pico)
 mkdir -p $P/microcontrollers/RP2040W/.pio
-cp -a microcontrollers/RP2040W/.pio/libdeps $P/microcontrollers/RP2040W/.pio
 (cd $P/microcontrollers/RP2040W ; pio run)
