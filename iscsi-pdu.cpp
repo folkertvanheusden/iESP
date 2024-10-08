@@ -927,7 +927,7 @@ bool iscsi_pdu_text_reply::set(const iscsi_pdu_text_request & reply_to, scsi *co
 		if (parts.size() < 2)
 			return false;
 
-		if (parts[0] == "SendTargets")
+		if (parts[0] == "SendTargets" && parts[1] == "All")
 			send_targets = true;
 
 		DOLOG(logging::ll_debug, "iscsi_pdu_text_reply::set", ses->get_endpoint_name(), "text request, responding to: %s", kv.c_str());
