@@ -1,0 +1,19 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ $default-branch ]
+  pull_request:
+    branches: [ $default-branch ]
+
+jobs:
+  build:
+
+    runs-on: debian-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: cmake
+      run: cmake -B build
+    - name: make
+      run: make -C build
