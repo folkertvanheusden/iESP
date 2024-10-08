@@ -6,9 +6,11 @@ Since then it was ported to Linux, \*BSD (tested on FreeBSD) and Microsoft Windo
 
 requirements
 ------------
-* a Linux/\*BSD/Windows system or a supported microcontroller with an SD-card reader connected to it.
-* platformio (for microcontrollers)
-* cmake (for other systems)
+* a Linux/\*BSD/Windows/Apple system with cmake and a C++ compiler
+
+OR
+
+* a supported microcontroller with an SD-card reader connected to it and platformio
 
 
 compiling
@@ -26,7 +28,7 @@ For the Raspberry Pi Pico (RP2040W):
 * * Optionally connect a green LED to GPIO 17 and a yellow LED to GPIO 18
 * * Connect the following pins of your SD card reader to: MISO to GPIO 8, MOSI to GPIO 11, SCK to GPIO 10 and SS/CS to GPIO 12
 
-For Linux/FreeBSD:
+For Linux/FreeBSD/Apple:
 * mkdir build
 * cd build
 * cmake ..
