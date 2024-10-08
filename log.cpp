@@ -158,9 +158,6 @@ namespace logging {
 
 	void dolog(const logging::log_level_t ll, const char *const component, const std::string context, const char *fmt, ...)
 	{
-		if (ll < log_level_file && ll < log_level_screen)
-			return;
-
 		FILE *lfh = fopen(logfile, "a+");
 		if (!lfh) {
 			fprintf(stderr, "Cannot access log-file \"%s\": %s\n", logfile, strerror(errno));

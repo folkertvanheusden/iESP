@@ -343,13 +343,16 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 		const std::vector<std::string> kvs {
 			ses->get_header_digest() ? "HeaderDigest=CRC32C" : "HeaderDigest=None",
 			ses->get_data_digest  () ? "DataDigest=CRC32C"   : "DataDigest=None",
-			"DefaultTime2Wait=2",
+			"DefaultTime2Wait=0",
 			"DefaultTime2Retain=20",
 			"ErrorRecoveryLevel=0",
+			"MaxConnections=128",  // arbitrarily chosen
 #if defined(ARDUINO)
 			"MaxRecvDataSegmentLength=4096",
+			"MaxBurstLength=4096",
 #else
 			"MaxRecvDataSegmentLength=8388608",  // 8 MB, anything large
+			"MaxBurstLength=8388608",
 #endif
 		};
 		for(auto & kv : kvs)
@@ -662,8 +665,8 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get() const
 		memcpy(pdu_data_in->LUN, reply_to_copy->get_LUN(), sizeof pdu_data_in->LUN);
 		pdu_data_in->Itasktag   = reply_to_copy->get_Itasktag();
 		pdu_data_in->StatSN     = HTONL(reply_to_copy->get_ExpStatSN());
-		pdu_data_in->ExpCmdSN   = HTONL(reply_to_copy->get_CmdSN() + 1);  // TODO?
-		pdu_data_in->MaxCmdSN   = HTONL(reply_to_copy->get_CmdSN() + max_msg_depth);  // TODO?
+		pdu_data_in->ExpCmdSN   = HTONL(reply_to_copy->get_CmdSN() + 1);
+		pdu_data_in->MaxCmdSN   = HTONL(reply_to_copy->get_CmdSN() + max_msg_depth);
 		pdu_data_in->DataSN     = HTONL(ses->get_inc_datasn(reply_to_copy->get_Itasktag()));
 		pdu_data_in->bufferoff  = HTONL(i);
 		pdu_data_in->ResidualCt = HTONL(use_pdu_data_size - i);
