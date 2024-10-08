@@ -299,10 +299,10 @@ public:
 	std::optional<iscsi_response_set> get_response(scsi *const sd, const uint8_t error);
 };
 
-class iscsi_pdu_scsi_data_in : public iscsi_pdu_bhs  // 0x25
+class iscsi_pdu_payload: public iscsi_pdu_bhs
 {
-public:
-	struct __pdu_data_in__ {
+private:
+	struct __pdu_payload__ {
 		uint8_t  b1;
 		// uint8_t  opcode    :  6;
 		// bool     reserved1 :  1;
@@ -318,27 +318,49 @@ public:
 		// bool     A         :  1;
 		// bool     F         :  1;  // bit 7
 
-		uint8_t  reserved6 :  8;
+		uint8_t  response_or_reserved6: 8;
 		uint8_t  status    :  8;
 
 		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
 		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
 		uint32_t datalenM  :  8;  // data segment length (bytes, excluding padding) 15...8
 		uint32_t datalenL  :  8;  // data segment length (bytes, excluding padding) 7...0
-		uint8_t  LUN[8];
+		uint8_t  LUN_or_reserved[8];
 		uint32_t Itasktag  : 32;  // initiator task tag
-		uint32_t TTT       : 32;  // target transfer tag
+		uint32_t snack_or_TTT: 32;  // target transfer tag
 		uint32_t StatSN    : 32;
 		uint32_t ExpCmdSN  : 32;
 		uint32_t MaxCmdSN  : 32;
-		uint32_t DataSN    : 32;
-		uint32_t bufferoff : 32;
+		uint32_t Exp_or_DataSN: 32;
+		uint32_t BidirResCt_or_bufferoff : 32;
 		uint32_t ResidualCt: 32;  // residual count or reserved
 	} __attribute__((packed));
 
-	__pdu_data_in__ *pdu_data_in __attribute__((packed)) { reinterpret_cast<__pdu_data_in__ *>(pdu_bytes) };
-	std::pair<uint8_t *, size_t> pdu_data_in_data { nullptr, 0 };
+	__pdu_payload__ *pdu_payload __attribute__((packed)) { reinterpret_cast<__pdu_payload__ *>(pdu_bytes) };
+	std::pair<uint8_t *, size_t> pdu_payload_data { nullptr, 0 };
 
+public:
+	iscsi_pdu_payload() { }
+	virtual ~iscsi_pdu_payload() { }
+
+	enum residual { iSR_OVERFLOW, iSR_UNDERFLOW, iSR_OK };  // iSR: iS(CSI) Residual
+
+	std::vector<blob_t> get() const override;
+
+	static std::pair<blob_t, uint8_t *> gen_payload_pdu(session *const ses, const iscsi_pdu_scsi_cmd & reply_to, const uint32_t offset, const uint32_t n_blocks, const uint32_t data_is_n_bytes, const bool is_last_block, const residual r, const uint32_t residual_length);
+}
+
+class iscsi_pdu_scsi_response : public iscsi_pdu_payload  // 0x21
+{
+public:
+	iscsi_pdu_scsi_response(session *const ses);
+	virtual ~iscsi_pdu_scsi_response();
+
+	bool set(const iscsi_pdu_scsi_cmd & reply_to, const std::vector<uint8_t> & scsi_sense_data, std::optional<uint32_t> ResidualCt);
+};
+
+class iscsi_pdu_scsi_data_in : public iscsi_pdu_payload  // 0x25
+{
 private:
 	iscsi_pdu_scsi_cmd *reply_to_copy { nullptr };
 
@@ -347,12 +369,7 @@ public:
 	virtual ~iscsi_pdu_scsi_data_in();
 
 	bool set(const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data, const bool has_sense);
-	std::vector<blob_t> get() const override;
-        uint32_t get_TTT() const { return pdu_data_in->TTT; }
-
-	enum residual { iSR_OVERFLOW, iSR_UNDERFLOW, iSR_OK };  // iSR: iS(CSI) Residual
-
-	static std::pair<blob_t, uint8_t *> gen_data_in_pdu(session *const ses, const iscsi_pdu_scsi_cmd & reply_to, const uint32_t offset, const uint32_t n_blocks, const uint32_t data_is_n_bytes, const bool is_last_block, const residual r, const uint32_t residual_length);
+        uint32_t get_TTT() const { return pdu_payload->snack_or_TTT; }
 };
 
 class iscsi_pdu_scsi_data_out : public iscsi_pdu_bhs  // 0x05
@@ -399,54 +416,6 @@ public:
 	bool     get_F()            const { return !!(pdu_data_out->b2 & 128);     }
 	uint32_t get_Itasktag()     const { return pdu_data_out->Itasktag;         }
 	uint32_t get_ExpStatSN()    const { return pdu_data_out->ExpStatSN;        }
-};
-
-class iscsi_pdu_scsi_response : public iscsi_pdu_bhs  // 0x21
-{
-public:
-	struct __pdu_response__ {
-		uint8_t  b1;
-		// uint8_t  opcode    :  6;
-		// bool     reserved1 :  1;
-		// bool     reserved0 :  1;  // bit 7
-
-		uint8_t  b2;
-		// bool     reserved3 :  1;
-		// bool     U         :  1;
-		// bool     O         :  1;
-		// bool     u         :  1;
-		// bool     o         :  1;
-		// uint8_t  reserved2 :  2;
-		// bool     set_to_1  :  1;  // 1, bit 7
-
-		uint8_t  response  :  8;
-		uint8_t  status    :  8;
-		uint8_t  ahslen    :  8;  // total ahs length (units of four byte words including padding)
-		uint32_t datalenH  :  8;  // data segment length (bytes, excluding padding) 23...16
-		uint32_t datalenM  :  8;  // data segment length (bytes, excluding padding) 15...8
-		uint32_t datalenL  :  8;  // data segment length (bytes, excluding padding) 7...0
-		uint8_t  reserved5[8];
-		uint32_t Itasktag  : 32;  // initiator task tag
-		uint32_t snack_tag : 32;
-		uint32_t StatSN    : 32;
-		uint32_t ExpCmdSN  : 32;
-		uint32_t MaxCmdSN  : 32;
-		uint32_t ExpDataSN : 32;
-		uint32_t BidirResCt: 32;  // bidirectional read residual count or reserved
-		uint32_t ResidualCt: 32;  // residual count or reserved
-	} __attribute__((packed));
-
-	__pdu_response__ *pdu_response __attribute__((packed)) =  { reinterpret_cast<__pdu_response__ *>(pdu_bytes) };
-
-	std::pair<uint8_t *, size_t> pdu_response_data { nullptr, 0 };
-
-public:
-	iscsi_pdu_scsi_response(session *const ses);
-	virtual ~iscsi_pdu_scsi_response();
-
-	bool set(const iscsi_pdu_scsi_cmd & reply_to, const std::vector<uint8_t> & scsi_sense_data, std::optional<uint32_t> ResidualCt);
-
-	std::vector<blob_t> get() const override;
 };
 
 class iscsi_pdu_nop_out : public iscsi_pdu_bhs  // NOP-Out  0x00
