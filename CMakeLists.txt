@@ -34,6 +34,11 @@ add_executable(
 	snmp/snmp_elem.cpp
 )
 
+set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
+set(THREADS_PREFER_PTHREAD_FLAG TRUE)
+find_package(Threads)
+target_link_libraries(iesp Threads::Threads)
+
 set(CMAKE_BUILD_TYPE RelWithDebInfo)
 #set(CMAKE_BUILD_TYPE Debug)
 #target_link_libraries(iesp -fsanitize=address)

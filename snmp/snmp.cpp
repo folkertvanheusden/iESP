@@ -19,6 +19,9 @@ namespace qn = qindesign::network;
 #include <sys/socket.h>
 #include <sys/types.h>
 #endif
+#if defined(__FreeBSD__)
+#include <netinet/in.h>
+#endif
 
 #include "../log.h"
 #include "../utils.h"
