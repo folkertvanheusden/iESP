@@ -34,6 +34,12 @@ For Linux/FreeBSD/Apple:
 * cmake ..
 * make
 
+On Debian systems you can also run:
+
+* dpkg-buildpackage -us -uc
+
+That will create a .deb-package file which you can install.
+
 For Windows:
 * mkdir buildMingw64 && cd buildMingw64
 * cmake -DCMAKE_TOOLCHAIN_FILE=../mingw64.cmake ..
