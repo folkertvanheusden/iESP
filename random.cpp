@@ -1,4 +1,4 @@
-#if defined(__MINGW32__)
+#if defined(__MINGW32__) || defined(__APPLE__)
 #include <cstdint>
 #include <cstdlib>
 #include <ctime>
@@ -16,7 +16,7 @@ bool my_getrandom(void *const tgt, const size_t n)
 
 	return true;
 }
-#elif defined(linux) || defined(__FreeBSD__) || defined(__APPLE__)
+#elif defined(linux) || defined(__FreeBSD__)
 #include <cstdint>
 #include <sys/random.h>
 
