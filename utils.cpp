@@ -17,7 +17,7 @@
 #include <time.h>
 #include <sys/types.h>
 #if !defined(__MINGW32__)
-#if !defined(TEENSY4_1)
+#if !defined(TEENSY4_1) && !defined(RP2040W)
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -314,7 +314,7 @@ int asprintf(char *strp[], const char *fmt, ...) {
 
 void socket_set_nodelay(const int fd)
 {
-#if !defined(TEENSY4_1)
+#if !defined(TEENSY4_1) && !defined(RP2040W)
 	int flags = 1;
 #if defined(__FreeBSD__) || defined(ESP32) || defined(__MINGW32__)
 	if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&flags, sizeof(flags)) == -1)
