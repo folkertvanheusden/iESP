@@ -200,7 +200,7 @@ bool iscsi_pdu_ahs::set(const uint8_t *const in, const size_t n)
 	if (n < 3)
 		return false;
 
-	size_t expected_size = NTOHS(reinterpret_cast<const __ahs_header__ *>(in)->length);
+	size_t expected_size = my_NTOHS(reinterpret_cast<const __ahs_header__ *>(in)->length);
 	if (expected_size + 3 != n)
 		return false;
 
@@ -212,7 +212,7 @@ bool iscsi_pdu_ahs::set(const uint8_t *const in, const size_t n)
 
 blob_t iscsi_pdu_ahs::get()
 {
-	uint16_t expected_size = NTOHS(reinterpret_cast<const __ahs_header__ *>(ahs)->length);
+	uint16_t expected_size = my_NTOHS(reinterpret_cast<const __ahs_header__ *>(ahs)->length);
 	uint32_t out_size      = sizeof(__ahs_header__) + expected_size;
 	uint8_t *out           = duplicate_new(ahs, out_size);
 
@@ -388,9 +388,9 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 		while(login_reply->TSIH == 0);
 	}
 	login_reply->Itasktag   = reply_to.get_Itasktag();
-	login_reply->StatSN     = HTONL(discovery ? 0 : reply_to.get_ExpStatSN());
-	login_reply->ExpCmdSN   = HTONL(reply_to.get_CmdSN());
-	login_reply->MaxCmdSN   = HTONL(reply_to.get_CmdSN() + 1);
+	login_reply->StatSN     = my_HTONL(discovery ? 0 : reply_to.get_ExpStatSN());
+	login_reply->ExpCmdSN   = my_HTONL(reply_to.get_CmdSN());
+	login_reply->MaxCmdSN   = my_HTONL(reply_to.get_CmdSN() + 1);
 
 	return true;
 }
@@ -552,10 +552,10 @@ bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std
 	pdu_response->datalenM   = reply_data_plus_sense_header >>  8;
 	pdu_response->datalenL   = reply_data_plus_sense_header      ;
 	pdu_response->Itasktag   = reply_to.get_Itasktag();
-	pdu_response->StatSN     = HTONL(reply_to.get_ExpStatSN());
-	pdu_response->ExpCmdSN   = HTONL(reply_to.get_CmdSN() + 1);
-	pdu_response->MaxCmdSN   = HTONL(reply_to.get_CmdSN() + max_msg_depth);
-	pdu_response->ExpDataSN  = HTONL(0);
+	pdu_response->StatSN     = my_HTONL(reply_to.get_ExpStatSN());
+	pdu_response->ExpCmdSN   = my_HTONL(reply_to.get_CmdSN() + 1);
+	pdu_response->MaxCmdSN   = my_HTONL(reply_to.get_CmdSN() + max_msg_depth);
+	pdu_response->ExpDataSN  = my_HTONL(0);
 	if (ResidualCt.has_value()) {
 		set_bits(&pdu_response->b2, 1, 1, true);  // U (residual underflow)
 		pdu_response->ResidualCt = ResidualCt.value();
@@ -638,11 +638,11 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get() const
 			set_bits(&pdu_data_in->b2, 7, 1, true);  // F
 			if (pdu_data_in_data.second < reply_to_copy->get_ExpDatLen()) {
 				set_bits(&pdu_data_in->b2, 1, 1, true);  // U
-				pdu_data_in->ResidualCt = HTONL(reply_to_copy->get_ExpDatLen() - pdu_data_in_data.second);
+				pdu_data_in->ResidualCt = my_HTONL(reply_to_copy->get_ExpDatLen() - pdu_data_in_data.second);
 			}
 			else if (pdu_data_in_data.second > reply_to_copy->get_ExpDatLen()) {
 				set_bits(&pdu_data_in->b2, 2, 1, true);  // O
-				pdu_data_in->ResidualCt = HTONL(pdu_data_in_data.second - reply_to_copy->get_ExpDatLen());
+				pdu_data_in->ResidualCt = my_HTONL(pdu_data_in_data.second - reply_to_copy->get_ExpDatLen());
 			}
 			set_bits(&pdu_data_in->b2, 0, 1, true);  // S
 		}
@@ -653,12 +653,12 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get() const
 		pdu_data_in->datalenL   = cur_len      ;
 		memcpy(pdu_data_in->LUN, reply_to_copy->get_LUN(), sizeof pdu_data_in->LUN);
 		pdu_data_in->Itasktag   = reply_to_copy->get_Itasktag();
-		pdu_data_in->StatSN     = HTONL(reply_to_copy->get_ExpStatSN());
-		pdu_data_in->ExpCmdSN   = HTONL(reply_to_copy->get_CmdSN() + 1);
-		pdu_data_in->MaxCmdSN   = HTONL(reply_to_copy->get_CmdSN() + max_msg_depth);
-		pdu_data_in->DataSN     = HTONL(ses->get_inc_datasn(reply_to_copy->get_Itasktag()));
-		pdu_data_in->bufferoff  = HTONL(i);
-		pdu_data_in->ResidualCt = HTONL(use_pdu_data_size - i);
+		pdu_data_in->StatSN     = my_HTONL(reply_to_copy->get_ExpStatSN());
+		pdu_data_in->ExpCmdSN   = my_HTONL(reply_to_copy->get_CmdSN() + 1);
+		pdu_data_in->MaxCmdSN   = my_HTONL(reply_to_copy->get_CmdSN() + max_msg_depth);
+		pdu_data_in->DataSN     = my_HTONL(ses->get_inc_datasn(reply_to_copy->get_Itasktag()));
+		pdu_data_in->bufferoff  = my_HTONL(i);
+		pdu_data_in->ResidualCt = my_HTONL(use_pdu_data_size - i);
 
 		auto temp_out = get_helper(pdu_data_in, pdu_data_in_data.first + i, cur_len);
 		v_out.push_back(temp_out.at(0));
@@ -697,16 +697,16 @@ std::pair<blob_t, uint8_t *> iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *co
 	pdu_data_in.datalenL   = data_is_n_bytes      ;
 	memcpy(pdu_data_in.LUN, reply_to.get_LUN(), sizeof pdu_data_in.LUN);
 	pdu_data_in.Itasktag   = reply_to.get_Itasktag();
-	pdu_data_in.StatSN     = HTONL(reply_to.get_ExpStatSN());
-	pdu_data_in.ExpCmdSN   = HTONL(reply_to.get_CmdSN() + 1);
-	pdu_data_in.MaxCmdSN   = HTONL(reply_to.get_CmdSN() + max_msg_depth);
-	pdu_data_in.DataSN     = HTONL(ses->get_inc_datasn(reply_to.get_Itasktag()));
-	pdu_data_in.bufferoff  = HTONL(offset_in_data);
+	pdu_data_in.StatSN     = my_HTONL(reply_to.get_ExpStatSN());
+	pdu_data_in.ExpCmdSN   = my_HTONL(reply_to.get_CmdSN() + 1);
+	pdu_data_in.MaxCmdSN   = my_HTONL(reply_to.get_CmdSN() + max_msg_depth);
+	pdu_data_in.DataSN     = my_HTONL(ses->get_inc_datasn(reply_to.get_Itasktag()));
+	pdu_data_in.bufferoff  = my_HTONL(offset_in_data);
 
 	if (reply_to.get_ExpDatLen() < offset_after_block)
-		pdu_data_in.ResidualCt = HTONL(offset_after_block - reply_to.get_ExpDatLen());
+		pdu_data_in.ResidualCt = my_HTONL(offset_after_block - reply_to.get_ExpDatLen());
 	else
-		pdu_data_in.ResidualCt = HTONL(reply_to.get_ExpDatLen() - (offset_in_data + data_is_n_bytes));
+		pdu_data_in.ResidualCt = my_HTONL(reply_to.get_ExpDatLen() - (offset_in_data + data_is_n_bytes));
 
 	size_t out_size = sizeof(pdu_data_in) + data_is_n_bytes;
 	out_size = (out_size + 3) & ~3;
@@ -815,9 +815,9 @@ bool iscsi_pdu_nop_in::set(const iscsi_pdu_nop_out & reply_to)
 	memcpy(nop_in->LUN, reply_to.get_LUN(), sizeof nop_in->LUN);
 	nop_in->Itasktag   = reply_to.get_Itasktag();
 	nop_in->TTT        = reply_to.get_TTT();
-	nop_in->StatSN     = HTONL(reply_to.get_ExpStatSN());
-	nop_in->ExpCmdSN   = HTONL(reply_to.get_CmdSN() + 1);
-	nop_in->MaxCmdSN   = HTONL(reply_to.get_CmdSN() + max_msg_depth);
+	nop_in->StatSN     = my_HTONL(reply_to.get_ExpStatSN());
+	nop_in->ExpCmdSN   = my_HTONL(reply_to.get_CmdSN() + 1);
+	nop_in->MaxCmdSN   = my_HTONL(reply_to.get_CmdSN() + max_msg_depth);
 
 	return true;
 }
@@ -847,11 +847,11 @@ bool iscsi_pdu_scsi_r2t::set(const iscsi_pdu_scsi_cmd & reply_to, const uint32_t
 	memcpy(pdu_scsi_r2t->LUN, reply_to.get_LUN(), sizeof pdu_scsi_r2t->LUN);
 	pdu_scsi_r2t->Itasktag   = reply_to.get_Itasktag();
 	pdu_scsi_r2t->TTT        = TTT;
-	pdu_scsi_r2t->StatSN     = HTONL(reply_to.get_ExpStatSN());
-	pdu_scsi_r2t->ExpCmdSN   = HTONL(reply_to.get_CmdSN() + 1);
-	pdu_scsi_r2t->MaxCmdSN   = HTONL(reply_to.get_CmdSN() + max_msg_depth);
-	pdu_scsi_r2t->bufferoff  = HTONL(buffer_offset);
-	pdu_scsi_r2t->DDTF       = HTONL(data_length);
+	pdu_scsi_r2t->StatSN     = my_HTONL(reply_to.get_ExpStatSN());
+	pdu_scsi_r2t->ExpCmdSN   = my_HTONL(reply_to.get_CmdSN() + 1);
+	pdu_scsi_r2t->MaxCmdSN   = my_HTONL(reply_to.get_CmdSN() + max_msg_depth);
+	pdu_scsi_r2t->bufferoff  = my_HTONL(buffer_offset);
+	pdu_scsi_r2t->DDTF       = my_HTONL(data_length);
 
 	return true;
 }
@@ -953,9 +953,9 @@ bool iscsi_pdu_text_reply::set(const iscsi_pdu_text_request & reply_to, scsi *co
 	memcpy(text_reply->LUN, reply_to.get_LUN(), sizeof text_reply->LUN);
 	text_reply->TTT        = reply_to.get_TTT();
 	text_reply->Itasktag   = reply_to.get_Itasktag();
-	text_reply->StatSN     = HTONL(reply_to.get_ExpStatSN());
-	text_reply->ExpCmdSN   = HTONL(reply_to.get_CmdSN() + 1);
-	text_reply->MaxCmdSN   = HTONL(reply_to.get_CmdSN() + max_msg_depth);
+	text_reply->StatSN     = my_HTONL(reply_to.get_ExpStatSN());
+	text_reply->ExpCmdSN   = my_HTONL(reply_to.get_CmdSN() + 1);
+	text_reply->MaxCmdSN   = my_HTONL(reply_to.get_CmdSN() + max_msg_depth);
 
 	return true;
 }
@@ -1024,9 +1024,9 @@ bool iscsi_pdu_logout_reply::set(const iscsi_pdu_logout_request & reply_to)
 	set_bits(&logout_reply->b1, 0, 6, o_logout_resp);  // 0x26
 	set_bits(&logout_reply->b2, 7, 1, true);
 	logout_reply->Itasktag = reply_to.get_Itasktag();
-	logout_reply->StatSN   = HTONL(reply_to.get_ExpStatSN());
-	logout_reply->ExpCmdSN = HTONL(reply_to.get_CmdSN());
-	logout_reply->MaxCmdSN = HTONL(reply_to.get_CmdSN());
+	logout_reply->StatSN   = my_HTONL(reply_to.get_ExpStatSN());
+	logout_reply->ExpCmdSN = my_HTONL(reply_to.get_CmdSN());
+	logout_reply->MaxCmdSN = my_HTONL(reply_to.get_CmdSN());
 
 	return true;
 }
@@ -1094,9 +1094,9 @@ bool iscsi_pdu_taskman_reply::set(const iscsi_pdu_taskman_request & reply_to)
 	set_bits(&taskman_reply->b1, 0, 6, o_scsi_taskmanr);  // 0x22
 	set_bits(&taskman_reply->b2, 7, 1, true);
 	taskman_reply->Itasktag = reply_to.get_Itasktag();
-	taskman_reply->StatSN   = HTONL(reply_to.get_ExpStatSN());
-	taskman_reply->ExpCmdSN = HTONL(reply_to.get_CmdSN() + 1);
-	taskman_reply->MaxCmdSN = HTONL(reply_to.get_CmdSN() + max_msg_depth);
+	taskman_reply->StatSN   = my_HTONL(reply_to.get_ExpStatSN());
+	taskman_reply->ExpCmdSN = my_HTONL(reply_to.get_CmdSN() + 1);
+	taskman_reply->MaxCmdSN = my_HTONL(reply_to.get_CmdSN() + max_msg_depth);
 
 	return true;
 }

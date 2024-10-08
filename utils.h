@@ -36,16 +36,15 @@ uint8_t * duplicate_new(const void *const in, const size_t n);
 
 std::string to_hex(const uint8_t *const in, const size_t n);
 
-#if !defined(__APPLE__)
-uint32_t NTOHL(const uint32_t x);
-uint16_t NTOHS(const uint16_t x);
-uint32_t HTONL(const uint32_t x);
-uint16_t HTONS(const uint16_t x);
-#endif
+// Apple has NTOHL/etc macros that confuse the build
+uint32_t my_NTOHL(const uint32_t x);
+uint16_t my_NTOHS(const uint16_t x);
+uint32_t my_HTONL(const uint32_t x);
+uint16_t my_HTONS(const uint16_t x);
 
 void socket_set_nodelay(const int fd);
 
-#define HTONLL(x) ((1==htonl(1)) ? (x) : (((uint64_t)htonl((x) & 0xFFFFFFFFUL)) << 32) | htonl((uint32_t)((x) >> 32)))
-#define NTOHLL(x) ((1==ntohl(1)) ? (x) : (((uint64_t)ntohl((x) & 0xFFFFFFFFUL)) << 32) | ntohl((uint32_t)((x) >> 32)))
+#define my_HTONLL(x) ((1==htonl(1)) ? (x) : (((uint64_t)htonl((x) & 0xFFFFFFFFUL)) << 32) | htonl((uint32_t)((x) >> 32)))
+#define my_NTOHLL(x) ((1==ntohl(1)) ? (x) : (((uint64_t)ntohl((x) & 0xFFFFFFFFUL)) << 32) | ntohl((uint32_t)((x) >> 32)))
 
 extern uint64_t running_since;

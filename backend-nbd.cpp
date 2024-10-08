@@ -109,7 +109,7 @@ bool backend_nbd::connect(const bool retry)
 				fd = -1;
 			}
 
-			dev_size = NTOHLL(nbd_hello.size);
+			dev_size = my_NTOHLL(nbd_hello.size);
 		}
 
 		if (fd != -1 && memcmp(nbd_hello.magic1, "NBDMAGIC", 8) != 0) {
@@ -157,7 +157,7 @@ bool backend_nbd::invoke_nbd(const uint32_t command, const uint64_t offset, cons
 
 		nbd_request.magic  = ntohl(0x25609513);
 		nbd_request.type   = htonl(command);
-		nbd_request.offset = HTONLL(offset);
+		nbd_request.offset = my_HTONLL(offset);
 		nbd_request.length = htonl(n_bytes);
 
 		if (WRITE(fd, reinterpret_cast<const uint8_t *>(&nbd_request), sizeof nbd_request) != sizeof nbd_request) {

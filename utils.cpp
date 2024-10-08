@@ -241,8 +241,7 @@ void encode_lun(uint8_t *const target, const uint64_t lun_nr)
 	}
 }
 
-#if !defined(__APPLE__)
-uint16_t HTONS(const uint16_t x)
+uint16_t my_HTONS(const uint16_t x)
 {
 	constexpr const uint16_t e = 1;
 	if (*reinterpret_cast<const uint8_t *>(&e))  // system is little endian
@@ -251,25 +250,24 @@ uint16_t HTONS(const uint16_t x)
 	return x;
 }
 
-uint32_t HTONL(const uint32_t x)
+uint32_t my_HTONL(const uint32_t x)
 {
 	constexpr const uint16_t e = 1;
 	if (*reinterpret_cast<const uint8_t *>(&e))  // system is little endian
-		return (HTONS(x) << 16) | HTONS(x >> 16);
+		return (my_HTONS(x) << 16) | my_HTONS(x >> 16);
 
 	return x;
 }
 
-uint16_t NTOHS(const uint16_t x)
+uint16_t my_NTOHS(const uint16_t x)
 {
-	return HTONS(x);
+	return my_HTONS(x);
 }
 
-uint32_t NTOHL(const uint32_t x)
+uint32_t my_NTOHL(const uint32_t x)
 {
-	return HTONL(x);
+	return my_HTONL(x);
 }
-#endif
 
 uint8_t * duplicate_new(const void *const in, const size_t n)
 {

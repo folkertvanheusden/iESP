@@ -187,7 +187,7 @@ public:
 
 	const uint8_t *get_ISID()       const { return login_req->ISID;         }
 	      uint16_t get_CID()        const { return login_req->CID;          }
-	      uint32_t get_CmdSN()      const { return NTOHL(login_req->CmdSN); }
+	      uint32_t get_CmdSN()      const { return my_NTOHL(login_req->CmdSN); }
 	      uint16_t get_TSIH()       const { return login_req->TSIH;         }
 	      bool     get_T()          const { return get_bits(login_req->b2, 7, 1); }
 	      bool     get_C()          const { return get_bits(login_req->b2, 6, 1); }
@@ -195,7 +195,7 @@ public:
 	      uint8_t  get_NSG()        const { return get_bits(login_req->b2, 0, 2); }
 	      uint8_t  get_versionmin() const { return login_req->versionmin;   }
 	      uint32_t get_Itasktag()   const { return login_req->Itasktag;     }
-	      uint32_t get_ExpStatSN()  const { return NTOHL(login_req->ExpStatSN); }
+	      uint32_t get_ExpStatSN()  const { return my_NTOHL(login_req->ExpStatSN); }
 	std::optional<std::string> get_initiator() const { return initiator;    }
 
 	virtual bool   set_data(std::pair<const uint8_t *, std::size_t> data_in) override;
@@ -289,10 +289,10 @@ public:
 
 	const uint8_t * get_CDB()       const { return cdb_pdu_req->CDB;              }
 	      uint32_t  get_Itasktag()  const { return cdb_pdu_req->Itasktag;         }
-	      uint32_t  get_ExpStatSN() const { return NTOHL(cdb_pdu_req->ExpStatSN); }
-	      uint32_t  get_CmdSN()     const { return NTOHL(cdb_pdu_req->CmdSN);     }
+	      uint32_t  get_ExpStatSN() const { return my_NTOHL(cdb_pdu_req->ExpStatSN); }
+	      uint32_t  get_CmdSN()     const { return my_NTOHL(cdb_pdu_req->CmdSN);     }
 	const uint8_t * get_LUN()       const { return cdb_pdu_req->LUN;              }
-	      uint32_t  get_ExpDatLen() const { return NTOHL(cdb_pdu_req->expdatlen); }
+	      uint32_t  get_ExpDatLen() const { return my_NTOHL(cdb_pdu_req->expdatlen); }
 
 	virtual std::optional<iscsi_response_set> get_response(scsi *const sd) override;
 	// special case: response after one or more data-out PDUs
@@ -392,7 +392,7 @@ public:
 	bool set(const iscsi_pdu_scsi_cmd & reply_to, const std::pair<uint8_t *, size_t> scsi_reply_data);
 	std::vector<blob_t> get() const override;
 
-	uint32_t get_BufferOffset() const { return NTOHL(pdu_data_out->bufferoff); }
+	uint32_t get_BufferOffset() const { return my_NTOHL(pdu_data_out->bufferoff); }
         uint32_t get_TTT()          const { return pdu_data_out->TTT;              }
 	bool     get_F()            const { return !!(pdu_data_out->b2 & 128);     }
 	uint32_t get_Itasktag()     const { return pdu_data_out->Itasktag;         }
@@ -480,8 +480,8 @@ public:
 	const uint8_t  *get_LUN()        const { return nop_out->LUN;              }
 	      uint32_t  get_Itasktag()   const { return nop_out->Itasktag;         }
 	      uint32_t  get_TTT()        const { return nop_out->TTT;              }
-	      uint32_t  get_CmdSN()      const { return NTOHL(nop_out->CmdSN);     }
-	      uint32_t  get_ExpStatSN()  const { return NTOHL(nop_out->ExpStatSN); }
+	      uint32_t  get_CmdSN()      const { return my_NTOHL(nop_out->CmdSN);     }
+	      uint32_t  get_ExpStatSN()  const { return my_NTOHL(nop_out->ExpStatSN); }
 
 	virtual std::optional<iscsi_response_set> get_response(scsi *const sd) override;
 };
@@ -599,9 +599,9 @@ public:
 	std::vector<blob_t> get() const override;
 
 	const uint8_t * get_LUN()      const { return text_req->LUN;              }
-	      uint32_t get_CmdSN()     const { return NTOHL(text_req->CmdSN);     }
+	      uint32_t get_CmdSN()     const { return my_NTOHL(text_req->CmdSN);     }
 	      uint32_t get_Itasktag()  const { return text_req->Itasktag;         }
-	      uint32_t get_ExpStatSN() const { return NTOHL(text_req->ExpStatSN); }
+	      uint32_t get_ExpStatSN() const { return my_NTOHL(text_req->ExpStatSN); }
               uint32_t get_TTT()       const { return text_req->TTT;              }
 
 	virtual std::optional<iscsi_response_set> get_response(scsi *const sd) override;
@@ -679,9 +679,9 @@ public:
 	bool set(const uint8_t *const in, const size_t n) override;
 	std::vector<blob_t> get() const override;
 
-	uint32_t get_CmdSN()      const { return NTOHL(logout_req->CmdSN); }
+	uint32_t get_CmdSN()      const { return my_NTOHL(logout_req->CmdSN); }
 	uint32_t get_Itasktag()   const { return logout_req->Itasktag;     }
-	uint32_t get_ExpStatSN()  const { return NTOHL(logout_req->ExpStatSN); }
+	uint32_t get_ExpStatSN()  const { return my_NTOHL(logout_req->ExpStatSN); }
 
 	virtual std::optional<iscsi_response_set> get_response(scsi *const sd) override;
 };
@@ -764,8 +764,8 @@ public:
 	std::vector<blob_t> get() const override;
 
 	uint32_t get_Itasktag()  const { return taskman_req->Itasktag;         }
-	uint32_t get_ExpStatSN() const { return NTOHL(taskman_req->ExpStatSN); }
-	uint32_t get_CmdSN()     const { return NTOHL(taskman_req->CmdSN);     }
+	uint32_t get_ExpStatSN() const { return my_NTOHL(taskman_req->ExpStatSN); }
+	uint32_t get_CmdSN()     const { return my_NTOHL(taskman_req->CmdSN);     }
 
 	virtual std::optional<iscsi_response_set> get_response(scsi *const sd) override;
 };
