@@ -851,6 +851,11 @@ std::optional<std::vector<uint8_t> > scsi::validate_request(const uint64_t lba, 
 			DOLOG(logging::ll_debug, "scsi::validate_request", "-", "WRITE_SAME with ANCHOR=1 and UNMAP=0 is a failure");
 				return error_invalid_field();
 		}
+
+		if ((opcode == o_write_10 || opcode == o_write_16 || opcode == o_write_verify_10 || opcode == o_write_same_10 || opcode == o_write_same_16) && (CDB[1] >> 5) != 0) {
+			DOLOG(logging::ll_debug, "scsi::validate_request", "-", "WRITE_SAME with WRPROTECT set is not supported");
+				return error_invalid_field();
+		}
 	}
 
 	return { };  // no error
