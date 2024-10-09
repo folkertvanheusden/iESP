@@ -388,7 +388,6 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		}
 
 		response.amount_of_data_expected = transfer_length * backend_block_size;
-		response.fua = CDB[1] & 8;
 
 		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE_%s, offset %" PRIu64 ", %u sectors", name, lba, transfer_length);
 
@@ -431,11 +430,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				delete [] temp_buffer;
 			}
 
-			if (ok) {
-				if (response.fua)
-					this->sync();
-			}
-			else {
+			if (!ok) {
 				if (rc == scsi_rw_result::rw_fail_rw) {
 					DOLOG(logging::ll_error, "scsi::send", lun_identifier, "WRITE_xx, general i/o error");
 					response.sense_data = error_write_error();
@@ -831,6 +826,11 @@ std::optional<std::vector<uint8_t> > scsi::validate_request(const uint64_t lba, 
 
 	if (CDB && (CDB[1] & 16)) {  // DPO
 		DOLOG(logging::ll_debug, "scsi::validate_request", "-", "DPO not supported");
+		return error_invalid_field();
+	}
+
+	if (CDB && (CDB[1] & 8)) {  // FUA
+		DOLOG(logging::ll_debug, "scsi::validate_request", "-", "FUA not supported");
 		return error_invalid_field();
 	}
 

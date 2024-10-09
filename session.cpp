@@ -29,7 +29,7 @@ uint32_t session::get_inc_datasn(const uint32_t data_sn_itt)
 	return data_sn++;
 }
 
-uint32_t session::init_r2t_session(const r2t_session & rs, const bool fua, iscsi_pdu_scsi_cmd *const pdu)
+uint32_t session::init_r2t_session(const r2t_session & rs, iscsi_pdu_scsi_cmd *const pdu)
 {
 	uint32_t ITT = pdu->get_Itasktag();
 
@@ -39,7 +39,6 @@ uint32_t session::init_r2t_session(const r2t_session & rs, const bool fua, iscsi
 
 	r2t_session *copy = new r2t_session;
 	*copy               = rs;
-	copy->fua           = fua;
 	copy->PDU_initiator = pdu->get_raw();
 
 	DOLOG(logging::ll_debug, "session::init_r2t_session", get_endpoint_name(), "register ITT %08x", ITT);

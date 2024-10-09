@@ -313,13 +313,6 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 
 			session->bytes_done += data.value().second;
 			session->bytes_left -= data.value().second;
-
-			if (session->fua) {
-				if (s->sync() == false) {
-					DOLOG(logging::ll_error, "server::push_response", cc->get_endpoint_name(), "DATA-OUT problem syncing data to backend");
-					return false;
-				}
-			}
 		}
 		else if (!F) {
 			DOLOG(logging::ll_warning, "server::push_response", cc->get_endpoint_name(), "DATA-OUT PDU has no data?");
