@@ -815,7 +815,7 @@ std::optional<std::vector<uint8_t> > scsi::validate_request(const uint64_t lba, 
 {
 	auto size_in_blocks = get_size_in_blocks();
 
-	if (lba + n_blocks > size_in_blocks) {
+	if (lba > size_in_blocks - n_blocks) {
 		DOLOG(logging::ll_debug, "scsi::validate_request", "-", "lba %" PRIu64 " + n_blocks %u > size_in_blocks %" PRIu64, lba, n_blocks, size_in_blocks);
 		return error_out_of_range();
 	}
@@ -825,24 +825,26 @@ std::optional<std::vector<uint8_t> > scsi::validate_request(const uint64_t lba, 
 		return error_out_of_range();
 	}
 
-	scsi_opcode opcode = scsi_opcode(CDB[0]);
+	if (CDB) {
+		scsi_opcode opcode = scsi_opcode(CDB[0]);
 
-	if (opcode == o_read_10 || opcode == o_read_16) {
-		if (CDB && (CDB[1] >> 5)) {  // RDPROTECT / WRPROTECT
-			DOLOG(logging::ll_debug, "scsi::validate_request", "-", "RD/WR PROTECT not supported");
-			return error_invalid_field();
-		}
-	}
-
-	if (opcode == o_read_10 || opcode == o_read_16 || opcode == o_write_verify_10) {
-		if (CDB && (CDB[1] & 16)) {  // DPO
-			DOLOG(logging::ll_debug, "scsi::validate_request", "-", "DPO not supported");
-			return error_invalid_field();
+		if (opcode == o_read_10 || opcode == o_read_16) {
+			if (CDB[1] >> 5) {  // RDPROTECT / WRPROTECT
+				DOLOG(logging::ll_debug, "scsi::validate_request", "-", "RD/WR PROTECT not supported");
+				return error_invalid_field();
+			}
 		}
 
-		if (CDB && (CDB[1] & 8)) {  // FUA
-			DOLOG(logging::ll_debug, "scsi::validate_request", "-", "FUA not supported");
-			return error_invalid_field();
+		if (opcode == o_read_10 || opcode == o_read_16 || opcode == o_write_verify_10) {
+			if (CDB[1] & 16) {  // DPO
+				DOLOG(logging::ll_debug, "scsi::validate_request", "-", "DPO not supported");
+				return error_invalid_field();
+			}
+
+			if (CDB[1] & 8) {  // FUA
+				DOLOG(logging::ll_debug, "scsi::validate_request", "-", "FUA not supported");
+				return error_invalid_field();
+			}
 		}
 	}
 
