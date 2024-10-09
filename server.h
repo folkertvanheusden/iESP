@@ -24,6 +24,7 @@ private:
 	com           *const c          { nullptr };
 	iscsi_stats_t *const is         { nullptr };
 	const std::string target_name;
+	const bool     digest_chk       { false   };
 #if !defined(ARDUINO) && !defined(NDEBUG)
 	std::atomic_uint64_t cmd_use_count[64] { };
 #endif
@@ -33,7 +34,7 @@ private:
 	bool    push_response(com_client *const cc, session *const s, iscsi_pdu_bhs *const pdu, scsi *const sd);
 
 public:
-	server(scsi *const s, com *const c, iscsi_stats_t *is, const std::string & target_name);
+	server(scsi *const s, com *const c, iscsi_stats_t *is, const std::string & target_name, const bool digest_chk);
 	virtual ~server();
 
 	bool begin();

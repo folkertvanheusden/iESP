@@ -27,11 +27,12 @@
 
 extern std::atomic_bool stop;
 
-server::server(scsi *const s, com *const c, iscsi_stats_t *is, const std::string & target_name):
+server::server(scsi *const s, com *const c, iscsi_stats_t *is, const std::string & target_name, const bool digest_chk):
 	s(s),
 	c(c),
 	is(is),
-	target_name(target_name)
+	target_name(target_name),
+	digest_chk(digest_chk)
 {
 }
 
@@ -178,9 +179,11 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 			}
 			else {
 				// verify digest
-				if (remote_header_digest != incoming_crc32c.first) {
-					ok        = false;
-					pdu_error = true;
+				if (remote_header_digest != incoming_crc32c.first && digest_chk) {
+					if (digest_chk) {
+						ok        = false;
+						pdu_error = true;
+					}
 					DOLOG(logging::ll_info, "server::receive_pdu", cc->get_endpoint_name(), "header digest mismatch: received=%08x, calculated=%08x", remote_header_digest, incoming_crc32c.first);
 				}
 
@@ -223,8 +226,10 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 				else {
 					// verify digest
 					if (remote_data_digest != incoming_crc32c.first) {
-						ok        = false;
-						pdu_error = true;
+						if (digest_chk) {
+							ok        = false;
+							pdu_error = true;
+						}
 						DOLOG(logging::ll_info, "server::receive_pdu", cc->get_endpoint_name(), "data digest mismatch: received=%08x, calculated=%08x", remote_data_digest, incoming_crc32c.first);
 					}
 

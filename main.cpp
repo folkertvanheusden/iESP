@@ -92,6 +92,7 @@ void help()
 	printf("-T x    trim level (0=disable, 1=normal (default), 2=auto)\n");
 	printf("-L x,y  set file log level (x) and screen log level (y)\n");
 	printf("-l x    set log file\n");
+	printf("-D      disable digest\n");
 	printf("-S      enable SNMP agent\n");
 	printf("-h      this help\n");
 }
@@ -120,14 +121,17 @@ int main(int argc, char *argv[])
 	std::string    target_name= "test";
 	int            trim_level = 1;
 	bool           use_snmp   = false;
+	bool           digest_chk = true;
 	backend_type_t bt         = backend_type_t::BT_FILE;
 	const char    *logfile    = "/tmp/iesp.log";
 	logging::log_level_t ll_screen = logging::ll_error;
 	logging::log_level_t ll_file   = logging::ll_error;
 	int o = -1;
-	while((o = getopt(argc, argv, "Sb:d:i:p:T:t:L:l:h")) != -1) {
+	while((o = getopt(argc, argv, "SDb:d:i:p:T:t:L:l:h")) != -1) {
 		if (o == 'S')
 			use_snmp = true;
+		else if (o == 'D')
+			digest_chk = false;
 		else if (o == 'b') {
 			if (strcasecmp(optarg, "file") == 0)
 				bt = backend_type_t::BT_FILE;
@@ -207,7 +211,7 @@ int main(int argc, char *argv[])
 
 	std::thread *mth = new std::thread(maintenance_thread, &stop, &cpu_usage, &ram_free_kb);
 
-	server s(&sd, &c, &is, target_name);
+	server s(&sd, &c, &is, target_name, digest_chk);
 	printf("Go!\n");
 	s.handler();
 
