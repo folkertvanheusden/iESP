@@ -21,6 +21,8 @@ private:
 	uint64_t          bytes_rx      { 0       };
 	uint64_t          bytes_tx      { 0       };
 
+	uint32_t          max_seg_len   { 8192    };
+
 	bool              header_digest { false   };
 	bool              data_digest   { false   };
 
@@ -40,6 +42,9 @@ public:
 	void     set_data_digest  (const bool v) { data_digest   = v; }
 	bool     get_header_digest() const { return header_digest; }
 	bool     get_data_digest  () const { return data_digest;   }
+
+	void     set_max_seg_len(const uint32_t v) { max_seg_len = v; }
+	uint32_t get_max_seg_len() const { return max_seg_len; }
 
 	void     add_bytes_rx(const uint64_t n) { bytes_rx += n; }
 	uint64_t get_bytes_rx() const { return bytes_rx; }

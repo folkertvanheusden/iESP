@@ -252,6 +252,7 @@ bool iscsi_pdu_login_request::set_data(std::pair<const uint8_t *, std::size_t> d
 
 	auto        kvs_in      = data_to_text_array(data.first, data.second);
 	uint32_t    max_burst   = ~0;
+	uint32_t    max_seg_len = 8192;
 	std::string target_name;
 	bool        discovery   = false;
 	for(auto & kv: kvs_in) {
@@ -265,6 +266,8 @@ bool iscsi_pdu_login_request::set_data(std::pair<const uint8_t *, std::size_t> d
 			max_burst = std::min(max_burst, uint32_t(std::stoi(parts[1])));
 		else if (parts[0] == "FirstBurstLength")
 			max_burst = std::min(max_burst, uint32_t(std::stoi(parts[1])));
+		else if (parts[0] == "MaxRecvDataSegmentLength")
+			max_seg_len = uint32_t(std::stoi(parts[1]));
 		else if (parts[0] == "InitiatorName")
 			initiator = parts[1];
 		else if (parts[0] == "TargetName")
@@ -276,6 +279,8 @@ bool iscsi_pdu_login_request::set_data(std::pair<const uint8_t *, std::size_t> d
 		else if (parts[0] == "DataDigest")
 			ses->set_data_digest(has_CRC32C(parts[1]));
 	}
+
+	ses->set_max_seg_len(max_seg_len);
 
 	if (max_burst < uint32_t(~0)) {
 		DOLOG(logging::ll_debug, "iscsi_pdu_login_request::set_data", ses->get_endpoint_name(), "set max-burst to %u", max_burst);
