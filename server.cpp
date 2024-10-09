@@ -248,7 +248,7 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 	return { pdu_obj, pdu_error, tx_start };
 }
 
-bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_bhs *const pdu, scsi *const sd)
+bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_bhs *const pdu)
 {
 	bool ok = true;
 
@@ -328,7 +328,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 				DOLOG(logging::ll_error, "server::push_response", cc->get_endpoint_name(), "response.set failed");
 				return false;
 			}
-			response_set = response.get_response(sd, session->bytes_left);
+			response_set = response.get_response(s, session->bytes_left);
 
 			if (session->bytes_left == 0) {
 				DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "end of task");
@@ -353,7 +353,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 		}
 	}
 	else {
-		response_set = pdu->get_response(sd);
+		response_set = pdu->get_response(s);
 	}
 
 	if (response_set.has_value() == false) {
@@ -388,18 +388,12 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 	if (response_set.value().to_stream.has_value()) {
 		auto & stream_parameters = response_set.value().to_stream.value();
 
-		DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "stream %u sectors, LBA: %zu", stream_parameters.n_sectors, size_t(stream_parameters.lba));
-
 		iscsi_pdu_scsi_cmd reply_to(ses);
 		auto temp = pdu->get_raw();
 		reply_to.set(temp.data, temp.n);
 		delete [] temp.data;
 
-	        uint64_t use_pdu_data_size = uint64_t(stream_parameters.n_sectors) * s->get_block_size();
-		if (use_pdu_data_size > reply_to.get_ExpDatLen()) {
-			DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "requested less (%u) than wat is available (%" PRIu64 ")", reply_to.get_ExpDatLen(), use_pdu_data_size);
-			use_pdu_data_size = reply_to.get_ExpDatLen();
-		}
+		DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "SCSI: stream %u sectors starting at LBA %" PRIu64 ", iSCSI: %u", stream_parameters.n_sectors, stream_parameters.lba, reply_to.get_ExpDatLen());
 
 		size_t buffer_n     = 0;
 		auto   ack_interval = ses->get_ack_interval();
@@ -432,58 +426,59 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 		if (buffer_n < s->get_block_size())
 			buffer_n = s->get_block_size();
 
-		uint32_t block_group_size = buffer_n / s->get_block_size();
-		uint32_t offset           = 0;
-		bool     low_ram          = false;
+		uint64_t scsi_has    = stream_parameters.n_sectors * s->get_block_size();
+		uint64_t iscsi_wants = reply_to.get_ExpDatLen();
 
-		for(uint32_t block_nr = 0; block_nr < stream_parameters.n_sectors;) {
-			uint32_t n_left = low_ram ? 1 : std::min(block_group_size, stream_parameters.n_sectors - block_nr);
-			buffer_n = n_left * s->get_block_size();
-			buffer_n = std::max(s->get_block_size(), uint64_t(std::min(buffer_n, size_t(use_pdu_data_size - offset))));
-			uint32_t do_n = buffer_n / s->get_block_size();
+		uint64_t current_lba = stream_parameters.lba;
+		uint32_t offset      = 0;
+		uint32_t offset_end  = std::min(scsi_has, iscsi_wants);
 
-			auto [ out, data_pointer ] = iscsi_pdu_scsi_data_in::gen_data_in_pdu(ses, reply_to, use_pdu_data_size, offset, buffer_n);
+		while(offset < offset_end) {
+			uint64_t bytes_left = offset_end - offset;
+			uint32_t current_n  = std::min(bytes_left, buffer_n);
 
-			uint64_t cur_block_nr = block_nr + stream_parameters.lba;
-			DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "reading %u block(s) nr %zu from backend", do_n, size_t(cur_block_nr));
-			if (buffer_n > 0) {
-				auto rc = s->read(cur_block_nr, do_n, data_pointer);
-				if (rc != scsi::rw_ok) {
-					delete [] out.data;
-					DOLOG(logging::ll_error, "server::push_response", cc->get_endpoint_name(), "reading %u block(s) %zu from backend failed (%d)", do_n, size_t(cur_block_nr), rc);
-					ok = false;
-					break;
-				}
+			bool last_block = offset + current_n == offset_end;
 
-				if (ses->get_data_digest()) {
-					size_t   n_bytes = do_n * s->get_block_size();
-					uint32_t crc32   = crc32_0x11EDC6F41(reinterpret_cast<const uint8_t *>(data_pointer), n_bytes, { }).first;
-					memcpy(&data_pointer[n_bytes], &crc32, sizeof crc32);
-				}
-			}
+			auto [ out, data_pointer ] = iscsi_pdu_scsi_data_in::gen_data_in_pdu(ses, reply_to, s->get_block_size(), offset, current_n, last_block);
 
-			if (out.n == 0) {  // gen_data_in_pdu could not allocate memory
-				DOLOG(logging::ll_warning, "server::push_response", cc->get_endpoint_name(), "low on memory: %zu bytes failed", buffer_n);
-				low_ram  = true;
-				buffer_n = s->get_block_size();
+			scsi::scsi_rw_result rc = scsi::rw_ok;
+
+			if (current_n < s->get_block_size()) {
+				uint8_t *temp_buffer = new uint8_t[s->get_block_size()];
+				rc = s->read(current_lba, 1, temp_buffer);
+				if (rc == scsi::rw_ok)
+					memcpy(data_pointer, temp_buffer, current_n);
+				delete [] temp_buffer;
 			}
 			else {
-				bool rc = cc->send(out.data, out.n);
-				delete [] out.data;
-				if (rc == false) {
-					DOLOG(logging::ll_info, "server::push_response", cc->get_endpoint_name(), "problem sending block %zu to initiator", size_t(cur_block_nr));
-					ok = false;
-					break;
-				}
-
-				ses->add_bytes_tx(out.n);
-				offset   += buffer_n;
-				block_nr += do_n;
-				is->iscsiSsnTxDataOctets += out.n;
+				rc = s->read(current_lba, current_n / s->get_block_size(), data_pointer);
 			}
 
-			if (buffer_n == 0)
+			if (rc != scsi::rw_ok) {
+				delete [] out.data;
+				DOLOG(logging::ll_error, "server::push_response", cc->get_endpoint_name(), "reading %u bytes failed: %d", current_n, rc);
+				ok = false;
 				break;
+			}
+
+			if (ses->get_data_digest()) {
+				size_t   n_bytes = current_n;
+				uint32_t crc32   = crc32_0x11EDC6F41(reinterpret_cast<const uint8_t *>(data_pointer), n_bytes, { }).first;
+				memcpy(&data_pointer[n_bytes], &crc32, sizeof crc32);
+			}
+
+			bool rc_tx = cc->send(out.data, out.n);
+			delete [] out.data;
+			if (rc_tx == false) {
+				DOLOG(logging::ll_info, "server::push_response", cc->get_endpoint_name(), "problem sending %u bytes of block %" PRIu64 " to initiator", current_lba, current_n);
+				ok = false;
+				break;
+			}
+
+			ses->add_bytes_tx(out.n);
+			offset      += current_n;
+			current_lba += 1;
+			is->iscsiSsnTxDataOctets += out.n;
 		}
 	}
 
@@ -568,7 +563,7 @@ void server::handler()
 					DOLOG(logging::ll_debug, "server::handler", endpoint, "transmitted reject PDU");
 				}
 				else {
-					ok = push_response(cc, ses, pdu, s);
+					ok = push_response(cc, ses, pdu);
 					if (!ok)
 						is->iscsiInstSsnFailures++;
 				}
