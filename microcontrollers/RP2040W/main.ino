@@ -82,7 +82,7 @@ void setup()
 		sd = new scsi(bs, 1, &ios);
 
 		Serial.println(F("Instantiate iSCSI server"));
-		s = new server(sd, c, &is, "test");
+		s = new server(sd, c, &is, "test", false);
 
 		Serial.print(F("Free memory after full init: "));
 		Serial.println(rp2040.getFreeHeap());
