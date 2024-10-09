@@ -135,5 +135,5 @@ public:
 	scsi_rw_result read    (const uint64_t block_nr, const uint32_t n_blocks,       uint8_t *const data);
 	scsi_rw_result cmpwrite(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const write_data, const uint8_t *const compare_data);
 
-	std::optional<scsi_response> send(const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
+	std::optional<scsi_response> send(const uint64_t lun, const uint8_t *const CDB, const size_t size, std::tuple<uint8_t *, size_t> data);
 };

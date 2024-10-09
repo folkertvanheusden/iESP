@@ -446,14 +446,15 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(scsi *const s
 	const uint64_t lun = get_LUN_nr();	
 	DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "working on ITT %08x for LUN %" PRIu64, get_Itasktag(), lun);
 
-	auto scsi_reply = sd->send(lun, get_CDB(), 16, data);
+	uint64_t iscsi_expected = get_ExpDatLen();
+	auto     scsi_reply     = sd->send(lun, get_CDB(), 16, data);
 	if (scsi_reply.has_value() == false) {
 		DOLOG(logging::ll_warning, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "scsi::send returned nothing");
 		return { };
 	}
 
 	iscsi_response_set response;
-	bool               ok       { true };
+	bool               ok       = true;
 
 	if (scsi_reply.value().io.is_inline) {
 		auto pdu_data_in = new iscsi_pdu_scsi_data_in(ses);  // 0x25
@@ -499,7 +500,6 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(scsi *const s
 	else if (scsi_reply.value().type == ir_r2t) {
 		assert(scsi_reply.value().amount_of_data_expected.has_value());
 		uint64_t scsi_expected               = scsi_reply.value().amount_of_data_expected.value();
-		uint64_t iscsi_expected              = get_ExpDatLen();
 		bool     r2t_would_under_or_overflow = scsi_expected != iscsi_expected;
 
 		if (r2t_would_under_or_overflow) {
