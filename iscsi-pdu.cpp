@@ -343,16 +343,13 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 		const std::vector<std::string> kvs {
 			ses->get_header_digest() ? "HeaderDigest=CRC32C" : "HeaderDigest=None",
 			ses->get_data_digest  () ? "DataDigest=CRC32C"   : "DataDigest=None",
-			"DefaultTime2Wait=0",
+			"DefaultTime2Wait=2",
 			"DefaultTime2Retain=20",
 			"ErrorRecoveryLevel=0",
-			"MaxConnections=128",  // arbitrarily chosen
 #if defined(ARDUINO)
 			"MaxRecvDataSegmentLength=4096",
-			"MaxBurstLength=4096",
 #else
 			"MaxRecvDataSegmentLength=8388608",  // 8 MB, anything large
-			"MaxBurstLength=8388608",
 #endif
 		};
 		for(auto & kv : kvs)
