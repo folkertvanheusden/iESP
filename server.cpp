@@ -396,7 +396,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 
 		DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "SCSI: stream %u sectors starting at LBA %" PRIu64 ", iSCSI: %u", stream_parameters.n_sectors, stream_parameters.lba, reply_to.get_ExpDatLen());
 
-		size_t   buffer_n    = MAX_DATA_SEGMENT_SIZE;
+		uint64_t buffer_n    = MAX_DATA_SEGMENT_SIZE;
 
 		uint32_t scsi_has    = stream_parameters.n_sectors * s->get_block_size();
 		uint32_t iscsi_wants = reply_to.get_ExpDatLen();
