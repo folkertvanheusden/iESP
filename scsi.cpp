@@ -264,7 +264,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				response.io.what.data.first[1] = CDB[2];
 				response.io.what.data.first[2] = (response.io.what.data.second - 4)>> 8;  // page length
 				response.io.what.data.first[3] = response.io.what.data.second - 4;
-				response.io.what.data.first[5] = 128 /* LBPU */ | 2 /* LBRZ: zeros */;
+				response.io.what.data.first[5] = 128 /* LBPU */ | 64 /* LBPWS */ | 32 /* LBPWS10 */ | 2 /* LBRZ: zeros */;
 				// TODO
 			}
 			else {
