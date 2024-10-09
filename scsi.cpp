@@ -715,19 +715,20 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		uint64_t lba             = 0;
 		uint32_t transfer_length = 0;
 
+		response.r2t.write_same_is_unmap = CDB[1] & 8;
+
 		if (opcode == o_write_same_16) {
 			lba             = get_uint64_t(&CDB[2]);  // TODO not checked in the documentation
 			transfer_length = get_uint32_t(&CDB[10]);
-			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE_SAME_16, LBA %" PRIu64 ", %u sectors", lba, transfer_length);
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE_SAME_16, LBA %" PRIu64 ", %u sectors, is unmap: %d", lba, transfer_length, response.r2t.write_same_is_unmap);
 		}
 		else if (opcode == o_write_same_10) {
 			lba             = get_uint32_t(&CDB[2]);
 			transfer_length = (CDB[7] << 8) | CDB[8];
-			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE_SAME_10, LBA %" PRIu64 ", %u sectors", lba, transfer_length);
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE_SAME_10, LBA %" PRIu64 ", %u sectors, is unmap: %d", lba, transfer_length, response.r2t.write_same_is_unmap);
 		}
 
 		response.r2t.is_write_same       = true;
-		response.r2t.write_same_is_unmap = CDB[1] & 8;
 		response.amount_of_data_expected = transfer_length * backend_block_size;
 
 		size_t expected_size = backend_block_size;
@@ -753,16 +754,21 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			}
 
 			if (ok) {
-				scsi::scsi_rw_result rc = rw_fail_general;
+				scsi::scsi_rw_result rc = rw_ok;
 
-				for(uint32_t i=0; i<transfer_length; i++) {
-					rc = response.r2t.write_same_is_unmap ?
-						trim(lba, 1) :
-						write(lba, 1, data.first);
-					if (rc != rw_ok)
-						break;
-
-					lba++;
+				if (transfer_length == 0) {
+					for(uint64_t i=lba; i<b->get_size_in_blocks() && rc == rw_ok; i++) {
+						rc = response.r2t.write_same_is_unmap ?
+							trim(i, 1) :
+							write(i, 1, data.first);
+					}
+				}
+				else {
+					for(uint32_t i=0; i<transfer_length && rc == rw_ok; i++, lba++) {
+						rc = response.r2t.write_same_is_unmap ?
+							trim(lba, 1) :
+							write(lba, 1, data.first);
+					}
 				}
 
 				if (rc == scsi_rw_result::rw_fail_rw) {
