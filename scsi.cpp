@@ -104,6 +104,8 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 	response.type         = ir_as_is;
 	response.data_is_meta = true;
 
+	auto backend_block_size = b->get_block_size();
+
 	if (opcode == o_test_unit_ready) {
 		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "TEST UNIT READY");
 		response.type = ir_empty_sense;
@@ -381,6 +383,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			name = "16";
 		}
 
+		response.amount_of_data_expected = transfer_length * backend_block_size;
 		response.fua = CDB[1] & 8;
 
 		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE_%s, offset %" PRIu64 ", %u sectors", name, lba, transfer_length);
@@ -393,7 +396,6 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		else if (data.first) {
 			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "write command includes data (%zu bytes)", data.second);
 
-			auto   backend_block_size = b->get_block_size();
 			size_t expected_size      = transfer_length * backend_block_size;
 			size_t received_size      = data.second;
 			size_t received_blocks    = received_size / backend_block_size;
@@ -465,6 +467,8 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				transfer_length = 256;
 			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "READ_6, LBA %" PRIu64 ", %u sectors", lba, transfer_length);
 		}
+
+		response.amount_of_data_expected = transfer_length * backend_block_size;
 
 		auto vr = validate_request(lba, transfer_length, CDB);
 		if (vr.has_value()) {
@@ -567,6 +571,8 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		auto expected_data_size = block_size * block_count * 2;
 		if (expected_data_size != data.second)
 			DOLOG(logging::ll_warning, "scsi::send", lun_identifier, "COMPARE AND WRITE: data count mismatch (%zu versus %zu)", size_t(expected_data_size), data.second);
+
+		response.amount_of_data_expected = expected_data_size;
 
 		auto vr = validate_request(lba, block_count, CDB);
 		if (vr.has_value()) {
@@ -693,15 +699,15 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		}
 		else if (opcode == o_write_same_10) {
 			lba             = get_uint32_t(&CDB[2]);
-			transfer_length =  (CDB[7] << 8) | CDB[8];
+			transfer_length = (CDB[7] << 8) | CDB[8];
 			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE_SAME_10, LBA %" PRIu64 ", %u sectors", lba, transfer_length);
 		}
 
 		response.r2t.is_write_same       = true;
 		response.r2t.write_same_is_unmap = CDB[1] & 8;
+		response.amount_of_data_expected = transfer_length * backend_block_size;
 
-		auto   backend_block_size = b->get_block_size();
-		size_t expected_size      = backend_block_size;
+		size_t expected_size = backend_block_size;
 
 		auto vr = validate_request(lba, transfer_length, CDB);
 		if (vr.has_value()) {

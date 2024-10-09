@@ -476,26 +476,67 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(scsi *const s
 			auto *temp = new iscsi_pdu_scsi_response(ses) /* 0x21 */;
 			DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "sending SCSI response with %zu sense bytes", scsi_reply.value().sense_data.size());
 
-			if (temp->set(*this, scsi_reply.value().sense_data, { }) == false) {
+			std::optional<std::pair<residual, uint32_t> > residual_state;
+
+			// WRITE under/overflow check
+			if (scsi_reply.value().amount_of_data_expected.has_value() && data.first != nullptr) {
+				uint64_t scsi_expected  = scsi_reply.value().amount_of_data_expected.value();
+
+				if (scsi_expected < data.second)
+					residual_state = { iSR_UNDERFLOW, data.second - scsi_expected };
+				else if (scsi_expected > data.second)
+					residual_state = { iSR_OVERFLOW, scsi_expected - data.second };
+			}
+
+			if (temp->set(*this, scsi_reply.value().sense_data, residual_state) == false) {
 				ok = false;
 				DOLOG(logging::ll_info, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "iscsi_pdu_scsi_response::set returned error");
 			}
+
 			pdu_scsi_response = temp;
 		}
 	}
 	else if (scsi_reply.value().type == ir_r2t) {
-		auto *temp = new iscsi_pdu_scsi_r2t(ses) /* 0x31 */;
-		DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "sending R2T with %zu sense bytes", scsi_reply.value().sense_data.size());
+		assert(scsi_reply.value().amount_of_data_expected.has_value());
+		uint64_t scsi_expected               = scsi_reply.value().amount_of_data_expected.value();
+		uint64_t iscsi_expected              = get_ExpDatLen();
+		bool     r2t_would_under_or_overflow = scsi_expected != iscsi_expected;
 
-		uint32_t TTT = ses->init_r2t_session(scsi_reply.value().r2t, scsi_reply.value().fua, this);
-		DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "TTT is %08x", TTT);
+		if (r2t_would_under_or_overflow) {
+			auto *temp = new iscsi_pdu_scsi_response(ses) /* 0x21 */;
 
-		if (temp->set(*this, TTT, scsi_reply.value().r2t.bytes_done, scsi_reply.value().r2t.bytes_left) == false) {
-			ok = false;
-			DOLOG(logging::ll_info, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "iscsi_pdu_scsi_response::set returned error");
+			std::pair<residual, uint32_t> residual_state { };
+
+			if (scsi_expected < iscsi_expected)
+				residual_state = { iSR_UNDERFLOW, iscsi_expected - scsi_expected };
+			else if (scsi_expected > iscsi_expected)
+				residual_state = { iSR_OVERFLOW, scsi_expected - iscsi_expected };
+			else
+				assert(0);
+
+			if (temp->set(*this, { }, residual_state) == false) {
+				ok = false;
+				DOLOG(logging::ll_info, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "iscsi_pdu_scsi_response::set returned error");
+			}
+
+			pdu_scsi_response = temp;
 		}
-		pdu_scsi_response = temp;
+		else {
+			auto *temp = new iscsi_pdu_scsi_r2t(ses) /* 0x31 */;
+			DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "sending R2T with %zu sense bytes", scsi_reply.value().sense_data.size());
+
+			uint32_t TTT = ses->init_r2t_session(scsi_reply.value().r2t, scsi_reply.value().fua, this);
+			DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "TTT is %08x", TTT);
+
+			if (temp->set(*this, TTT, scsi_reply.value().r2t.bytes_done, scsi_reply.value().r2t.bytes_left) == false) {
+				ok = false;
+				DOLOG(logging::ll_info, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "iscsi_pdu_scsi_response::set returned error");
+			}
+
+			pdu_scsi_response = temp;
+		}
 	}
+
 	if (pdu_scsi_response)
 		response.responses.push_back(pdu_scsi_response);
 
@@ -529,7 +570,7 @@ iscsi_pdu_scsi_response::~iscsi_pdu_scsi_response()
 	delete [] pdu_response_data.first;
 }
 
-bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std::vector<uint8_t> & scsi_sense_data, std::optional<uint32_t> ResidualCt)
+bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std::vector<uint8_t> & scsi_sense_data, std::optional<std::pair<residual, uint32_t> > has_residual)
 {
 	size_t sense_data_size = scsi_sense_data.size();
 	size_t reply_data_plus_sense_header = sense_data_size > 0 ? 2 + sense_data_size : 0;
@@ -549,9 +590,16 @@ bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std
 	pdu_response->ExpCmdSN   = my_HTONL(reply_to.get_CmdSN() + 1);
 	pdu_response->MaxCmdSN   = my_HTONL(reply_to.get_CmdSN() + max_msg_depth);
 	pdu_response->ExpDataSN  = my_HTONL(0);
-	if (ResidualCt.has_value()) {
-		set_bits(&pdu_response->b2, 1, 1, true);  // U (residual underflow)
-		pdu_response->ResidualCt = ResidualCt.value();
+
+	if (has_residual.has_value()) {
+		if (has_residual.value().first == iSR_UNDERFLOW)
+			set_bits(&pdu_response->b2, 1, 1, true);  // U (residual underflow)
+		else if (has_residual.value().first == iSR_OVERFLOW)
+			set_bits(&pdu_response->b2, 2, 1, true);  // O (residual overflow)
+		else
+			assert(false);
+
+		pdu_response->ResidualCt = my_HTONL(has_residual.value().second);
 	}
 
 	pdu_response_data.second = reply_data_plus_sense_header;

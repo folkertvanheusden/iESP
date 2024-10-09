@@ -13,6 +13,8 @@
 #define MAX_DATA_SEGMENT_SIZE (256 * 1024 * 1024)  // 256 MB
 #endif
 
+enum residual { iSR_OVERFLOW, iSR_UNDERFLOW, iSR_OK };  // iSR: iS(CSI) Residual
+
 typedef struct {
 	uint8_t *data;
 	size_t n;

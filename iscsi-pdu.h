@@ -443,7 +443,11 @@ public:
 	iscsi_pdu_scsi_response(session *const ses);
 	virtual ~iscsi_pdu_scsi_response();
 
-	bool set(const iscsi_pdu_scsi_cmd & reply_to, const std::vector<uint8_t> & scsi_sense_data, std::optional<uint32_t> ResidualCt);
+	bool set(const iscsi_pdu_scsi_cmd & reply_to, const std::vector<uint8_t> & scsi_sense_data, std::optional<std::pair<residual, uint32_t> > has_residual);
+
+	void set_residual_count(const uint32_t v) { pdu_response->ResidualCt = v; }
+	void set_overflow_flag (const bool state) { set_bits(&pdu_response->b2, 2, 1, state); }
+	void set_underflow_flag(const bool state) { set_bits(&pdu_response->b2, 1, 1, state); }
 
 	std::vector<blob_t> get() const override;
 };
