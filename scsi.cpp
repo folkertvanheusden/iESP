@@ -91,7 +91,7 @@ scsi::~scsi()
 // 0: pointer
 // 1: size of data
 // 2: how much is allowed to be written of it by iSCSI layer
-std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const CDB, const size_t size, std::tuple<uint8_t *, size_t> data)
+std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data)
 {
 	assert(size >= 16);
 
@@ -397,11 +397,11 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE_1x parameters invalid");
 			response.sense_data = vr.value();
 		}
-		else if (std::get<0>(data)) {
-			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "write command includes data (%zu bytes)", std::get<1>(data));
+		else if (data.first) {
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "write command includes data (%zu bytes)", data.second);
 
 			size_t expected_size      = transfer_length * backend_block_size;
-			size_t received_size      = std::get<1>(data);
+			size_t received_size      = data.second;
 			size_t received_blocks    = received_size / backend_block_size;
 			if (received_blocks)
 				DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE_xx to LBA %" PRIu64 " is %zu in bytes, %zu bytes", lba, lba * backend_block_size, received_size);
@@ -411,7 +411,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 
 			uint32_t work_n_blocks  = std::min(transfer_length, uint32_t(received_blocks));
 			if (received_blocks > 0) {
-				rc = write(lba, work_n_blocks, std::get<0>(data));
+				rc = write(lba, work_n_blocks, data.first);
 				ok = rc == scsi_rw_result::rw_ok;
 			}
 
@@ -422,7 +422,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				// received_blocks is rounded down above
 				rc = read(lba + work_n_blocks, 1, temp_buffer);
 				if (rc == scsi_rw_result::rw_ok) {
-					memcpy(temp_buffer, &std::get<0>(data)[work_n_blocks * backend_block_size], fragment_size);
+					memcpy(temp_buffer, &data.first[work_n_blocks * backend_block_size], fragment_size);
 					rc = write(lba + received_blocks, 1, temp_buffer);
 				}
 
@@ -597,8 +597,8 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 
 		auto block_size         = b->get_block_size();
 		auto expected_data_size = block_size * block_count * 2;
-		if (expected_data_size != std::get<1>(data))
-			DOLOG(logging::ll_warning, "scsi::send", lun_identifier, "COMPARE AND WRITE: data count mismatch (%zu versus %zu)", size_t(expected_data_size), std::get<1>(data));
+		if (expected_data_size != data.second)
+			DOLOG(logging::ll_warning, "scsi::send", lun_identifier, "COMPARE AND WRITE: data count mismatch (%zu versus %zu)", size_t(expected_data_size), data.second);
 
 		response.amount_of_data_expected = expected_data_size;
 
@@ -612,7 +612,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			response.sense_data = error_compare_and_write_count();
 		}
 		else {
-			auto result = cmpwrite(lba, block_count, &std::get<0>(data)[block_count * block_size], &std::get<0>(data)[0]);
+			auto result = cmpwrite(lba, block_count, &data.first[block_count * block_size], &data.first[0]);
 
 			if (result == scsi_rw_result::rw_ok)
 				response.type = ir_empty_sense;
@@ -674,9 +674,9 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 	else if (opcode == o_unmap) {
 		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "UNMAP");
 
-		const uint8_t *const pd = std::get<0>(data);
+		const uint8_t *const pd = data.first;
 		scsi_rw_result rc = rw_ok;
-		for(size_t i=8; i<std::get<1>(data); i+= 16) {
+		for(size_t i=8; i<data.second; i+= 16) {
 			uint64_t lba             = get_uint64_t(&pd[i]);
 			uint32_t transfer_length = get_uint32_t(&pd[i + 8]);
 
@@ -742,11 +742,11 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE_SAME parameters invalid");
 			response.sense_data = vr.value();
 		}
-		else if (std::get<0>(data)) {
-			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE SAME command includes data (%zu bytes)", std::get<1>(data));
+		else if (data.first) {
+			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE SAME command includes data (%zu bytes)", data.second);
 
-			size_t received_size      = std::get<1>(data);
-			size_t received_blocks    = received_size / backend_block_size;
+			size_t received_size   = data.second;
+			size_t received_blocks = received_size / backend_block_size;
 
 			bool ok = true;
 
@@ -763,7 +763,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				for(uint32_t i=0; i<transfer_length; i++) {
 					rc = response.r2t.write_same_is_unmap ?
 						trim(lba, 1) :
-						write(lba, 1, std::get<0>(data));
+						write(lba, 1, data.first);
 					if (rc != rw_ok)
 						break;
 
