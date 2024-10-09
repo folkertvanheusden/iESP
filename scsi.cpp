@@ -829,6 +829,11 @@ std::optional<std::vector<uint8_t> > scsi::validate_request(const uint64_t lba, 
 		return error_invalid_field();
 	}
 
+	if (CDB && (CDB[1] & 16)) {  // DPO
+		DOLOG(logging::ll_debug, "scsi::validate_request", "-", "DPO not supported");
+		return error_invalid_field();
+	}
+
 	return { };  // no error
 }
 
