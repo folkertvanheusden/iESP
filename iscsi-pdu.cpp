@@ -698,7 +698,7 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get() const
 	return v_out;
 }
 
-std::pair<blob_t, uint8_t *> iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *const ses, const iscsi_pdu_scsi_cmd & reply_to, const uint32_t iscsi_size, const uint32_t offset_in_data, const uint32_t data_is_n_bytes, const bool is_last_block)
+std::pair<blob_t, uint8_t *> iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *const ses, const iscsi_pdu_scsi_cmd & reply_to, const std::optional<std::pair<residual, uint32_t> > & has_residual, const uint32_t offset_in_data, const uint32_t data_is_n_bytes, const bool is_last_block)
 {
 	__pdu_data_in__ pdu_data_in { };
 
@@ -719,13 +719,15 @@ std::pair<blob_t, uint8_t *> iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *co
 	pdu_data_in.DataSN     = my_HTONL(ses->get_inc_datasn(reply_to.get_Itasktag()));
 	pdu_data_in.bufferoff  = my_HTONL(offset_in_data);
 
-	if (iscsi_size < data_is_n_bytes) {
-		pdu_data_in.ResidualCt = my_HTONL(data_is_n_bytes - iscsi_size);
-		set_bits(&pdu_data_in.b2, 2, 1, true);  // O
-	}
-	else if (iscsi_size > data_is_n_bytes) {
-		set_bits(&pdu_data_in.b2, 1, 1, true);  // U
-		pdu_data_in.ResidualCt = my_HTONL(iscsi_size - data_is_n_bytes);
+	if (has_residual.has_value()) {
+		pdu_data_in.ResidualCt = my_HTONL(has_residual.value().second);
+
+		if (has_residual.value().first == iSR_UNDERFLOW)
+			set_bits(&pdu_data_in.b2, 1, 1, true);  // U
+		else if (has_residual.value().first == iSR_OVERFLOW)
+			set_bits(&pdu_data_in.b2, 2, 1, true);  // O
+		else
+			assert(0);
 	}
 
 	size_t out_size = sizeof(pdu_data_in) + data_is_n_bytes;

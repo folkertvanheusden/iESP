@@ -135,6 +135,7 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 
 		if (bhs.get_opcode() == iscsi_pdu_bhs::iscsi_bhs_opcode::o_login_req) {
 			is->iscsiTgtLoginAccepts++;
+
 			auto initiator = reinterpret_cast<iscsi_pdu_login_request *>(pdu_obj)->get_initiator();
 			if (initiator.has_value()) {
 #ifdef ESP32
@@ -395,53 +396,62 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 
 		DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "SCSI: stream %u sectors starting at LBA %" PRIu64 ", iSCSI: %u", stream_parameters.n_sectors, stream_parameters.lba, reply_to.get_ExpDatLen());
 
-		size_t buffer_n     = 0;
-		auto   ack_interval = ses->get_ack_interval();
-#ifdef ESP32
-		size_t heap_free = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
-		if (heap_free >= 5120) {
-			size_t heap_allowed = (heap_free - 2048) / 4;
+		size_t   buffer_n    = MAX_DATA_SEGMENT_SIZE;
 
-			if (ack_interval.has_value())
-				buffer_n = std::min(heap_allowed, size_t(ack_interval.value()));
-			else
-				buffer_n = heap_allowed;
-		}
-#elif defined(RP2040W)
-		if (ack_interval.has_value())
-			buffer_n = std::min(uint32_t(4096), ack_interval.value());
-		else
-			buffer_n = 4096;
-#elif defined(TEENSY4_1)
-		if (ack_interval.has_value())
-			buffer_n = std::min(uint32_t(16384), ack_interval.value());
-		else
-			buffer_n = 16384;
-#else
-		if (ack_interval.has_value())
-			buffer_n = std::max(uint32_t(s->get_block_size()), ack_interval.value());
-		else
-			buffer_n = std::max(uint32_t(s->get_block_size()), uint32_t(65536));  // 64 kB, arbitrarily chosen
-#endif
-		if (buffer_n < s->get_block_size())
-			buffer_n = s->get_block_size();
-
-		uint64_t scsi_has    = stream_parameters.n_sectors * s->get_block_size();
-		uint64_t iscsi_wants = reply_to.get_ExpDatLen();
+		uint32_t scsi_has    = stream_parameters.n_sectors * s->get_block_size();
+		uint32_t iscsi_wants = reply_to.get_ExpDatLen();
 
 		uint64_t current_lba = stream_parameters.lba;
 		uint32_t offset      = 0;
 		uint32_t offset_end  = std::min(scsi_has, iscsi_wants);
 
+		if (offset_end == 0) {
+                        auto *temp = new iscsi_pdu_scsi_response(ses) /* 0x21 */;
+
+			std::optional<std::pair<residual, uint32_t> > residual_state;
+
+                        if (scsi_has < iscsi_wants)
+                                residual_state = { iSR_UNDERFLOW, iscsi_wants - scsi_has };
+                        else if (scsi_has > iscsi_wants)
+                                residual_state = { iSR_OVERFLOW, scsi_has - iscsi_wants };
+
+                        if (temp->set(reply_to, { }, residual_state) == false) {
+                                ok = false;
+                                DOLOG(logging::ll_info, "server::push_response", cc->get_endpoint_name(), "iscsi_pdu_scsi_response::set returned error");
+                        }
+
+			auto out = temp->get()[0];
+
+			bool rc_tx = cc->send(out.data, out.n);
+			delete [] out.data;
+			if (rc_tx == false) {
+				DOLOG(logging::ll_info, "server::push_response", cc->get_endpoint_name(), "problem sending %zu bytes", out.n);
+				ok = false;
+			}
+			else {
+				ses->add_bytes_tx(out.n);
+				is->iscsiSsnTxDataOctets += out.n;
+			}
+
+			delete temp;
+		}
+
 		while(offset < offset_end) {
 			uint64_t bytes_left = offset_end - offset;
 			uint32_t current_n  = std::min(bytes_left, buffer_n);
+			bool     last_block = offset + current_n == offset_end;
 
-			bool last_block = offset + current_n == offset_end;
+			std::optional<std::pair<residual, uint32_t> > has_residual;
+			if (last_block) {
+				if (scsi_has > iscsi_wants)
+					has_residual = { iSR_OVERFLOW, scsi_has - iscsi_wants };
+				else if (scsi_has < iscsi_wants)
+					has_residual = { iSR_UNDERFLOW, iscsi_wants - scsi_has };
+			}
 
-			auto [ out, data_pointer ] = iscsi_pdu_scsi_data_in::gen_data_in_pdu(ses, reply_to, s->get_block_size(), offset, current_n, last_block);
+			auto [ out, data_pointer ] = iscsi_pdu_scsi_data_in::gen_data_in_pdu(ses, reply_to, has_residual, offset, current_n, last_block);
 
-			scsi::scsi_rw_result rc = scsi::rw_ok;
+			scsi::scsi_rw_result rc = scsi::rw_fail_general;
 
 			if (current_n < s->get_block_size()) {
 				uint8_t *temp_buffer = new uint8_t[s->get_block_size()];
@@ -475,9 +485,9 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 				break;
 			}
 
-			ses->add_bytes_tx(out.n);
 			offset      += current_n;
 			current_lba += 1;
+			ses->add_bytes_tx(out.n);
 			is->iscsiSsnTxDataOctets += out.n;
 		}
 	}
