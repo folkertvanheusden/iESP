@@ -58,9 +58,11 @@ uint8_t get_bits(const uint8_t from, const int bit_nr, const int length)
 	return (from >> bit_nr) & mask; 
 }
 
-uint32_t crc32_0x11EDC6F41(const uint8_t *data, const size_t len)
+// first : finished CRC32c
+// second: to be used for incremental
+std::pair<uint32_t, uint32_t> crc32_0x11EDC6F41(const uint8_t *data, const size_t len, std::optional<uint32_t> start_with)
 {
-	uint32_t r = ~0;
+	uint32_t r = start_with.has_value() ? start_with.value() : ~0;
 
 	for(size_t k=0; k<len; k++) {
 		r ^= data[k];
@@ -71,5 +73,5 @@ uint32_t crc32_0x11EDC6F41(const uint8_t *data, const size_t len)
 		}
 	}
 
-	return ~r;
+	return { ~r, r };
 }

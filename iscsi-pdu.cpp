@@ -70,7 +70,7 @@ std::vector<blob_t> iscsi_pdu_bhs::get_helper(const void *const header, const ui
 	size_t                  digest_length = sizeof(uint32_t);
 
 	if (ses->get_header_digest() && allow_digest) {
-		uint32_t crc32 = crc32_0x11EDC6F41(reinterpret_cast<const uint8_t *>(header), header_size);
+		uint32_t crc32 = crc32_0x11EDC6F41(reinterpret_cast<const uint8_t *>(header), header_size, { }).first;
 		out_size += digest_length;
 		header_digest = crc32;
 	}
@@ -92,7 +92,7 @@ std::vector<blob_t> iscsi_pdu_bhs::get_helper(const void *const header, const ui
 			memset(&out[out_size] - (4 /* data padding */ + digest_length), 0x00, 4);  // make sure padding is 0x00
 			memcpy(&out[data_offset], data, data_len);
 
-			uint32_t data_digest = crc32_0x11EDC6F41(&out[data_offset], data_padded_length);
+			uint32_t data_digest = crc32_0x11EDC6F41(&out[data_offset], data_padded_length, { }).first;
 			memcpy(&out[data_digest_offset], &data_digest, digest_length);
 		}
 		else {
@@ -346,11 +346,7 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 			"DefaultTime2Wait=2",
 			"DefaultTime2Retain=20",
 			"ErrorRecoveryLevel=0",
-#if defined(ARDUINO)
-			"MaxRecvDataSegmentLength=4096",
-#else
-			"MaxRecvDataSegmentLength=8388608",  // 8 MB, anything large
-#endif
+			myformat("MaxRecvDataSegmentLength=%u", MAX_DATA_SEGMENT_SIZE),
 		};
 		for(auto & kv : kvs)
 			DOLOG(logging::ll_debug, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "send KV \"%s\"", kv.c_str());
@@ -720,7 +716,7 @@ std::pair<blob_t, uint8_t *> iscsi_pdu_scsi_data_in::gen_data_in_pdu(session *co
 		memcpy(out, &pdu_data_in, pdu_size);  // data is set by caller! (to reduce memcpy's)
 
 		if (ses->get_header_digest()) {
-			uint32_t crc32 = crc32_0x11EDC6F41(reinterpret_cast<const uint8_t *>(&pdu_data_in), pdu_size);
+			uint32_t crc32 = crc32_0x11EDC6F41(reinterpret_cast<const uint8_t *>(&pdu_data_in), pdu_size, { }).first;
 			memcpy(&out[pdu_size], &crc32, sizeof crc32);
 			out_data = &out[pdu_size + sizeof crc32];
 		}

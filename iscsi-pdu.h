@@ -122,6 +122,7 @@ public:
 
 	uint64_t         get_LUN_nr()      const { return *reinterpret_cast<const uint64_t *>(bhs->lunfields);          }
 
+	bool             get_I_flag()      const { return get_bits(bhs->b1, 6, 1);                                      }
 	iscsi_bhs_opcode get_opcode()      const { return iscsi_bhs_opcode(get_bits(bhs->b1, 0, 6));                    }
 	blob_t           get_raw()         const;
 	size_t           get_data_length() const { return (bhs->datalenH << 16) | (bhs->datalenM << 8) | bhs->datalenL; }

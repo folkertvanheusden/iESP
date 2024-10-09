@@ -148,6 +148,8 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 		if (bhs.get_opcode() == iscsi_pdu_bhs::iscsi_bhs_opcode::o_logout_req)
 			is->iscsiTgtLogoutNormals++;
 
+		auto incoming_crc32c = crc32_0x11EDC6F41(pdu, sizeof pdu, { });
+
 		size_t ahs_len = pdu_obj->get_ahs_length();
 		if (ahs_len) {
 			DOLOG(logging::ll_debug, "server::receive_pdu", cc->get_endpoint_name(), "read %zu ahs bytes", ahs_len);
@@ -160,6 +162,7 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 			else {
 				pdu_obj->set_ahs_segment({ ahs_temp, ahs_len });
 			}
+			incoming_crc32c = crc32_0x11EDC6F41(ahs_temp, ahs_len, incoming_crc32c.second);
 			delete [] ahs_temp;
 
 			(*ses)->add_bytes_rx(ahs_len);
@@ -174,14 +177,22 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 				DOLOG(logging::ll_info, "server::receive_pdu", cc->get_endpoint_name(), "header digest receive error");
 			}
 			else {
-				// TODO verify digest
+				// verify digest
+				if (remote_header_digest != incoming_crc32c.first) {
+					ok = false;
+					DOLOG(logging::ll_info, "server::receive_pdu", cc->get_endpoint_name(), "header digest mismatch: received=%08x, calculated=%08x", remote_header_digest, incoming_crc32c.first);
+				}
 
 				is->iscsiSsnRxDataOctets += sizeof remote_header_digest;
 			}
 		}
 
 		size_t data_length = pdu_obj->get_data_length();
-		if (data_length) {
+		if (data_length > MAX_DATA_SEGMENT_SIZE) {
+			DOLOG(logging::ll_debug, "server::receive_pdu", cc->get_endpoint_name(), "initiator is pushing too many data (%zu bytes, max is %u)", data_length, MAX_DATA_SEGMENT_SIZE);
+			ok = false;
+		}
+		else if (data_length) {
 			size_t padded_data_length = (data_length + 3) & ~3;
 
 			DOLOG(logging::ll_debug, "server::receive_pdu", cc->get_endpoint_name(), "read %zu data bytes (%zu with padding)", data_length, padded_data_length);
@@ -194,6 +205,7 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 			else {
 				pdu_obj->set_data({ data_temp, data_length });
 			}
+			auto incoming_crc32c = crc32_0x11EDC6F41(data_temp, padded_data_length, { });
 			delete [] data_temp;
 
 			(*ses)->add_bytes_rx(padded_data_length);
@@ -207,7 +219,11 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 					DOLOG(logging::ll_info, "server::receive_pdu", cc->get_endpoint_name(), "data digest receive error");
 				}
 				else {
-					// TODO verify digest
+					// verify digest
+					if (remote_data_digest != incoming_crc32c.first) {
+						ok = false;
+						DOLOG(logging::ll_info, "server::receive_pdu", cc->get_endpoint_name(), "data digest mismatch: received=%08x, calculated=%08x", remote_data_digest, incoming_crc32c.first);
+					}
 
 					is->iscsiSsnRxDataOctets += sizeof remote_data_digest;
 				}
@@ -440,7 +456,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 
 				if (ses->get_data_digest()) {
 					size_t   n_bytes = do_n * s->get_block_size();
-					uint32_t crc32   = crc32_0x11EDC6F41(reinterpret_cast<const uint8_t *>(data_pointer), n_bytes);
+					uint32_t crc32   = crc32_0x11EDC6F41(reinterpret_cast<const uint8_t *>(data_pointer), n_bytes, { }).first;
 					memcpy(&data_pointer[n_bytes], &crc32, sizeof crc32);
 				}
 			}

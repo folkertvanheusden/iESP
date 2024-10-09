@@ -2,9 +2,16 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
+
+#if defined(ARDUINO)
+#define MAX_DATA_SEGMENT_SIZE 4096  // 4 kB
+#else
+#define MAX_DATA_SEGMENT_SIZE (8192 * 1024)  // 8 MB
+#endif
 
 typedef struct {
 	uint8_t *data;
@@ -28,8 +35,8 @@ typedef enum
 	ir_r2t,  // R2T
 } iscsi_reacion_t;
 
-std::vector<std::string>     data_to_text_array(const uint8_t *const data, const size_t n);
-std::pair<uint8_t *, size_t> text_array_to_data(const std::vector<std::string> & in);
-void                         set_bits(uint8_t *const target, const int bit_nr, const int length, const uint8_t value);
-uint8_t                      get_bits(const uint8_t from, const int bit_nr, const int length);
-uint32_t                     crc32_0x11EDC6F41(const uint8_t *data, const size_t len);
+std::vector<std::string>      data_to_text_array(const uint8_t *const data, const size_t n);
+std::pair<uint8_t *, size_t>  text_array_to_data(const std::vector<std::string> & in);
+void                          set_bits(uint8_t *const target, const int bit_nr, const int length, const uint8_t value);
+uint8_t                       get_bits(const uint8_t from, const int bit_nr, const int length);
+std::pair<uint32_t, uint32_t> crc32_0x11EDC6F41(const uint8_t *data, const size_t len, std::optional<uint32_t> start_with);
