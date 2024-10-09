@@ -179,7 +179,8 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 			else {
 				// verify digest
 				if (remote_header_digest != incoming_crc32c.first) {
-					ok = false;
+					ok        = false;
+					pdu_error = true;
 					DOLOG(logging::ll_info, "server::receive_pdu", cc->get_endpoint_name(), "header digest mismatch: received=%08x, calculated=%08x", remote_header_digest, incoming_crc32c.first);
 				}
 
@@ -190,7 +191,8 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 		size_t data_length = pdu_obj->get_data_length();
 		if (data_length > MAX_DATA_SEGMENT_SIZE) {
 			DOLOG(logging::ll_debug, "server::receive_pdu", cc->get_endpoint_name(), "initiator is pushing too many data (%zu bytes, max is %u)", data_length, MAX_DATA_SEGMENT_SIZE);
-			ok = false;
+			ok        = false;
+			pdu_error = true;
 		}
 		else if (data_length) {
 			size_t padded_data_length = (data_length + 3) & ~3;
@@ -221,7 +223,8 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 				else {
 					// verify digest
 					if (remote_data_digest != incoming_crc32c.first) {
-						ok = false;
+						ok        = false;
+						pdu_error = true;
 						DOLOG(logging::ll_info, "server::receive_pdu", cc->get_endpoint_name(), "data digest mismatch: received=%08x, calculated=%08x", remote_data_digest, incoming_crc32c.first);
 					}
 

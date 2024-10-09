@@ -10,7 +10,7 @@
 #if defined(ARDUINO)
 #define MAX_DATA_SEGMENT_SIZE 4096  // 4 kB
 #else
-#define MAX_DATA_SEGMENT_SIZE (8192 * 1024)  // 8 MB
+#define MAX_DATA_SEGMENT_SIZE (256 * 1024 * 1024)  // 256 MB
 #endif
 
 typedef struct {
