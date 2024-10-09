@@ -702,7 +702,7 @@ void loop()
 		}
 
 		draw_status(220);
-		server s(scsi_dev, &c, &is, "test");
+		server s(scsi_dev, &c, &is, "test", false);
 		Serial.printf("Free heap space: %u\r\n", get_free_heap_space());
 		Serial.println(F("Go!"));
 		draw_status(500);
