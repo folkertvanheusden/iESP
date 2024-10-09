@@ -477,19 +477,7 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(scsi *const s
 			auto *temp = new iscsi_pdu_scsi_response(ses) /* 0x21 */;
 			DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "sending SCSI response with %zu sense bytes", scsi_reply.value().sense_data.size());
 
-			std::optional<std::pair<residual, uint32_t> > residual_state;
-
-			// WRITE under/overflow check
-			if (scsi_reply.value().amount_of_data_expected.has_value() && data.first != nullptr) {
-				uint64_t scsi_expected  = scsi_reply.value().amount_of_data_expected.value();
-
-				if (scsi_expected < data.second)
-					residual_state = { iSR_UNDERFLOW, data.second - scsi_expected };
-				else if (scsi_expected > data.second)
-					residual_state = { iSR_OVERFLOW, scsi_expected - data.second };
-			}
-
-			if (temp->set(*this, scsi_reply.value().sense_data, residual_state) == false) {
+			if (temp->set(*this, scsi_reply.value().sense_data, { }) == false) {
 				ok = false;
 				DOLOG(logging::ll_info, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "iscsi_pdu_scsi_response::set returned error");
 			}
