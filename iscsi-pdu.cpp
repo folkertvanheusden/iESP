@@ -350,8 +350,8 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 		DOLOG(logging::ll_debug, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "login mode");
 
 		const std::vector<std::string> kvs {
-			ses->get_header_digest() ? "HeaderDigest=CRC32C" : "HeaderDigest=None",
-			ses->get_data_digest  () ? "DataDigest=CRC32C"   : "DataDigest=None",
+			ses->get_header_digest() ? "HeaderDigest=CRC32C,None" : "HeaderDigest=None",
+			ses->get_data_digest  () ? "DataDigest=CRC32C,None"   : "DataDigest=None",
 			"DefaultTime2Wait=2",
 			"DefaultTime2Retain=20",
 			"ErrorRecoveryLevel=0",

@@ -4,9 +4,10 @@
 #include "session.h"
 
 
-session::session(com_client *const connected_to, const std::string & target_name):
+session::session(com_client *const connected_to, const std::string & target_name, const bool allow_digest):
 	connected_to(connected_to),
-	target_name(target_name)
+	target_name(target_name),
+	allow_digest(allow_digest)
 {
 }
 

@@ -53,7 +53,7 @@ server::~server()
 std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *const cc, session **const ses)
 {
 	if (*ses == nullptr) {
-		*ses = new session(cc, target_name);
+		*ses = new session(cc, target_name, digest_chk);
 		(*ses)->set_block_size(s->get_block_size());
 	}
 

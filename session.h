@@ -23,6 +23,7 @@ private:
 
 	uint32_t          max_seg_len   { 8192    };
 
+	const bool        allow_digest  { false   };
 	bool              header_digest { false   };
 	bool              data_digest   { false   };
 
@@ -31,7 +32,7 @@ private:
 	std::map<uint32_t, r2t_session *> r2t_sessions; // r2t sessions
 
 public:
-	session(com_client *const connected_to, const std::string & target_name);
+	session(com_client *const connected_to, const std::string & target_name, const bool allow_digest);
 	virtual ~session();
 
 	std::string get_target_name  () const { return target_name;                       }
@@ -40,8 +41,8 @@ public:
 
 	void     set_header_digest(const bool v) { header_digest = v; }
 	void     set_data_digest  (const bool v) { data_digest   = v; }
-	bool     get_header_digest() const { return header_digest; }
-	bool     get_data_digest  () const { return data_digest;   }
+	bool     get_header_digest() const { return header_digest & allow_digest; }
+	bool     get_data_digest  () const { return data_digest & allow_digest;   }
 
 	void     set_max_seg_len(const uint32_t v) { max_seg_len = v; }
 	uint32_t get_max_seg_len() const { return max_seg_len; }
