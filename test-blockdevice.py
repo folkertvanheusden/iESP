@@ -116,6 +116,7 @@ w = 0
 read_error_count = 0
 write_error_count = 0
 data_total = 0
+failure_count = 0
 
 lock = threading.Lock()
 ranges = []
@@ -132,12 +133,15 @@ def do(show_stats):
     global lock
     global ranges
     global data_total
+    global failure_count
 
     n_failed = 0
 
     prev = start
 
     while True:
+        ok = True
+
         lock.acquire()
         while True:
             # pick a number of blocks to work on
@@ -188,12 +192,14 @@ def do(show_stats):
                             n_failed += 1
                             if n_failed == 3:
                                 print('Stopped outputting errors for this thread')
+                        ok = False
                     else:
                         verified += 1
 
             except OSError as e:
                 print(f'Read error: {e} at {offset} ({len(b)} bytes)', offset/blocksize)
                 read_error_count += 1
+                ok = False
 
         else:
             w += cur_n_blocks
@@ -224,17 +230,21 @@ def do(show_stats):
         except OSError as e:
             print(f'Write/trim error: {e} at {offset} ({len(b)} bytes)', offset/blocksize)
             write_error_count += 1
+            ok = False
 
         n += 1
         total_n += cur_n_blocks
 
         data_total += cur_n_blocks * blocksize
 
+        if ok == False:
+            failure_count += 1
+
         if show_stats:
             now = time.time()
             time_diff = now - start
             if now - prev >= 1:
-                print(f'total: {n}, n/s: {int(n / time_diff)}, avg blocks per it.: {total_n / n:.2f}, percent done: {w * 100 / n_blocks:.2f}, n verified: {verified}/{verified_d}/{verified_t}, write errors: {write_error_count}, MB/s: {data_total / time_diff / 1024 / 1024:.2f}')
+                print(f'total: {n}, n/s: {int(n / time_diff)}, avg blocks per it.: {total_n / n:.2f}, percent done: {w * 100 / n_blocks:.2f}, verify cnt: {verified}/{verified_d}/{verified_t}, failures: {failure_count}, MB/s: {data_total / time_diff / 1024 / 1024:.2f}')
                 prev = now
 
         lock.acquire()
