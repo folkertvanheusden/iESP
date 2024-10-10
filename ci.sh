@@ -1,6 +1,6 @@
 #! /bin/sh
 
-ssh -CAYf 172.29.0.132 /home/folkert/CC.work/update-iESP.sh
+ssh -CAYf 172.29.0.132 /home/folkert/CC.work/update-iESP.sh > /dev/null
 
 F=/tmp/iesp-ci.log
 rm -f $F
