@@ -235,7 +235,7 @@ iscsi_pdu_login_request::~iscsi_pdu_login_request()
 bool has_CRC32C(const std::string & value)
 {
 	auto parts = split(value, ",");
-	for(auto & part: parts) {
+	for(const auto & part: parts) {
 		if (part == "CRC32C")
 			return true;
 	}
@@ -255,7 +255,7 @@ bool iscsi_pdu_login_request::set_data(std::pair<const uint8_t *, std::size_t> d
 	uint32_t    max_seg_len = 8192;
 	std::string target_name;
 	bool        discovery   = false;
-	for(auto & kv: kvs_in) {
+	for(const auto & kv: kvs_in) {
 		DOLOG(logging::ll_debug, "iscsi_pdu_login_request::set_data", ses->get_endpoint_name(), "kv %s", kv.c_str());
 
 		auto parts = split(kv, "=");
@@ -336,7 +336,7 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 			"TargetPortalGroupTag=1",
 			"AuthMethod=None",
 		};
-		for(auto & kv : kvs)
+		for(const auto & kv : kvs)
 			DOLOG(logging::ll_debug, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "send KV \"%s\"", kv.c_str());
 		auto temp = text_array_to_data(kvs);
 		login_reply_reply_data.first  = temp.first;
@@ -353,7 +353,7 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 			"ErrorRecoveryLevel=0",
 			myformat("MaxRecvDataSegmentLength=%u", MAX_DATA_SEGMENT_SIZE),
 		};
-		for(auto & kv : kvs)
+		for(const auto & kv : kvs)
 			DOLOG(logging::ll_debug, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "send KV \"%s\"", kv.c_str());
 		auto temp = text_array_to_data(kvs);
 		login_reply_reply_data.first  = temp.first;
@@ -957,7 +957,7 @@ bool iscsi_pdu_text_reply::set(const iscsi_pdu_text_request & reply_to, scsi *co
 	auto kvs_in = data_to_text_array(data.value().first, data.value().second);
 	bool send_targets = false;
 
-	for(auto & kv: kvs_in) {
+	for(const auto & kv: kvs_in) {
 		auto parts = split(kv, "=");
 		if (parts.size() < 2)
 			return false;
