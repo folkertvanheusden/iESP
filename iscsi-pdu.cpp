@@ -10,7 +10,11 @@
 #include "utils.h"
 
 
+#if defined(ARDUINO)
+constexpr int max_msg_depth = 1;
+#else
 constexpr int max_msg_depth = 128;
+#endif
 
 std::optional<std::string> pdu_opcode_to_string(const iscsi_pdu_bhs::iscsi_bhs_opcode opcode)
 {
