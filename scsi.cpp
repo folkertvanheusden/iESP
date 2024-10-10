@@ -247,10 +247,10 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				response.io.what.data.first[23] = 00;  // LSB of 'MAXIMUM UNMAP LBA COUNT'
 				response.io.what.data.first[27] = 8;  // LSB of 'MAXIMUM UNMAP BLOCK DESCRIPTOR COUNT'
 				response.io.what.data.first[31] = 8;  // LSB of 'OPTIMAL UNMAP GRANULARITY'
-				response.io.what.data.first[40] = MAX_WS_LEN >> 24;  // 'MAXIMUM WRITE SAME LENGTH'
-				response.io.what.data.first[41] = MAX_WS_LEN >> 16;
-				response.io.what.data.first[42] = MAX_WS_LEN >> 8;
-				response.io.what.data.first[43] = MAX_WS_LEN;
+				response.io.what.data.first[40] = uint8_t(MAX_WS_LEN >> 24);  // 'MAXIMUM WRITE SAME LENGTH'
+				response.io.what.data.first[41] = uint8_t(MAX_WS_LEN >> 16);
+				response.io.what.data.first[42] = uint8_t(MAX_WS_LEN >> 8);
+				response.io.what.data.first[43] = uint8_t(MAX_WS_LEN);
 				// ... set rest to 'not set'
 			}
 			else if (CDB[2] == 0xb1) {  // block device characteristics
