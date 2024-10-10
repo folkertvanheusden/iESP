@@ -48,6 +48,11 @@ const std::map<scsi::scsi_opcode, scsi_opcode_details> scsi_a3_data {
 };
 
 #define DEFAULT_SERIAL "12345678"
+#if defined(ARDUINO)
+#define MAX_WS_LEN 2
+#else
+#define MAX_WS_LEN 256
+#endif
 
 constexpr const uint8_t max_compare_and_write_block_count = 1;
 
@@ -232,7 +237,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				response.io.what.data.first[5] = max_compare_and_write_block_count;  // compare and write
 				response.io.what.data.first[6] = 0;  // OPTIMAL TRANSFER LENGTH GRANULARITY
 				response.io.what.data.first[7] = 0;
-#ifdef ESP32
+#if defined(ESP32)
 				response.io.what.data.first[22] = 1;  // 'MAXIMUM UNMAP LBA COUNT': 256 blocks
 #define MAX_UNMAP_BLOCKS 256
 #else
@@ -242,6 +247,10 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 				response.io.what.data.first[23] = 00;  // LSB of 'MAXIMUM UNMAP LBA COUNT'
 				response.io.what.data.first[27] = 8;  // LSB of 'MAXIMUM UNMAP BLOCK DESCRIPTOR COUNT'
 				response.io.what.data.first[31] = 8;  // LSB of 'OPTIMAL UNMAP GRANULARITY'
+				response.io.what.data.first[40] = MAX_WS_LEN >> 24;  // 'MAXIMUM WRITE SAME LENGTH'
+				response.io.what.data.first[41] = MAX_WS_LEN >> 16;
+				response.io.what.data.first[42] = MAX_WS_LEN >> 8;
+				response.io.what.data.first[43] = MAX_WS_LEN;
 				// ... set rest to 'not set'
 			}
 			else if (CDB[2] == 0xb1) {  // block device characteristics
@@ -850,6 +859,11 @@ std::optional<std::vector<uint8_t> > scsi::validate_request(const uint64_t lba, 
 
 		if ((opcode == o_write_same_10 || opcode == o_write_same_16) && (CDB[1] & 16) == 16 && (CDB[1] & 8) == 0) {
 			DOLOG(logging::ll_debug, "scsi::validate_request", "-", "WRITE_SAME with ANCHOR=1 and UNMAP=0 is a failure");
+			return error_invalid_field();
+		}
+
+		if ((opcode == o_write_same_10 || opcode == o_write_same_16) && n_blocks > MAX_WS_LEN) {
+			DOLOG(logging::ll_debug, "scsi::validate_request", "-", "WRITE_SAME maximum number of blocks");
 			return error_invalid_field();
 		}
 
