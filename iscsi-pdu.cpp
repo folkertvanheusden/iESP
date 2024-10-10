@@ -96,7 +96,7 @@ std::vector<blob_t> iscsi_pdu_bhs::get_helper(const void *const header, const ui
 			memcpy(&out[data_digest_offset], &data_digest, digest_length);
 		}
 		else {
-			memset(&out[out_size] - 4 /* data padding */, 0x00, 4);
+			memset(&out[out_size - 4 /* data padding */], 0x00, 4);
 			memcpy(&out[data_offset], data, data_len);
 		}
 	}
