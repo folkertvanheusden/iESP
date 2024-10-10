@@ -765,11 +765,20 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 			if (ok) {
 				scsi::scsi_rw_result rc = rw_ok;
 
+				const uint64_t size_in_blocks = b->get_size_in_blocks();
+
 				if (transfer_length == 0) {
-					for(uint64_t i=lba; i<b->get_size_in_blocks() && rc == rw_ok; i++) {
-						rc = response.r2t.write_same_is_unmap ?
-							trim(i, 1) :
-							write(i, 1, data.first);
+					if (size_in_blocks - lba > MAX_WS_LEN) {
+						DOLOG(logging::ll_debug, "scsi::validate_request", "-", "WRITE_SAME maximum number of blocks for TL=0");
+						response.sense_data = error_invalid_field();
+						ok = false;
+					}
+					else {
+						for(uint64_t i=lba; i<b->get_size_in_blocks() && rc == rw_ok; i++) {
+							rc = response.r2t.write_same_is_unmap ?
+								trim(i, 1) :
+								write(i, 1, data.first);
+						}
 					}
 				}
 				else {

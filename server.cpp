@@ -211,7 +211,9 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 			else {
 				pdu_obj->set_data({ data_temp, data_length });
 			}
-			auto incoming_crc32c = crc32_0x11EDC6F41(data_temp, padded_data_length, { });
+			std::pair<uint32_t, uint32_t> incoming_crc32c { };
+			if (digest_chk)
+				incoming_crc32c = crc32_0x11EDC6F41(data_temp, padded_data_length, { });
 			delete [] data_temp;
 
 			(*ses)->add_bytes_rx(padded_data_length);
