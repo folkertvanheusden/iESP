@@ -107,6 +107,16 @@ For test-blockdevice.py:
 * any errors? then failed
 
 
+build status
+------------
+[POSIX CI](https://github.com/folkertvanheusden/iESP/actions/workflows/posix.yaml/badge.svg)
+[Windows CI](https://github.com/folkertvanheusden/iESP/actions/workflows/windows.yaml/badge.svg)
+[Microcontrollers CI](https://github.com/folkertvanheusden/iESP/actions/workflows/platformio.yaml/badge.svg)
+[MacOS X CI](https://github.com/folkertvanheusden/iESP/actions/workflows/macos.yaml/badge.svg)
+
+[Coverity](https://scan.coverity.com/projects/29725/badge.svg)
+
+
 license
 -------
 It is licensed under the MIT license.
