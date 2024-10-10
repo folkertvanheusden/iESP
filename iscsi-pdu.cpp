@@ -141,7 +141,7 @@ bool iscsi_pdu_bhs::set_ahs_segment(std::pair<const uint8_t *, std::size_t> ahs_
 	return offset == ahs_in.second;
 }
 
-bool iscsi_pdu_bhs::set_data(std::pair<const uint8_t *, std::size_t> data_in)
+bool iscsi_pdu_bhs::set_data(const std::pair<const uint8_t *, std::size_t> & data_in)
 {
 	if (data_in.second == 0 || data_in.second > 16777215)
 		return false;
@@ -243,7 +243,7 @@ bool has_CRC32C(const std::string & value)
 	return false;
 }
 
-bool iscsi_pdu_login_request::set_data(std::pair<const uint8_t *, std::size_t> data_in)
+bool iscsi_pdu_login_request::set_data(const std::pair<const uint8_t *, std::size_t> & data_in)
 {
 	if (iscsi_pdu_bhs::set_data(data_in) == false) {
 		DOLOG(logging::ll_warning, "iscsi_pdu_login_request::set_data", ses->get_endpoint_name(), "iscsi_pdu_bhs::set_data returned false");
