@@ -90,14 +90,21 @@ test tools
 
 test methodology
 ----------------
-Tested with "test-blockdevice.py" and 'FSX' by Apple (using the rust version from https://github.com/asomers/fsx-rs the original version is at https://github.com/apple/fstools/ ).
-For this:
+Tested with "test-blockdevice.py", 'FSX' by Apple (using the rust version from https://github.com/asomers/fsx-rs the original version is at https://github.com/apple/fstools/ ) and the 'test-tool' from libiscsi.
+
+For FSX:
 * a disk-image is created on a ramdisk
 * that disk-image is given as a backend to iesp
 * in a virtual machine, a multipath setup (2 paths) is created
-* in the virtual machine, the resulting iSCSI target is mounted under a mountpoint (ext4 filesyste with journal and discard-mountoption)
+* in the virtual machine, the resulting iSCSI target is mounted under a mountpoint (ext4 filesystem with journal and discard-mountoption)
 * 2 instances of FSX(-rs) are started and monitored for error messages
 * 1 instance of test-blockdevice.py with 3 threads is started with trim/discard/unmap and deduplication-support set to 81% and trim to 9%
+
+For test-blockdevice.py:
+* a disk-image is created on a ramdisk
+* that disk-image is given as a backend to iesp
+* test-blockdevice.py is ran as: ./test-blockdevice.py -d <devicename> -b 4096 -u 75 -n 6 -T 10 
+* any errors? then failed
 
 
 license

@@ -5,7 +5,7 @@ add_compile_options(-Wall -pedantic -D_FILE_OFFSET_BITS=64)  # -Wextra -fanalyze
 #add_compile_options(-fsanitize=address -O0 -fno-inline)
 #add_compile_options(-fsanitize=undefined -O0 -fno-inline)
 
-SET(VERSION "1.1")
+SET(VERSION "2.0")
 
 add_definitions(-DVERSION=\"${VERSION}\")
 
