@@ -1101,6 +1101,16 @@ std::vector<blob_t> iscsi_pdu_taskman_request::get() const
 
 std::optional<iscsi_response_set> iscsi_pdu_taskman_request::get_response(scsi *const sd)
 {
+	uint8_t task_function = get_task_func();
+
+	// logical unit reset, target warm reset, target cold reset
+	if (task_function == 5 || task_function == 6 || task_function == 7) {
+		DOLOG(logging::ll_debug, "iscsi_pdu_taskman_request::get_response", "-", "reset (%d)", task_function);
+
+		// at least this:
+		sd->unlock_device();
+	}
+
 	iscsi_response_set response;
 	auto reply_pdu = new iscsi_pdu_taskman_reply(ses);
 	if (reply_pdu->set(*this) == false) {

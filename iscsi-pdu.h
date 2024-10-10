@@ -768,9 +768,10 @@ public:
 	bool set(const uint8_t *const in, const size_t n) override;
 	std::vector<blob_t> get() const override;
 
-	uint32_t get_Itasktag()  const { return taskman_req->Itasktag;         }
+	uint32_t get_Itasktag()  const { return taskman_req->Itasktag;            }
 	uint32_t get_ExpStatSN() const { return my_NTOHL(taskman_req->ExpStatSN); }
 	uint32_t get_CmdSN()     const { return my_NTOHL(taskman_req->CmdSN);     }
+	uint8_t  get_task_func() const { return get_bits(taskman_req->b2, 0, 7);  }
 
 	virtual std::optional<iscsi_response_set> get_response(scsi *const sd) override;
 };
