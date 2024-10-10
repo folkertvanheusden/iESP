@@ -1047,7 +1047,7 @@ scsi::scsi_lock_status scsi::reserve_device()
 		return l_locked_other;
 	}
 
-	locked_by = std::this_thread::get_id();
+	locked_by = cur_id;
 #endif
 	return l_locked;
 }
