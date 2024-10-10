@@ -67,7 +67,7 @@ bool backend_nbd::connect(const bool retry)
 		hints.ai_socktype = SOCK_STREAM;
 
 		char port_str[8] { 0 };
-		snprintf(port_str, sizeof port_str, "%u", port);
+		snprintf(port_str, sizeof port_str, "%d", port);
 
 		int rc = getaddrinfo(host.c_str(), port_str, &hints, &res);
 		if (rc != 0) {
