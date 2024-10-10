@@ -64,15 +64,6 @@ private:
 	std::optional<std::vector<uint8_t> > validate_request(const uint64_t lba, const uint32_t n_blocks, const uint8_t *const CDB) const;
 	std::optional<std::vector<uint8_t> > validate_request(const uint64_t lba) const;
 
-	std::vector<uint8_t> error_reservation_conflict_1()  const;
-	std::vector<uint8_t> error_reservation_conflict_2()  const;
-	std::vector<uint8_t> error_not_implemented()         const;
-	std::vector<uint8_t> error_write_error()             const;
-	std::vector<uint8_t> error_compare_and_write_count() const;
-	std::vector<uint8_t> error_out_of_range()            const;
-	std::vector<uint8_t> error_miscompare()              const;
-	std::vector<uint8_t> error_invalid_field()           const;
-
 public:
 	scsi(backend *const b, const int trim_level, io_stats_t *const is);
 	virtual ~scsi();
@@ -135,4 +126,13 @@ public:
 	scsi_rw_result cmpwrite(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const write_data, const uint8_t *const compare_data);
 
 	std::optional<scsi_response> send(const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
+
+	std::vector<uint8_t> error_reservation_conflict_1()  const;
+	std::vector<uint8_t> error_reservation_conflict_2()  const;
+	std::vector<uint8_t> error_not_implemented()         const;
+	std::vector<uint8_t> error_write_error()             const;
+	std::vector<uint8_t> error_compare_and_write_count() const;
+	std::vector<uint8_t> error_out_of_range()            const;
+	std::vector<uint8_t> error_miscompare()              const;
+	std::vector<uint8_t> error_invalid_field()           const;
 };

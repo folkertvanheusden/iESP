@@ -122,7 +122,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 	else if (opcode == o_mode_sense_6) {  // 0x1a
 		if (locking_status() == l_locked_other) {
 			DOLOG(logging::ll_error, "scsi::send", lun_identifier, "MODE SENSE 6 failed due to reservations");
-			response.sense_data = error_reservation_conflict_2();
+			response.sense_data = error_reservation_conflict_1();
 		}
 		else {
 			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "MODE SENSE 6");
@@ -668,12 +668,8 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 	}
 	else if (opcode == o_release_6) {
 		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "RELEASE 6");
-		if (unlock_device())
-			response.type = ir_empty_sense;
-		else {
-			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "RELEASE 6 failed");
-			response.sense_data = error_reservation_conflict_1();
-		}
+		unlock_device();
+		response.type = ir_empty_sense;
 	}
 	else if (opcode == o_unmap) {
 		DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "UNMAP");

@@ -435,7 +435,7 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(scsi *const s
 	iscsi_response_set response;
 
 	auto *pdu_scsi_response = new iscsi_pdu_scsi_response(ses) /* 0x21 */;
-	if (pdu_scsi_response->set(*this, { }, { }) == false) {
+	if (pdu_scsi_response->set(*this, { }, { }, { }) == false) {
 		DOLOG(logging::ll_info, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "iscsi_pdu_scsi_response::set returned error");
 
 		return { };
@@ -482,7 +482,12 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(scsi *const s
 			auto *temp = new iscsi_pdu_scsi_response(ses) /* 0x21 */;
 			DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "sending SCSI response with %zu sense bytes", scsi_reply.value().sense_data.size());
 
-			if (temp->set(*this, scsi_reply.value().sense_data, { }) == false) {
+			std::optional<uint8_t> iscsi_status;
+			auto & sense_data = scsi_reply.value().sense_data;
+			if (sense_data == sd->error_reservation_conflict_1())
+				iscsi_status = 0x18;  // RESERVATION CONFLICT
+
+			if (temp->set(*this, sense_data, { }, iscsi_status) == false) {
 				ok = false;
 				DOLOG(logging::ll_info, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "iscsi_pdu_scsi_response::set returned error");
 			}
@@ -507,7 +512,7 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(scsi *const s
 			else
 				assert(0);
 
-			if (temp->set(*this, { }, residual_state) == false) {
+			if (temp->set(*this, { }, residual_state, { }) == false) {
 				ok = false;
 				DOLOG(logging::ll_info, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "iscsi_pdu_scsi_response::set returned error");
 			}
@@ -563,7 +568,7 @@ iscsi_pdu_scsi_response::~iscsi_pdu_scsi_response()
 	delete [] pdu_response_data.first;
 }
 
-bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std::vector<uint8_t> & scsi_sense_data, std::optional<std::pair<residual, uint32_t> > has_residual)
+bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std::vector<uint8_t> & scsi_sense_data, std::optional<std::pair<residual, uint32_t> > has_residual, const std::optional<uint8_t> iscsi_status)
 {
 	size_t sense_data_size = scsi_sense_data.size();
 	size_t reply_data_plus_sense_header = sense_data_size > 0 ? 2 + sense_data_size : 0;
@@ -599,7 +604,10 @@ bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std
 	if (pdu_response_data.second) {
 		DOLOG(logging::ll_warning, "iscsi_pdu_scsi_response::set", ses->get_endpoint_name(), "CHECK CONDITION");
 
-		pdu_response->status       = 0x02;  // check condition
+		if (iscsi_status.has_value())
+			pdu_response->status = iscsi_status.value();
+		else
+			pdu_response->status = 0x02;  // check condition
 		pdu_response->response     = 0x01;  // target failure
 		pdu_response->ExpDataSN    = 0;
 

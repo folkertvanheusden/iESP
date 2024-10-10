@@ -417,7 +417,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
                         else if (scsi_has > iscsi_wants)
                                 residual_state = { iSR_OVERFLOW, scsi_has - iscsi_wants };
 
-                        if (temp->set(reply_to, { }, residual_state) == false) {
+                        if (temp->set(reply_to, { }, residual_state, { }) == false) {
                                 ok = false;
                                 DOLOG(logging::ll_info, "server::push_response", cc->get_endpoint_name(), "iscsi_pdu_scsi_response::set returned error");
                         }
