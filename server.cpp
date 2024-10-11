@@ -401,7 +401,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 
 		uint64_t current_lba = stream_parameters.lba;
 		uint32_t offset      = 0;
-		uint32_t offset_end  = std::min(std::min(scsi_has, iscsi_wants), ses->get_max_seg_len());
+		uint32_t offset_end  = std::min(scsi_has, iscsi_wants);
 
 		if (offset_end == 0) {
                         auto *temp = new iscsi_pdu_scsi_response(ses) /* 0x21 */;
