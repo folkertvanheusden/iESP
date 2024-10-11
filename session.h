@@ -21,7 +21,7 @@ private:
 	uint64_t          bytes_rx      { 0       };
 	uint64_t          bytes_tx      { 0       };
 
-	uint32_t          max_seg_len   { 8192    };
+	uint32_t          max_seg_len   { MAX_DATA_SEGMENT_SIZE };
 
 	const bool        allow_digest  { false   };
 	bool              header_digest { false   };

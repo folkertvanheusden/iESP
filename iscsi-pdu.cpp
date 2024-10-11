@@ -256,9 +256,7 @@ bool iscsi_pdu_login_request::set_data(const std::pair<const uint8_t *, std::siz
 
 	auto        kvs_in      = data_to_text_array(data.first, data.second);
 	uint32_t    max_burst   = ~0;
-	uint32_t    max_seg_len = 8192;
-	std::string target_name;
-	bool        discovery   = false;
+	uint32_t    max_seg_len = ses->get_max_seg_len();
 	for(const auto & kv: kvs_in) {
 		DOLOG(logging::ll_debug, "iscsi_pdu_login_request::set_data", ses->get_endpoint_name(), "kv %s", kv.c_str());
 
@@ -271,13 +269,9 @@ bool iscsi_pdu_login_request::set_data(const std::pair<const uint8_t *, std::siz
 		else if (parts[0] == "FirstBurstLength")
 			max_burst = std::min(max_burst, uint32_t(std::stoi(parts[1])));
 		else if (parts[0] == "MaxRecvDataSegmentLength")
-			max_seg_len = uint32_t(std::stoi(parts[1]));
+			max_seg_len = std::min(max_seg_len, uint32_t(std::stoi(parts[1])));
 		else if (parts[0] == "InitiatorName")
 			initiator = parts[1];
-		else if (parts[0] == "TargetName")
-			target_name = parts[1];
-		else if (parts[0] == "SessionType")
-			discovery = parts[1] == "Discovery";
 		else if (parts[0] == "HeaderDigest")
 			ses->set_header_digest(has_CRC32C(parts[1]));
 		else if (parts[0] == "DataDigest")
@@ -289,11 +283,6 @@ bool iscsi_pdu_login_request::set_data(const std::pair<const uint8_t *, std::siz
 	if (max_burst < uint32_t(~0)) {
 		DOLOG(logging::ll_debug, "iscsi_pdu_login_request::set_data", ses->get_endpoint_name(), "set max-burst to %u", max_burst);
 		ses->set_ack_interval(max_burst);
-	}
-
-	if (target_name != ses->get_target_name() && discovery == false) {
-		DOLOG(logging::ll_warning, "iscsi_pdu_login_request::set_data", ses->get_endpoint_name(), "invalid target name \"%s\", expecting \"%s\"", target_name.c_str(), ses->get_target_name().c_str());
-		return false;
 	}
 
 	return true;
@@ -334,11 +323,12 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 	bool discovery = reply_to.get_NSG() == 1;
 
 	if (discovery) {
-		DOLOG(logging::ll_debug, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "discovery mode");
+		DOLOG(logging::ll_debug, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "discovery mode, CSG %d, NSG %d", reply_to.get_CSG(), reply_to.get_NSG());
 
 		const std::vector<std::string> kvs {
 			"TargetPortalGroupTag=1",
 			"AuthMethod=None",
+			"ErrorRecoveryLevel=0",
 		};
 		for(const auto & kv : kvs)
 			DOLOG(logging::ll_debug, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "send KV \"%s\"", kv.c_str());
@@ -347,16 +337,14 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 		login_reply_reply_data.second = temp.second;
 	}
 	else {
-		DOLOG(logging::ll_debug, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "login mode");
+		DOLOG(logging::ll_debug, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "login mode, CSG %d, NSG %d", reply_to.get_CSG(), reply_to.get_NSG());
 
 		const std::vector<std::string> kvs {
 			ses->get_header_digest() ? "HeaderDigest=CRC32C,None" : "HeaderDigest=None",
 			ses->get_data_digest  () ? "DataDigest=CRC32C,None"   : "DataDigest=None",
 			"DefaultTime2Wait=2",
 			"DefaultTime2Retain=20",
-			"ErrorRecoveryLevel=0",
 			"InitialR2T=Yes",
-			myformat("MaxRecvDataSegmentLength=%u", MAX_DATA_SEGMENT_SIZE),
 		};
 		for(const auto & kv : kvs)
 			DOLOG(logging::ll_debug, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "send KV \"%s\"", kv.c_str());
@@ -381,17 +369,16 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 	login_reply->datalenM   = login_reply_reply_data.second >>  8;
 	login_reply->datalenL   = login_reply_reply_data.second      ;
 	memcpy(login_reply->ISID, reply_to.get_ISID(), 6);
-	if (!discovery) {
-		do {
+	if (reply_to.get_NSG() == 3) {
+		while(login_reply->TSIH == 0) {
 			if (my_getrandom(&login_reply->TSIH, sizeof login_reply->TSIH) == false) {
 				DOLOG(logging::ll_error, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "random generator returned an error");
 				return false;
 			}
 		}
-		while(login_reply->TSIH == 0);
 	}
 	login_reply->Itasktag   = reply_to.get_Itasktag();
-	login_reply->StatSN     = my_HTONL(discovery ? 0 : reply_to.get_ExpStatSN());
+	login_reply->StatSN     = my_HTONL(reply_to.get_CSG() == 0 ? 0 : 1);
 	login_reply->ExpCmdSN   = my_HTONL(reply_to.get_CmdSN());
 	login_reply->MaxCmdSN   = my_HTONL(reply_to.get_CmdSN() + 1);
 
