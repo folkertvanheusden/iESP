@@ -112,7 +112,6 @@ n = 0
 verified = 0
 verified_d = 0
 verified_t = 0
-w = 0
 read_error_count = 0
 write_error_count = 0
 data_total = 0
@@ -127,7 +126,6 @@ def do(show_stats):
     global verified
     global verified_d
     global verified_t
-    global w
     global read_error_count
     global write_error_count
     global lock
@@ -201,9 +199,6 @@ def do(show_stats):
                 read_error_count += 1
                 ok = False
 
-        else:
-            w += cur_n_blocks
-
         # update blocks with new data
         b = bytearray()
         for i in range(0, cur_n_blocks):
@@ -244,7 +239,7 @@ def do(show_stats):
             now = time.time()
             time_diff = now - start
             if now - prev >= 1:
-                print(f'total: {n}, n/s: {int(n / time_diff)}, avg blocks per it.: {total_n / n:.2f}, percent done: {w * 100 / n_blocks:.2f}, verify cnt: {verified}/{verified_d}/{verified_t}, failures: {failure_count}, MB/s: {data_total / time_diff / 1024 / 1024:.2f}')
+                print(f'total: {n}, n/s: {int(n / time_diff)}, avg blocks per it.: {total_n / n:.2f}, percent done: {verified * 100 / n_blocks:.2f}, verify cnt: {verified}/{verified_d}/{verified_t}, failures: {failure_count}, MB/s: {data_total / time_diff / 1024 / 1024:.2f}')
                 prev = now
 
         lock.acquire()
@@ -254,7 +249,7 @@ def do(show_stats):
                 break
         lock.release()
 
-        if w >= n_blocks and stop_at_100:
+        if verified >= n_blocks and stop_at_100:
             break
 
 t = []
