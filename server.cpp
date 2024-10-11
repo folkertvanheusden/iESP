@@ -262,7 +262,8 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 		auto     session      = ses->get_r2t_sesion(TTT);
 
 		if (TTT == 0xffffffff) {  // unsollicited data
-			TTT = pdu_data_out->get_Itasktag();
+			TTT     = pdu_data_out->get_Itasktag();
+			session = ses->get_r2t_sesion(TTT);
 		}
 
 		if (session == nullptr) {
