@@ -329,6 +329,7 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 			"TargetPortalGroupTag=1",
 			"AuthMethod=None",
 			"ErrorRecoveryLevel=0",
+			"InitialR2T=Yes",
 		};
 		for(const auto & kv : kvs)
 			DOLOG(logging::ll_debug, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "send KV \"%s\"", kv.c_str());
@@ -344,7 +345,6 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 			ses->get_data_digest  () ? "DataDigest=CRC32C,None"   : "DataDigest=None",
 			"DefaultTime2Wait=2",
 			"DefaultTime2Retain=20",
-			"InitialR2T=Yes",
 		};
 		for(const auto & kv : kvs)
 			DOLOG(logging::ll_debug, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "send KV \"%s\"", kv.c_str());
