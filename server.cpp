@@ -436,7 +436,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 
 		while(offset < offset_end) {
 			uint64_t bytes_left = offset_end - offset;
-			uint32_t current_n  = std::min(bytes_left, buffer_n);
+			uint32_t current_n  = std::min(uint64_t(ses->get_max_seg_len()), std::min(bytes_left, buffer_n));
 			bool     last_block = offset + current_n == offset_end;
 
 			std::optional<std::pair<residual, uint32_t> > has_residual;
