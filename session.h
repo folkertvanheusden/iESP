@@ -62,7 +62,7 @@ public:
 	void     set_ack_interval(const uint32_t bytes) { ack_interval = bytes; }
 	std::optional<uint32_t> get_ack_interval()      { return ack_interval;  }
 
-	uint32_t init_r2t_session(const r2t_session & rs, iscsi_pdu_scsi_cmd *const pdu);
+	void     init_r2t_session(const r2t_session & rs, iscsi_pdu_scsi_cmd *const pdu, const uint32_t transfer_tag);
 	r2t_session *get_r2t_sesion(const uint32_t ttt);
-	void remove_r2t_session(const uint32_t ttt);
+	void     remove_r2t_session(const uint32_t ttt);
 };

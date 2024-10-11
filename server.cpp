@@ -257,17 +257,19 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 		auto     pdu_data_out = reinterpret_cast<iscsi_pdu_scsi_data_out *>(pdu);
 		uint32_t offset       = pdu_data_out->get_BufferOffset();
 		auto     data         = pdu_data_out->get_data();
-		uint32_t TTT          = pdu_data_out->get_TTT();
+		uint32_t transfer_tag = pdu_data_out->get_TTT();
 		bool     F            = pdu_data_out->get_F();
-		auto     session      = ses->get_r2t_sesion(TTT);
+		auto     session      = ses->get_r2t_sesion(transfer_tag);
 
-		if (TTT == 0xffffffff) {  // unsollicited data
-			TTT     = pdu_data_out->get_Itasktag();
-			session = ses->get_r2t_sesion(TTT);
+		if (transfer_tag == 0xffffffff) {  // unsollicited data
+			transfer_tag = pdu_data_out->get_Itasktag();
+			session      = ses->get_r2t_sesion(transfer_tag);
 		}
 
+		DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "TT: %08x, F: %d, session: %d, offset: %u, has data: %u", transfer_tag, F, session != nullptr, offset, data.has_value() ? data.value().second : 0);
+
 		if (session == nullptr) {
-			DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "DATA-OUT PDU references unknown TTT (%08x)", TTT);
+			DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "DATA-OUT PDU references unknown TTT (%08x)", transfer_tag);
 			return false;
 		}
 		else if (data.has_value() && data.value().second > 0) {
@@ -333,7 +335,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 			if (session->bytes_left == 0) {
 				DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "end of task");
 
-				ses->remove_r2t_session(TTT);
+				ses->remove_r2t_session(transfer_tag);
 			}
 			else {
 				DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "ask for more (%u bytes left)", session->bytes_left);
@@ -342,7 +344,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 				temp.set(session->PDU_initiator.data, session->PDU_initiator.n);
 
 				auto *response = new iscsi_pdu_scsi_r2t(ses) /* 0x31 */;
-				if (response->set(temp, TTT, session->bytes_done, session->bytes_left) == false) {
+				if (response->set(temp, transfer_tag, session->bytes_done, session->bytes_left) == false) {
 					DOLOG(logging::ll_error, "server::push_response", cc->get_endpoint_name(), "response->set failed");
 					delete response;
 					return false;
@@ -384,7 +386,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 		delete pdu_out;
 	}
 
-	// e.g. for READ_xx (as buffering may be RAM-wise too costly (on microcontrollers))
+	// e.g. for READ_xx (as buffering may be RAM-wise too costly (on microcontrollers)) -> DATA-IN
 	if (response_set.value().to_stream.has_value()) {
 		auto & stream_parameters = response_set.value().to_stream.value();
 

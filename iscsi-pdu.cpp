@@ -355,6 +355,7 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 			"DefaultTime2Wait=2",
 			"DefaultTime2Retain=20",
 			"ErrorRecoveryLevel=0",
+			"InitialR2T=Yes",
 			myformat("MaxRecvDataSegmentLength=%u", MAX_DATA_SEGMENT_SIZE),
 		};
 		for(const auto & kv : kvs)
@@ -527,7 +528,13 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(scsi *const s
 			auto *temp = new iscsi_pdu_scsi_r2t(ses) /* 0x31 */;
 			DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "sending R2T with %zu sense bytes", scsi_reply.value().sense_data.size());
 
-			uint32_t TTT = ses->init_r2t_session(scsi_reply.value().r2t, this);
+			uint32_t TTT = 0;
+			if (my_getrandom(&TTT) == false) {
+				DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "my_getrandom failed");
+				ok = false;
+			}
+
+			ses->init_r2t_session(scsi_reply.value().r2t, this, TTT);
 			DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "TTT is %08x", TTT);
 
 			if (temp->set(*this, TTT, scsi_reply.value().r2t.bytes_done, scsi_reply.value().r2t.bytes_left) == false) {

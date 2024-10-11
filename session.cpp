@@ -30,22 +30,18 @@ uint32_t session::get_inc_datasn(const uint32_t data_sn_itt)
 	return data_sn++;
 }
 
-uint32_t session::init_r2t_session(const r2t_session & rs, iscsi_pdu_scsi_cmd *const pdu)
+void session::init_r2t_session(const r2t_session & rs, iscsi_pdu_scsi_cmd *const pdu, const uint32_t transfer_tag)
 {
-	uint32_t ITT = pdu->get_Itasktag();
-
-	auto it = r2t_sessions.find(ITT);
+	auto it = r2t_sessions.find(transfer_tag);
 	if (it != r2t_sessions.end())
-		return ITT;
+		return;
 
-	r2t_session *copy = new r2t_session;
+	r2t_session   *copy = new r2t_session;
 	*copy               = rs;
 	copy->PDU_initiator = pdu->get_raw();
 
-	DOLOG(logging::ll_debug, "session::init_r2t_session", get_endpoint_name(), "register ITT %08x", ITT);
-	r2t_sessions.insert({ ITT, copy });
-
-	return ITT;
+	DOLOG(logging::ll_debug, "session::init_r2t_session", get_endpoint_name(), "register transfer tag %08x", transfer_tag);
+	r2t_sessions.insert({ transfer_tag, copy });
 }
 
 r2t_session *session::get_r2t_sesion(const uint32_t ttt)
