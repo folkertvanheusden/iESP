@@ -470,8 +470,12 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 		else {
 			DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE without data");
 
-			if (transfer_length)
-				response.type = ir_r2t;  // allow R2T packets to come in
+			if (transfer_length) {
+				response.type           = ir_r2t;  // allow R2T packets to come in
+				response.r2t.buffer_lba = lba;
+				response.r2t.bytes_left = transfer_length * backend_block_size;
+				DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "starting R2T with %u bytes left (LBA: %" PRIu64 ")", response.r2t.bytes_left, response.r2t.buffer_lba);
+			}
 			else {
 				response.type = ir_empty_sense;
 				DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "WRITE with 0 transfer_length");

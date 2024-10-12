@@ -516,13 +516,18 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(scsi *const s
 			DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "sending R2T with %zu sense bytes", scsi_reply.value().sense_data.size());
 
 			uint32_t TTT = 0;
-			if (my_getrandom(&TTT) == false) {
+			uint32_t ITT = get_Itasktag();
+			if (ITT != 0xffffffff) {
+				DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "has an ITT: %08x", ITT);
+				TTT = ITT;
+			}
+			else if (my_getrandom(&TTT) == false) {
 				DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "my_getrandom failed");
 				ok = false;
 			}
 
 			ses->init_r2t_session(scsi_reply.value().r2t, this, TTT);
-			DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "TTT is %08x", TTT);
+			DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "ITT/TTT is %08x", TTT);
 
 			if (temp->set(*this, TTT, scsi_reply.value().r2t.bytes_done, scsi_reply.value().r2t.bytes_left) == false) {
 				ok = false;
