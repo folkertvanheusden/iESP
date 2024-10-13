@@ -130,6 +130,7 @@ public:
 	std::vector<uint8_t> error_reservation_conflict_1()  const;
 	std::vector<uint8_t> error_reservation_conflict_2()  const;
 	std::vector<uint8_t> error_not_implemented()         const;
+	std::vector<uint8_t> error_read_error()              const;
 	std::vector<uint8_t> error_write_error()             const;
 	std::vector<uint8_t> error_compare_and_write_count() const;
 	std::vector<uint8_t> error_out_of_range()            const;
