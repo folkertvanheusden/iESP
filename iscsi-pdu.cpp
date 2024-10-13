@@ -1156,7 +1156,7 @@ std::vector<blob_t> iscsi_pdu_taskman_reply::get() const
 	return get_helper(taskman_reply, nullptr, 0);
 }
 
-std::optional<blob_t> generate_reject_pdu(const iscsi_pdu_bhs & about)
+std::optional<blob_t> generate_reject_pdu(const iscsi_pdu_bhs & about, const std::optional<uint8_t> reason)
 {
 	struct __reject__ {
 		uint8_t  b1;
@@ -1202,7 +1202,10 @@ std::optional<blob_t> generate_reject_pdu(const iscsi_pdu_bhs & about)
 	set_bits(&reject->b1, 0, 6, iscsi_pdu_bhs::iscsi_bhs_opcode::o_reject);  // 0x3f
 	set_bits(&reject->b2, 7, 1, true);
 
-	reject->reason = 0x09;  // (invalid PDU field)
+	if (reason.has_value())
+		reject->reason = reason.value();
+	else
+		reject->reason = 0x09;  // (invalid PDU field)
 
 	size_t s = sizeof *reject;
 	blob_t out { duplicate_new(reinterpret_cast<uint8_t *>(reject), s), s };

@@ -142,7 +142,7 @@ struct iscsi_response_set
 
 std::optional<std::string> pdu_opcode_to_string(const iscsi_pdu_bhs::iscsi_bhs_opcode opcode);
 
-std::optional<blob_t> generate_reject_pdu(const iscsi_pdu_bhs & about);
+std::optional<blob_t> generate_reject_pdu(const iscsi_pdu_bhs & about, const std::optional<uint8_t> reason = { });
 
 class iscsi_pdu_login_request : public iscsi_pdu_bhs  // login request 0x03
 {

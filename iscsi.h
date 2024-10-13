@@ -15,6 +15,8 @@
 
 enum residual { iSR_OVERFLOW, iSR_UNDERFLOW, iSR_OK };  // iSR: iS(CSI) Residual
 
+enum iscsi_fail_reason { IFR_OK, IFR_CONNECTION, IFR_INVALID_FIELD, IFR_DIGEST, IFR_IO_ERROR, IFR_MISC, IFR_INVALID_COMMAND };
+
 typedef struct {
 	uint8_t *data;
 	size_t n;

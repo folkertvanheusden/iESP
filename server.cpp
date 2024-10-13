@@ -50,7 +50,7 @@ server::~server()
 #endif
 }
 
-std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *const cc, session **const ses)
+std::tuple<iscsi_pdu_bhs *, iscsi_fail_reason, uint64_t> server::receive_pdu(com_client *const cc, session **const ses)
 {
 	if (*ses == nullptr) {
 		*ses = new session(cc, target_name, digest_chk);
@@ -60,7 +60,7 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 	uint8_t pdu[48] { };
 	if (cc->recv(pdu, sizeof pdu) == false) {
 		DOLOG(logging::ll_info, "server::receive_pdu", cc->get_endpoint_name(), "PDU receive error");
-		return { nullptr, false, 0 };
+		return { nullptr, IFR_CONNECTION, 0 };
 	}
 
 	uint64_t tx_start = get_micros();
@@ -71,7 +71,7 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 	iscsi_pdu_bhs bhs(*ses);
 	if (bhs.set(pdu, sizeof pdu) == false) {
 		DOLOG(logging::ll_debug, "server::receive_pdu", cc->get_endpoint_name(), "BHS validation error");
-		return { nullptr, false, tx_start };
+		return { nullptr, IFR_INVALID_FIELD, tx_start };
 	}
 
 #if defined(ESP32) || defined(RP2040W)
@@ -84,13 +84,13 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 	DOLOG(logging::ll_debug, "server::receive_pdu", cc->get_endpoint_name(), "opcode: %02xh / %s", bhs.get_opcode(), descr.has_value() ? descr.value().c_str() : "?");
 #endif
 
-	iscsi_pdu_bhs *pdu_obj   = nullptr;
-	bool           pdu_error = false;
-	auto           opcode    = bhs.get_opcode();
+	iscsi_pdu_bhs    *pdu_obj    = nullptr;
+	iscsi_fail_reason pdu_error  = IFR_OK;
+	bool              has_digest = true;
+	auto              opcode     = bhs.get_opcode();
 #if !defined(ARDUINO) && !defined(NDEBUG)
 	cmd_use_count[opcode]++;
 #endif
-	bool           has_digest = true;
 
 	switch(opcode) {
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_login_req:
@@ -121,7 +121,7 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 		default:
 			DOLOG(logging::ll_error, "server::receive_pdu", cc->get_endpoint_name(), "opcode %02xh not implemented", bhs.get_opcode());
 			pdu_obj = new iscsi_pdu_bhs(*ses);
-			pdu_error = true;
+			pdu_error = IFR_INVALID_COMMAND;
 			break;
 	}
 
@@ -182,7 +182,7 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 				// verify digest
 				if (remote_header_digest != incoming_crc32c.first && digest_chk) {
 					ok        = false;
-					pdu_error = true;
+					pdu_error = IFR_DIGEST;
 					DOLOG(logging::ll_info, "server::receive_pdu", cc->get_endpoint_name(), "header digest mismatch: received=%08x, calculated=%08x", remote_header_digest, incoming_crc32c.first);
 				}
 
@@ -194,7 +194,7 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 		if (data_length > MAX_DATA_SEGMENT_SIZE) {
 			DOLOG(logging::ll_debug, "server::receive_pdu", cc->get_endpoint_name(), "initiator is pushing too many data (%zu bytes, max is %u)", data_length, MAX_DATA_SEGMENT_SIZE);
 			ok        = false;
-			pdu_error = true;
+			pdu_error = IFR_INVALID_FIELD;
 		}
 		else if (data_length) {
 			size_t padded_data_length = (data_length + 3) & ~3;
@@ -228,7 +228,7 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 					// verify digest
 					if (remote_data_digest != incoming_crc32c.first && digest_chk) {
 						ok        = false;
-						pdu_error = true;
+						pdu_error = IFR_DIGEST;
 						DOLOG(logging::ll_info, "server::receive_pdu", cc->get_endpoint_name(), "data digest mismatch: received=%08x, calculated=%08x", remote_data_digest, incoming_crc32c.first);
 					}
 
@@ -247,9 +247,9 @@ std::tuple<iscsi_pdu_bhs *, bool, uint64_t> server::receive_pdu(com_client *cons
 	return { pdu_obj, pdu_error, tx_start };
 }
 
-bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_bhs *const pdu)
+iscsi_fail_reason server::push_response(com_client *const cc, session *const ses, iscsi_pdu_bhs *const pdu)
 {
-	bool ok = true;
+	iscsi_fail_reason ifr = IFR_OK;
 
 	std::optional<iscsi_response_set> response_set;
 
@@ -270,7 +270,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 
 		if (session == nullptr) {
 			DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "DATA-OUT PDU references unknown TTT (%08x)", transfer_tag);
-			return false;
+			return IFR_INVALID_FIELD;
 		}
 		else if (data.has_value() && data.value().second > 0) {
 			auto block_size = s->get_block_size();
@@ -278,12 +278,12 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 
 			 if (offset % block_size) {
 				DOLOG(logging::ll_info, "server::push_response", cc->get_endpoint_name(), "offset is not multiple of block size");
-				return false;
+				return IFR_INVALID_FIELD;
 			 }
 
 			if (data.value().second % block_size) {
 				DOLOG(logging::ll_info, "server::push_response", cc->get_endpoint_name(), "data size is not multiple of block size");
-				return false;
+				return IFR_INVALID_FIELD;
 			}
 
 			scsi::scsi_rw_result rc = scsi::scsi_rw_result::rw_ok;
@@ -310,7 +310,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 
 			if (rc != scsi::rw_ok) {
 				DOLOG(logging::ll_info, "server::push_response", cc->get_endpoint_name(), "DATA-OUT problem writing to backend: %d", rc);
-				return false;
+				return IFR_IO_ERROR;
 			}
 
 			session->bytes_done += data.value().second;
@@ -318,7 +318,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 		}
 		else if (!F) {
 			DOLOG(logging::ll_warning, "server::push_response", cc->get_endpoint_name(), "DATA-OUT PDU has no data?");
-			return false;
+			return IFR_INVALID_FIELD;
 		}
 
 		// create response
@@ -328,7 +328,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 			iscsi_pdu_scsi_cmd response(ses);
 			if (response.set(session->PDU_initiator.data, session->PDU_initiator.n) == false) {
 				DOLOG(logging::ll_error, "server::push_response", cc->get_endpoint_name(), "response.set failed");
-				return false;
+				return IFR_MISC;
 			}
 			response_set = response.get_response(s, session->bytes_left);
 
@@ -347,7 +347,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 				if (response->set(temp, transfer_tag, session->bytes_done, session->bytes_left) == false) {
 					DOLOG(logging::ll_error, "server::push_response", cc->get_endpoint_name(), "response->set failed");
 					delete response;
-					return false;
+					return IFR_MISC;
 				}
 
 				response_set.value().responses.push_back(response);
@@ -360,22 +360,25 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 
 	if (response_set.has_value() == false) {
 		DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "no response from PDU");
-		return true;
+		return IFR_OK;
 	}
 
 	for(auto & pdu_out: response_set.value().responses) {
 		for(auto & blobs: pdu_out->get()) {
 			if (blobs.data == nullptr) {
-				ok = false;
+				ifr = IFR_INVALID_FIELD;
 				DOLOG(logging::ll_error, "server::push_response", cc->get_endpoint_name(), "PDU did not emit data bundle");
 			}
 
 			assert((blobs.n & 3) == 0);
 
-			if (ok) {
-				ok = cc->send(blobs.data, blobs.n);
-				if (!ok)
+			if (ifr == IFR_OK) {
+				bool ok = cc->send(blobs.data, blobs.n);
+				if (!ok) {
+					ifr = IFR_CONNECTION;
 					DOLOG(logging::ll_info, "server::push_response", cc->get_endpoint_name(), "sending PDU to peer failed (%s)", strerror(errno));
+				}
+
 				ses->add_bytes_tx(blobs.n);
 				is->iscsiSsnTxDataOctets += blobs.n;
 			}
@@ -417,7 +420,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
                                 residual_state = { iSR_OVERFLOW, scsi_has - iscsi_wants };
 
                         if (temp->set(reply_to, { }, residual_state, { }) == false) {
-                                ok = false;
+                                ifr = IFR_MISC;
                                 DOLOG(logging::ll_info, "server::push_response", cc->get_endpoint_name(), "iscsi_pdu_scsi_response::set returned error");
                         }
 
@@ -427,7 +430,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 			delete [] out.data;
 			if (rc_tx == false) {
 				DOLOG(logging::ll_info, "server::push_response", cc->get_endpoint_name(), "problem sending %zu bytes", out.n);
-				ok = false;
+				ifr = IFR_CONNECTION;
 			}
 			else {
 				ses->add_bytes_tx(out.n);
@@ -468,7 +471,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 			if (rc != scsi::rw_ok) {
 				delete [] out.data;
 				DOLOG(logging::ll_error, "server::push_response", cc->get_endpoint_name(), "reading %u bytes failed: %d", current_n, rc);
-				ok = false;
+				ifr = IFR_CONNECTION;
 				break;
 			}
 
@@ -482,7 +485,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 			delete [] out.data;
 			if (rc_tx == false) {
 				DOLOG(logging::ll_info, "server::push_response", cc->get_endpoint_name(), "problem sending %u bytes of block %" PRIu64 " to initiator", current_lba, current_n);
-				ok = false;
+				ifr = IFR_CONNECTION;
 				break;
 			}
 
@@ -495,7 +498,7 @@ bool server::push_response(com_client *const cc, session *const ses, iscsi_pdu_b
 
 	DOLOG(logging::ll_debug, "server::push_response", "-", "---");
 
-	return ok;
+	return ifr;
 }
 
 void server::handler()
@@ -534,12 +537,13 @@ void server::handler()
 #else
 			DOLOG(logging::ll_info, "server::handler", "-", "new session with %s", endpoint.c_str());
 #endif
-			auto          prev_output = get_millis();
-			uint32_t      pdu_count   = 0;
-			unsigned long busy        = 0;
-			const long    interval    = 5000;
-			session      *ses         = nullptr;
-			bool          ok          = true;
+			auto          prev_output  = get_millis();
+			uint32_t      pdu_count    = 0;
+			unsigned long busy         = 0;
+			const long    interval     = 5000;
+			session      *ses          = nullptr;
+			bool          ok           = true;
+			int           fail_counter = 0;
 
 			do {
 				auto incoming = receive_pdu(cc, &ses);
@@ -552,12 +556,30 @@ void server::handler()
 
 				is->iscsiSsnCmdPDUs++;
 
-				if (std::get<1>(incoming)) {  // something wrong with the received PDU?
-					DOLOG(logging::ll_debug, "server::handler", endpoint, "invalid PDU received");
+				iscsi_fail_reason ifr = std::get<1>(incoming);
+				if (ifr == IFR_OK) {
+					ifr = push_response(cc, ses, pdu);
+					if (ifr != IFR_OK)
+						is->iscsiInstSsnFailures++;
+				}
+
+				if (ifr != IFR_OK && ifr != IFR_CONNECTION) {  // something wrong with the received PDU?
+					DOLOG(logging::ll_debug, "server::handler", endpoint, "invalid PDU");
 
 					is->iscsiInstSsnFormatErrors++;
 
-					std::optional<blob_t> reject = generate_reject_pdu(*pdu);
+					std::optional<uint8_t> reason;
+
+					if (ifr == IFR_INVALID_FIELD || ifr == IFR_IO_ERROR || ifr == IFR_MISC)
+						reason = 0x09;
+					else if (ifr == IFR_DIGEST)
+						reason = 0x02;
+					else if (ifr == IFR_INVALID_COMMAND)
+						reason = 0x05;
+					else
+						DOLOG(logging::ll_error, "server::handler", endpoint, "internal error, IFR %d not known", ifr);
+
+					std::optional<blob_t> reject = generate_reject_pdu(*pdu, reason);
 					if (reject.has_value() == false) {
 						DOLOG(logging::ll_error, "server::handler", endpoint, "cannot generate reject PDU");
 						continue;
@@ -567,21 +589,32 @@ void server::handler()
 					delete [] reject.value().data;
 					if (rc == false) {
 						DOLOG(logging::ll_error, "server::handler", endpoint, "cannot transmit reject PDU");
-						break;
+						ok = false;
 					}
-					is->iscsiSsnTxDataOctets += reject.value().n;
-
-					DOLOG(logging::ll_debug, "server::handler", endpoint, "transmitted reject PDU");
-				}
-				else {
-					ok = push_response(cc, ses, pdu);
-					if (!ok)
-						is->iscsiInstSsnFailures++;
+					else {
+						is->iscsiSsnTxDataOctets += reject.value().n;
+						DOLOG(logging::ll_debug, "server::handler", endpoint, "transmitted reject PDU");
+					}
 				}
 
 				delete pdu;
 
 				pdu_count++;
+
+				if (ifr == IFR_OK)
+					fail_counter = 0;
+				else {
+					fail_counter++;
+					if (fail_counter >= 16) {
+						ok = false;
+						DOLOG(logging::ll_info, "server::handler", endpoint, "disconnecting because of too many consecutive errors");
+					}
+				}
+
+				if (ifr == IFR_CONNECTION) {
+					DOLOG(logging::ll_debug, "server::handler", endpoint, "disconnected");
+					ok = false;
+				}
 
 				auto tx_start = std::get<2>(incoming);
 				auto tx_end   = get_micros();
