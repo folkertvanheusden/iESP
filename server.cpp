@@ -566,18 +566,21 @@ void server::handler()
 				if (ifr != IFR_OK && ifr != IFR_CONNECTION) {  // something wrong with the received PDU?
 					DOLOG(logging::ll_debug, "server::handler", endpoint, "invalid PDU");
 
-					is->iscsiInstSsnFormatErrors++;
-
 					std::optional<uint8_t> reason;
 
-					if (ifr == IFR_INVALID_FIELD || ifr == IFR_IO_ERROR || ifr == IFR_MISC)
+					if (ifr == IFR_INVALID_FIELD || ifr == IFR_IO_ERROR || ifr == IFR_MISC) {
+						is->iscsiInstSsnFormatErrors++;
 						reason = 0x09;
-					else if (ifr == IFR_DIGEST)
+					}
+					else if (ifr == IFR_DIGEST) {
+						is->iscsiInstSsnDigestErrors++;
 						reason = 0x02;
+					}
 					else if (ifr == IFR_INVALID_COMMAND)
 						reason = 0x05;
-					else
+					else {
 						DOLOG(logging::ll_error, "server::handler", endpoint, "internal error, IFR %d not known", ifr);
+					}
 
 					std::optional<blob_t> reject = generate_reject_pdu(*pdu, reason);
 					if (reject.has_value() == false) {
