@@ -566,11 +566,22 @@ void server::handler()
 				if (ifr != IFR_OK && ifr != IFR_CONNECTION) {  // something wrong with the received PDU?
 					DOLOG(logging::ll_debug, "server::handler", endpoint, "invalid PDU");
 
+					std::optional<blob_t>  reject;
 					std::optional<uint8_t> reason;
 
-					if (ifr == IFR_INVALID_FIELD || ifr == IFR_IO_ERROR || ifr == IFR_MISC) {
+					if (ifr == IFR_INVALID_FIELD || ifr == IFR_MISC) {
 						is->iscsiInstSsnFormatErrors++;
 						reason = 0x09;
+					}
+					else if (ifr == IFR_IO_ERROR) {
+			                        auto *temp = new iscsi_pdu_scsi_response(ses) /* 0x21 */;
+
+						if (temp->set(*reinterpret_cast<iscsi_pdu_scsi_cmd *>(pdu), s->error_read_error(), { }, 0x09) == false) {
+							reason = IFR_CONNECTION;
+							DOLOG(logging::ll_info, "server::handler", ses->get_endpoint_name(), "iscsi_pdu_scsi_response::set returned error");
+						}
+
+						reject = temp->get()[0];
 					}
 					else if (ifr == IFR_DIGEST) {
 						is->iscsiInstSsnDigestErrors++;
@@ -582,10 +593,12 @@ void server::handler()
 						DOLOG(logging::ll_error, "server::handler", endpoint, "internal error, IFR %d not known", ifr);
 					}
 
-					std::optional<blob_t> reject = generate_reject_pdu(*pdu, reason);
 					if (reject.has_value() == false) {
-						DOLOG(logging::ll_error, "server::handler", endpoint, "cannot generate reject PDU");
-						continue;
+						reject = generate_reject_pdu(*pdu, reason);
+						if (reject.has_value() == false) {
+							DOLOG(logging::ll_error, "server::handler", endpoint, "cannot generate reject PDU");
+							continue;
+						}
 					}
 
 					bool rc = cc->send(reject.value().data, reject.value().n);
