@@ -114,7 +114,6 @@ build status
 ![Microcontrollers CI](https://github.com/folkertvanheusden/iESP/actions/workflows/platformio.yaml/badge.svg)
 ![MacOS X CI](https://github.com/folkertvanheusden/iESP/actions/workflows/macos.yaml/badge.svg)
 
-![CodeQL](https://github.com/folkertvanheusden/iESP/actions/workflows/codeql.yaml/badge.svg)
 ![Coverity](https://scan.coverity.com/projects/29725/badge.svg)
 
 

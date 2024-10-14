@@ -92,10 +92,6 @@ scsi::~scsi()
 #endif
 }
 
-// data:
-// 0: pointer
-// 1: size of data
-// 2: how much is allowed to be written of it by iSCSI layer
 std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data)
 {
 	assert(size >= 16);
