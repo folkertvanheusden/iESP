@@ -103,6 +103,8 @@ namespace logging {
 			sl_nr += 2;  // critical
 
 		int offset = snprintf(err_log_buf, sizeof err_log_buf, "<%d>%s|%s] ", sl_nr, component, context.c_str());
+		if (offset == -1)
+			offset = 0;  // snprintf failed, proceeed without component etc
 
 		va_list ap;
 		va_start(ap, fmt);
