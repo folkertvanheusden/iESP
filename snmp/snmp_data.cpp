@@ -78,7 +78,7 @@ snmp_elem * snmp_data_type_static::get_data()
 	if (is_string)
 		return new snmp_octet_string(reinterpret_cast<const uint8_t *>(data.c_str()), data.size());
 
-	return new snmp_integer(snmp_integer::si_integer, data_int);
+	return new snmp_integer(type, data_int);
 }
 
 snmp_data_type_stats::snmp_data_type_stats(const snmp_integer::snmp_integer_type type, uint64_t *const counter) :

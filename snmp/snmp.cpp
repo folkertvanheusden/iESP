@@ -72,7 +72,7 @@ uint64_t snmp::get_INTEGER(const uint8_t *p, const size_t length)
 	uint64_t v = 0;
 
 	if (length > 8)
-		DOLOG(logging::ll_error, "SNMP::get_INTEGER", "-", "truncated (%zu bytes)\n", length);
+		DOLOG(logging::ll_error, "SNMP::get_INTEGER", "-", "truncated (%zu bytes)", length);
 
 	for(size_t i=0; i<length; i++) {
 		v <<= 8;
@@ -85,7 +85,7 @@ uint64_t snmp::get_INTEGER(const uint8_t *p, const size_t length)
 bool snmp::get_type_length(const uint8_t *p, const size_t len, uint8_t *const type, uint8_t *const length)
 {
 	if (len < 2) {
-		DOLOG(logging::ll_error, "snmp::get_type_length", "-", "length < 2\n");
+		DOLOG(logging::ll_error, "snmp::get_type_length", "-", "length < 2");
 		return false;
 	}
 
@@ -121,7 +121,7 @@ bool snmp::get_OID(const uint8_t *p, const size_t length, std::string *const oid
 	}
 
 	if (v) {
-		DOLOG(logging::ll_error, "snmp::get_OID", "-", "object identifier did not properly terminate\n");
+		DOLOG(logging::ll_error, "snmp::get_OID", "-", "object identifier did not properly terminate");
 		return false;
 	}
 
@@ -137,7 +137,7 @@ bool snmp::process_PDU(const uint8_t *p, const size_t len, oid_req_t *const oids
 		return false;
 
 	if (pdu_type != 0x02) { // expecting an integer here)
-		DOLOG(logging::ll_error, "SNMP::process_PDU", "-", "ID-type is not integer\n");
+		DOLOG(logging::ll_error, "SNMP::process_PDU", "-", "ID-type is not integer");
 		return false;
 	}
 
@@ -151,7 +151,7 @@ bool snmp::process_PDU(const uint8_t *p, const size_t len, oid_req_t *const oids
 		return false;
 
 	if (pdu_type != 0x02) { // expecting an integer here)
-		DOLOG(logging::ll_error, "SNMP::process_PDU", "-", "error-type is not integer\n");
+		DOLOG(logging::ll_error, "SNMP::process_PDU", "-", "error-type is not integer");
 		return false;
 	}
 
@@ -166,7 +166,7 @@ bool snmp::process_PDU(const uint8_t *p, const size_t len, oid_req_t *const oids
 		return false;
 
 	if (pdu_type != 0x02) { // expecting an integer here)
-		DOLOG(logging::ll_error, "SNMP::process_PDU", "-", "error-index is not integer\n");
+		DOLOG(logging::ll_error, "SNMP::process_PDU", "-", "error-index is not integer");
 		return false;
 	}
 
@@ -179,7 +179,7 @@ bool snmp::process_PDU(const uint8_t *p, const size_t len, oid_req_t *const oids
 	// varbind list sequence
 	uint8_t type_vb_list = *p++;
 	if (type_vb_list != 0x30) {
-		DOLOG(logging::ll_error, "SNMP::process_PDU", "-", "expecting varbind list sequence, got %02x\n", type_vb_list);
+		DOLOG(logging::ll_error, "SNMP::process_PDU", "-", "expecting varbind list sequence, got %02x", type_vb_list);
 		return false;
 	}
 	uint8_t len_vb_list = *p++;
@@ -191,7 +191,7 @@ bool snmp::process_PDU(const uint8_t *p, const size_t len, oid_req_t *const oids
 		uint8_t seq_length = *pnt++;
 
 		if (&pnt[seq_length] > &p[len_vb_list]) {
-			DOLOG(logging::ll_error, "SNMP::process_PDU", "-", "length field out of bounds (PDU)\n");
+			DOLOG(logging::ll_error, "SNMP::process_PDU", "-", "length field out of bounds (PDU)");
 			return false;
 		}
 
@@ -200,7 +200,7 @@ bool snmp::process_PDU(const uint8_t *p, const size_t len, oid_req_t *const oids
 			pnt += seq_length;
 		}
 		else {
-			DOLOG(logging::ll_error, "SNMP::process_PDU", "-", "unexpected/invalid type %02x\n", seq_type);
+			DOLOG(logging::ll_error, "SNMP::process_PDU", "-", "unexpected/invalid type %02x", seq_type);
 			return false;
 		}
 	}
@@ -211,7 +211,7 @@ bool snmp::process_PDU(const uint8_t *p, const size_t len, oid_req_t *const oids
 bool snmp::process_BER(const uint8_t *p, const size_t len, oid_req_t *const oids_req, const bool is_getnext, const int is_top)
 {
 	if (len < 2) {
-		DOLOG(logging::ll_error, "SNMP::process_BER", "-", "BER too small\n");
+		DOLOG(logging::ll_error, "SNMP::process_BER", "-", "BER too small");
 		return false;
 	}
 
@@ -224,7 +224,7 @@ bool snmp::process_BER(const uint8_t *p, const size_t len, oid_req_t *const oids
 		uint8_t length = *pnt++;
 
 		if (&pnt[length] > &p[len]) {
-			DOLOG(logging::ll_error, "SNMP::process_BER", "-", "length field out of bounds (BER)\n");
+			DOLOG(logging::ll_error, "SNMP::process_BER", "-", "length field out of bounds (BER)");
 			return false;
 		}
 
@@ -293,7 +293,7 @@ bool snmp::process_BER(const uint8_t *p, const size_t len, oid_req_t *const oids
 			pnt += length;
 		}
 		else {
-			DOLOG(logging::ll_error, "SNMP::process_BER", "-", "invalid type %02x\n", type);
+			DOLOG(logging::ll_error, "SNMP::process_BER", "-", "invalid type %02x", type);
 			return false;
 		}
 	}
@@ -332,7 +332,7 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 
 		varbind->add(new snmp_oid(e));
 
-		DOLOG(logging::ll_error, "SNMP:process_BER", "-", "requested: %s\n", e.c_str());
+		DOLOG(logging::ll_debug, "SNMP:process_BER", "-", "requested: %s", e.c_str());
 
 		std::optional<snmp_elem *> rc = sd->find_by_oid(e);
 
@@ -351,7 +351,7 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 				varbind->add(new snmp_null());
 		}
 		else {
-			DOLOG(logging::ll_error, "SNMP::process_BER", "-", "requested %s not found, returning null\n", e.c_str());
+			DOLOG(logging::ll_info, "SNMP::process_BER", "-", "requested %s not found, returning null", e.c_str());
 
 			// FIXME snmp_null?
 			varbind->add(new snmp_null());

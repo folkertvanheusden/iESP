@@ -8,14 +8,14 @@
 
 typedef struct
 {
-	uint32_t iscsiSsnCmdPDUs;           // 1.3.6.1.2.1.142.1.10.2.1.1
-	uint32_t iscsiInstSsnFailures;      // 1.3.6.1.2.1.142.1.1.1.1.10
-	uint32_t iscsiInstSsnFormatErrors;  // 1.3.6.1.2.1.142.1.1.2.1.3
-	uint32_t iscsiInstSsnDigestErrors;  // 1.3.6.1.2.1.142.1.1.2.1.1
+	uint64_t iscsiSsnCmdPDUs;           // 1.3.6.1.2.1.142.1.10.2.1.1
+	uint64_t iscsiInstSsnFailures;      // 1.3.6.1.2.1.142.1.1.1.1.10
+	uint64_t iscsiInstSsnFormatErrors;  // 1.3.6.1.2.1.142.1.1.2.1.3
+	uint64_t iscsiInstSsnDigestErrors;  // 1.3.6.1.2.1.142.1.1.2.1.1
 	uint64_t iscsiSsnTxDataOctets;      // 1.3.6.1.2.1.142.1.10.2.1.3
 	uint64_t iscsiSsnRxDataOctets;      // 1.3.6.1.2.1.142.1.10.2.1.4
-	uint32_t iscsiTgtLoginAccepts;      // 1.3.6.1.2.1.142.1.6.2.1.1
-	uint32_t iscsiTgtLogoutNormals;     // 1.3.6.1.2.1.142.1.6.3.1.1
+	uint64_t iscsiTgtLoginAccepts;      // 1.3.6.1.2.1.142.1.6.2.1.1
+	uint64_t iscsiTgtLogoutNormals;     // 1.3.6.1.2.1.142.1.6.3.1.1
 } iscsi_stats_t;
 
 class server
