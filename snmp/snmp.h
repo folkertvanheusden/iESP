@@ -55,7 +55,7 @@ private:
 #endif
 
 public:
-	snmp(snmp_data *const sd, std::atomic_bool *const stop);
+	snmp(snmp_data *const sd, std::atomic_bool *const stop, const int port);
 	snmp(const snmp &) = delete;
 	virtual ~snmp();
 

@@ -29,7 +29,7 @@ namespace qn = qindesign::network;
 #include "snmp_elem.h"
 
 
-snmp::snmp(snmp_data *const sd, std::atomic_bool *const stop): sd(sd), stop(stop)
+snmp::snmp(snmp_data *const sd, std::atomic_bool *const stop, const int port): sd(sd), stop(stop)
 {
 #if !defined(ARDUINO) || defined(ESP32)
 	fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -37,10 +37,10 @@ snmp::snmp(snmp_data *const sd, std::atomic_bool *const stop): sd(sd), stop(stop
 	sockaddr_in servaddr { };
 	servaddr.sin_family      = AF_INET; // IPv4
 	servaddr.sin_addr.s_addr = INADDR_ANY;
-	servaddr.sin_port        = htons(161);
+	servaddr.sin_port        = htons(port);
 
 	if (bind(fd, reinterpret_cast<const struct sockaddr *>(&servaddr), sizeof servaddr) == -1)
-		DOLOG(logging::ll_error, "snmp::snmp", "-", "Failed to bind to SNMP UDP port\n");
+		DOLOG(logging::ll_error, "snmp::snmp", "-", "Failed to bind to SNMP UDP port %d", port);
 #else
 	handle = new qn::EthernetUDP();
 	handle->begin(161);

@@ -93,7 +93,7 @@ void help()
 	printf("-L x,y  set file log level (x) and screen log level (y)\n");
 	printf("-l x    set log file\n");
 	printf("-D      disable digest\n");
-	printf("-S      enable SNMP agent\n");
+	printf("-S x    enable SNMP agent on port x, usually 161\n");
 	printf("-P x    write PID-file\n");
 	printf("-f      become daemon process\n");
 	printf("-h      this help\n");
@@ -126,19 +126,22 @@ int main(int argc, char *argv[])
 	std::string    target_name= "test";
 	int            trim_level = 1;
 	bool           use_snmp   = false;
+	int            snmp_port  = 161;
 	bool           digest_chk = true;
 	backend_type_t bt         = backend_type_t::BT_FILE;
 	const char    *logfile    = "/tmp/iesp.log";
 	logging::log_level_t ll_screen = logging::ll_error;
 	logging::log_level_t ll_file   = logging::ll_error;
 	int o = -1;
-	while((o = getopt(argc, argv, "P:fSDb:d:i:p:T:t:L:l:h")) != -1) {
+	while((o = getopt(argc, argv, "P:fS:Db:d:i:p:T:t:L:l:h")) != -1) {
 		if (o == 'P')
 			pid_file = optarg;  // used for scripting
 		else if (o == 'f')
 			do_daemon = true;
-		else if (o == 'S')
+		else if (o == 'S') {
 			use_snmp = true;
+			snmp_port = atoi(optarg);
+		}
 		else if (o == 'D')
 			digest_chk = false;
 		else if (o == 'b') {
@@ -225,7 +228,7 @@ int main(int argc, char *argv[])
 	snmp      *snmp_       { nullptr };
 	snmp_data *snmp_data_  { nullptr };
 	if (use_snmp)
-		init_snmp(&snmp_, &snmp_data_, &ios, &is, get_diskspace, b, &cpu_usage, &ram_free_kb, &stop);
+		init_snmp(&snmp_, &snmp_data_, &ios, &is, get_diskspace, b, &cpu_usage, &ram_free_kb, &stop, snmp_port);
 
 	server s(&sd, &c, &is, target_name, digest_chk);
 
