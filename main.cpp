@@ -95,7 +95,9 @@ void help()
 	printf("-D      disable digest\n");
 	printf("-S x    enable SNMP agent on port x, usually 161\n");
 	printf("-P x    write PID-file\n");
+#if !defined(__MINGW32__)
 	printf("-f      become daemon process\n");
+#endif
 	printf("-h      this help\n");
 }
 
@@ -216,12 +218,14 @@ int main(int argc, char *argv[])
 
 	printf("Go!\n");
 
+#if !defined(__MINGW32__)
 	if (do_daemon) {
 		if (daemon(-1, -1) == -1) {
 			fprintf(stderr, "Failed to daemonize: %s\n", strerror(errno));
 			return 1;
 		}
 	}
+#endif
 
 	int        cpu_usage   { 0       };
 	int        ram_free_kb { 0       };
