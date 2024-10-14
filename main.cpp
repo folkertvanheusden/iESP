@@ -94,6 +94,8 @@ void help()
 	printf("-l x    set log file\n");
 	printf("-D      disable digest\n");
 	printf("-S      enable SNMP agent\n");
+	printf("-P x    write PID-file\n");
+	printf("-f      become daemon process\n");
 	printf("-h      this help\n");
 }
 
@@ -103,6 +105,7 @@ int main(int argc, char *argv[])
 	signal(SIGPIPE, SIG_IGN);
 #endif
 	signal(SIGINT,  sigh);
+	signal(SIGTERM, sigh);
 
 #if defined(__MINGW32__)
 	WSADATA wsaData { };
@@ -115,6 +118,8 @@ int main(int argc, char *argv[])
 
 	enum backend_type_t { BT_FILE, BT_NBD };
 
+	bool           do_daemon  = false;
+	std::string    pid_file;
 	std::string    ip_address = "0.0.0.0";
 	int            port       = 3260;
 	std::string    dev        = "test.dat";
@@ -127,8 +132,12 @@ int main(int argc, char *argv[])
 	logging::log_level_t ll_screen = logging::ll_error;
 	logging::log_level_t ll_file   = logging::ll_error;
 	int o = -1;
-	while((o = getopt(argc, argv, "SDb:d:i:p:T:t:L:l:h")) != -1) {
-		if (o == 'S')
+	while((o = getopt(argc, argv, "P:fSDb:d:i:p:T:t:L:l:h")) != -1) {
+		if (o == 'P')
+			pid_file = optarg;  // used for scripting
+		else if (o == 'f')
+			do_daemon = true;
+		else if (o == 'S')
 			use_snmp = true;
 		else if (o == 'D')
 			digest_chk = false;
@@ -202,6 +211,15 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	printf("Go!\n");
+
+	if (do_daemon) {
+		if (daemon(-1, -1) == -1) {
+			fprintf(stderr, "Failed to daemonize: %s\n", strerror(errno));
+			return 1;
+		}
+	}
+
 	int        cpu_usage   { 0       };
 	int        ram_free_kb { 0       };
 	snmp      *snmp_       { nullptr };
@@ -209,10 +227,21 @@ int main(int argc, char *argv[])
 	if (use_snmp)
 		init_snmp(&snmp_, &snmp_data_, &ios, &is, get_diskspace, b, &cpu_usage, &ram_free_kb, &stop);
 
+	server s(&sd, &c, &is, target_name, digest_chk);
+
 	std::thread *mth = new std::thread(maintenance_thread, &stop, &cpu_usage, &ram_free_kb);
 
-	server s(&sd, &c, &is, target_name, digest_chk);
-	printf("Go!\n");
+	if (pid_file.empty() == false) {
+		FILE *fh = fopen(pid_file.c_str(), "w");
+		if (!fh) {
+			fprintf(stderr, "Failed to create \"%s\": %s\n", pid_file.c_str(), strerror(errno));
+			return 1;
+		}
+
+		fprintf(fh, "%d\n", getpid());
+		fclose(fh);
+	}
+
 	s.handler();
 
 	delete snmp_;
@@ -221,6 +250,11 @@ int main(int argc, char *argv[])
 	delete mth;
 
 	delete b;
+
+	if (pid_file.empty() == false) {
+		if (unlink(pid_file.c_str()) == -1)
+			fprintf(stderr, "Failed to remove \"%s\": %s\n", pid_file.c_str(), strerror(errno));
+	}
 
 	return 0;
 }

@@ -607,14 +607,14 @@ bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std
 
 	pdu_response_data.second = reply_data_plus_sense_header;
 	if (pdu_response_data.second) {
-		DOLOG(logging::ll_warning, "iscsi_pdu_scsi_response::set", ses->get_endpoint_name(), "CHECK CONDITION");
+		DOLOG(logging::ll_info, "iscsi_pdu_scsi_response::set", ses->get_endpoint_name(), "CHECK CONDITION");
 
 		if (iscsi_status.has_value())
 			pdu_response->status = iscsi_status.value();
 		else
 			pdu_response->status = 0x02;  // check condition
-		pdu_response->response     = 0x01;  // target failure
-		pdu_response->ExpDataSN    = 0;
+		pdu_response->response  = 0x01;  // target failure
+		pdu_response->ExpDataSN = 0;
 
 		pdu_response_data.first    = new uint8_t[pdu_response_data.second]();
 		pdu_response_data.first[0] = sense_data_size >> 8;
