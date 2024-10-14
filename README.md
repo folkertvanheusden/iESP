@@ -115,6 +115,7 @@ build status
 ![MacOS X CI](https://github.com/folkertvanheusden/iESP/actions/workflows/macos.yaml/badge.svg)
 
 ![Coverity](https://scan.coverity.com/projects/29725/badge.svg)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/4ac7abe4ee944411ac6c9cdc80eaf991)](https://app.codacy.com/gh/folkertvanheusden/iESP/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 
 
 license
