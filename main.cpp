@@ -15,6 +15,7 @@
 #include "backend-nbd.h"
 #include "com-sockets.h"
 #include "log.h"
+#include "random.h"
 #include "server.h"
 #include "snmp.h"
 #include "utils.h"
@@ -186,6 +187,8 @@ int main(int argc, char *argv[])
 
 	logging::initlogger();
 	logging::setlog(logfile, ll_file, ll_screen);
+
+	init_my_getrandom();
 
 	io_stats_t    ios { };
 	iscsi_stats_t is  { };
