@@ -589,7 +589,7 @@ void setup() {
 #endif
 
 	draw_status(13);
-	init_snmp(&snmp_, &snmp_data_, &ios, &is, get_diskspace, bs, &cpu_usage, &ram_free_kb, &stop);
+	init_snmp(&snmp_, &snmp_data_, &ios, &is, get_diskspace, bs, &cpu_usage, &ram_free_kb, &stop, 161);
 
 	draw_status(14);
 	if (bs->begin() == false) {
