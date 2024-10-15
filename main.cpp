@@ -53,10 +53,9 @@ void maintenance_thread(std::atomic_bool *const stop, int *const cpu_usage, int 
 	int prev_cpu_usage = get_cpu_usage_us();
 
 	while(!*stop) {
-		usleep(499000);
+		sleep(1);
 
 		uint64_t now = get_micros();
-
 		if (now - prev_w_poll >= 1000000) {
 			int current_cpu_usage = get_cpu_usage_us();
 			*cpu_usage = (current_cpu_usage - prev_cpu_usage) / 10000;
