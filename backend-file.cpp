@@ -100,7 +100,7 @@ bool backend_file::trim(const uint64_t block_nr, const uint32_t n_blocks)
 	off_t  offset     = block_nr * block_size;
 	size_t n_bytes    = n_blocks * block_size;
 	DOLOG(logging::ll_debug, "backend_file::trim", identifier, "block %" PRIu64 " (%lu), %d blocks, block size: %" PRIu64, block_nr, offset, n_blocks, block_size);
-#ifdef linux
+#if defined(linux)
 	int rc = fallocate(fd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, offset, n_bytes);
 #else
 	// no locking! write() takes care of that itself!
