@@ -95,11 +95,10 @@ scsi::~scsi()
 scsi_response scsi::test_unit_ready(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data)
 {
 	scsi_response response { };
-	response.type         = ir_as_is;
+	response.type         = ir_empty_sense;
 	response.data_is_meta = true;
 
 	DOLOG(logging::ll_debug, "scsi::test_unit_ready", identifier, "TEST UNIT READY");
-	response.type = ir_empty_sense;
 
 	return response;
 }
