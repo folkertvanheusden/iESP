@@ -128,8 +128,6 @@ def do(show_stats):
     global verified_t
     global read_error_count
     global write_error_count
-    global lock
-    global ranges
     global data_total
     global failure_count
 
@@ -183,7 +181,7 @@ def do(show_stats):
                 data = os.pread(fd, byte_count, offset)
 
                 for i in range(0, cur_n_blocks):
-                    cur_b_offset = i * blocksize 
+                    cur_b_offset = i * blocksize
                     if data[cur_b_offset:cur_b_offset+blocksize] != b[i]:
                         if n_failed < 3:
                             print(f'Sector {cur_n_blocks + i} has unexpected data ({data[cur_b_offset:cur_b_offset+16]}... instead of {b[i][0:16]}...')
