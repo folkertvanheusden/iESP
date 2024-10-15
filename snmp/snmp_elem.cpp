@@ -56,7 +56,7 @@ std::pair<uint8_t *, uint8_t> snmp_integer::get_payload() const
 		assert(0);
 
 	uint8_t pl_len = len - 2;
-	uint8_t *out = (uint8_t *)malloc(len);
+	uint8_t *out = reinterpret_cast<uint8_t *>(malloc(len));
 
 	out[0] = snmp_type;
 	out[1] = pl_len;
@@ -97,7 +97,7 @@ uint8_t snmp_sequence::get_size() const
 
 std::pair<uint8_t *, uint8_t> snmp_sequence::get_payload() const
 {
-	uint8_t *out = (uint8_t *)malloc(256);
+	uint8_t *out = reinterpret_cast<uint8_t *>(malloc(256));
 
 	out[0] = 0x30;
 
@@ -134,7 +134,7 @@ snmp_null::~snmp_null()
 
 std::pair<uint8_t *, uint8_t> snmp_null::get_payload() const
 {
-	uint8_t *out = (uint8_t *)malloc(2);
+	uint8_t *out = reinterpret_cast<uint8_t *>(malloc(2));
 
 	out[0] = 0x05;
 	out[1] = 0x00;
@@ -146,7 +146,7 @@ std::pair<uint8_t *, uint8_t> snmp_null::get_payload() const
 
 snmp_octet_string::snmp_octet_string(const uint8_t *const v, const int len)
 {
-	this->v = (uint8_t *)malloc(len);
+	this->v = reinterpret_cast<uint8_t *>(malloc(len));
 	memcpy(this->v, v, len);
 	this->len = len + 2;
 }
@@ -160,7 +160,7 @@ std::pair<uint8_t *, uint8_t> snmp_octet_string::get_payload() const
 {
 	uint8_t out_len = len;
 	uint8_t pl_len = len - 2;
-	uint8_t *out = (uint8_t *)malloc(out_len);
+	uint8_t *out = reinterpret_cast<uint8_t *>(malloc(out_len));
 
 	memcpy(out + 2, v, pl_len);
 
@@ -175,8 +175,7 @@ std::pair<uint8_t *, uint8_t> snmp_octet_string::get_payload() const
 snmp_oid::snmp_oid(const std::string & oid)
 {
 	int new_size = oid.size();
-
-	uint8_t *p = v = (uint8_t *)malloc(new_size);
+	uint8_t *p = v = reinterpret_cast<uint8_t *>(malloc(new_size));
 
 	std::string work = oid;
 
@@ -227,7 +226,7 @@ std::pair<uint8_t *, uint8_t> snmp_oid::get_payload() const
 {
 	uint8_t out_len = len;
 	uint8_t pl_len = len - 2;
-	uint8_t *out = (uint8_t *)malloc(out_len);
+	uint8_t *out = reinterpret_cast<uint8_t *>(malloc(out_len));
 
 	if (pl_len)
 		memcpy(out + 2, v, pl_len);
