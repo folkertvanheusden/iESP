@@ -26,7 +26,7 @@ rm -f $LOGFILE
 ./build/iesp -b file -d $TMPIMG -L error,debug -l $LOGFILE -P $PIDFILE -f -S 1610 $DIGESTDISABLE
 LINES=`snmpwalk -c public -v2c localhost:1610 -O n .iso 2> /dev/null | grep -v 'End of MIB' | wc -l`
 
-./build/quick_test
+./build/quick-test
 
 if [ $? -ne 0 ] ; then
 	echo 'quick-test failed'
