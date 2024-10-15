@@ -26,23 +26,23 @@ rm -f $LOGFILE
 ./build/iesp -b file -d $TMPIMG -L error,debug -l $LOGFILE -P $PIDFILE -f -S 1610 $DIGESTDISABLE
 LINES=`snmpwalk -c public -v2c localhost:1610 -O n .iso 2> /dev/null | grep -v 'End of MIB' | wc -l`
 
+./build/quick_test
+
+if [ $? -ne 0 ] ; then
+	echo 'quick-test failed'
+	exit 1
+fi
+
 cat <<EOF | /usr/bin/python3
-from pyscsi.pyscsi.scsi import SCSI
-from pyscsi.utils import init_device
-
-with SCSI(init_device('iscsi://localhost/test/1'), blocksize=512) as s:
-    r = s.read16(1, 8192,).datain
-    assert len(r) == 8192 * 512
-
-data = bytearray(4096)
-with SCSI(init_device('iscsi://localhost/test/1'), blocksize=4096) as s:
-    w = s.writesame16(1024, 27, data)
-    print(w.result)
-
-data = bytearray(4096 * 8192)
-with SCSI(init_device('iscsi://localhost/test/1'), blocksize=4096) as s:
-    w = s.write16(1, 8192, data)
-    print(w.result)
+import random
+import socket
+try:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.connect(('127.0.0.1', 3260))
+        for i in range(128):
+            s.send(bytearray([random.randint(0, 255) for i in range(48)]))
+except Exception as e:
+    print(e)
 EOF
 
 if [ $? -ne 0 ] ; then
