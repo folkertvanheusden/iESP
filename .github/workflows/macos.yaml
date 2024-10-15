@@ -10,6 +10,6 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: cmake
-      run: cmake -B build
+      run: cmake -B build -DIS_MAC=TRUE
     - name: make
       run: make -C build

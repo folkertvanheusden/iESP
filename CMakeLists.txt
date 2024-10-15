@@ -42,7 +42,7 @@ target_link_libraries(iesp Threads::Threads)
 
 include(FindPkgConfig)
 
-if (NOT IS_WINDOWS)
+if ((NOT IS_WINDOWS) AND (NOT IS_MAC))
 add_executable(
 	quick-test
 	quick-test.cpp
@@ -53,7 +53,7 @@ target_link_libraries(quick-test ${LIBISCSI_LIBRARIES})
 target_include_directories(quick-test PUBLIC ${LIBISCSI_INCLUDE_DIRS})
 target_compile_options(quick-test PUBLIC ${LIBISCSI_CFLAGS_OTHER})
 
-endif (NOT IS_WINDOWS)
+endif ((NOT IS_WINDOWS) AND (NOT IS_MAC))
 
 set(CMAKE_BUILD_TYPE RelWithDebInfo)
 #set(CMAKE_BUILD_TYPE Debug)
