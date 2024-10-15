@@ -11,13 +11,14 @@
 constexpr int      bs  = 4096;
 constexpr long int lba = 0;
 constexpr int      lun = 1;
+constexpr int      bc  = 3;  // block-count
 bool               ok  = true;
 
 void test_read_write(iscsi_context *const iscsi, const uint8_t fill)
 {
 	printf("Read/write test for filler %02x\n", fill);
 
-	uint8_t *buffer = new uint8_t[bs];
+	uint8_t *buffer = new uint8_t[bs * bc];
 
 	// just to see if they can be invoked
 	std::vector<std::tuple<std::string,
@@ -33,7 +34,7 @@ void test_read_write(iscsi_context *const iscsi, const uint8_t fill)
 	for(auto & e: rw_functions) {
 		printf(" Testing: %s\n", std::get<0>(e).c_str());
 
-		scsi_task *task_w = std::get<1>(e)(iscsi, lun, lba, buffer, bs, bs, 0, 0, 0, 0, 0);
+		scsi_task *task_w = std::get<1>(e)(iscsi, lun, lba, buffer, bs * bc, bs, 0, 0, 0, 0, 0);
 		if (task_w == nullptr || task_w->status != SCSI_STATUS_GOOD) {
 			printf("  write failed: %s\n", iscsi_get_error(iscsi));
 			scsi_free_scsi_task(task_w);
@@ -42,7 +43,7 @@ void test_read_write(iscsi_context *const iscsi, const uint8_t fill)
 		}
 		scsi_free_scsi_task(task_w);
 
-		scsi_task *task_r = std::get<2>(e)(iscsi, lun, lba, bs, bs, 0, 0, 0, 0, 0);
+		scsi_task *task_r = std::get<2>(e)(iscsi, lun, lba, bs * bc, bs, 0, 0, 0, 0, 0);
 		if (task_r == nullptr || task_r->status != SCSI_STATUS_GOOD) {
 			printf("  read failed: %s\n", iscsi_get_error(iscsi));
 			ok = false;
@@ -81,6 +82,23 @@ int main(int argc, char *argv[])
                 printf("Failed to set target name\n");
                 exit(10);
         }
+
+	if (iscsi_set_initial_r2t(iscsi, ISCSI_INITIAL_R2T_YES)) {
+		printf("ISCSI_INITIAL_R2T_YES failed: %s\n", iscsi_get_error(iscsi));
+		exit(10);
+	}
+
+	if (iscsi_set_header_digest(iscsi, ISCSI_HEADER_DIGEST_CRC32C_NONE)) {
+		printf("ISCSI_HEADER_DIGEST_CRC32C_NONE failed: %s\n", iscsi_get_error(iscsi));
+                exit(10);
+        }
+
+#if 0  // Not available in Ubuntu 24.04
+	if (iscsi_set_data_digest(iscsi, ISCSI_DATA_DIGEST_CRC32C_NONE)) {
+		printf("ISCSI_DATA_DIGEST_CRC32C_NONE failed: %s\n", iscsi_get_error(iscsi));
+                exit(10);
+        }
+#endif
 
 	if (iscsi_login_sync(iscsi)) {
 		printf("iscsi_login failed: %s\n", iscsi_get_error(iscsi));
