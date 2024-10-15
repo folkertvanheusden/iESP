@@ -5,7 +5,7 @@
 # truncate -s 900M /mnt/test.dat
 # apt install gcovr gcov
 # pip3 install python3-iscsi
-# libiscsi installed with test-tools inder /usr/local/libiscsi
+# libiscsi installed with test-tools under /usr/local
 
 TMPDIR=/mnt
 TMPIMG=$TMPDIR/test.dat
@@ -52,7 +52,7 @@ fi
 
 if [ $LINES -eq 26 ] ; then
 	PID=`cat $PIDFILE`
-	(cd $TMPDIR ; /usr/local/libiscsi/bin/iscsi-test-cu -d -S -x -s iscsi://localhost/test/1 > /dev/null)
+	(cd $TMPDIR ; /usr/local/bin/iscsi-test-cu -d -S -x -s iscsi://localhost/test/1 > /dev/null)
 
 	sleep 1
 	while true
