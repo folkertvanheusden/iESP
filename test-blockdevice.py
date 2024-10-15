@@ -23,7 +23,7 @@ trim_perc = 0
 n_threads = 2
 stop_at_100 = False
 
-def help():
+def cmdline_help():
     print(f'Usage: {sys.argv[0]} ...arguments...')
     print('-d dev:               block device')
     print('-b blocksize:         e.g. 512 or 4096')
@@ -41,7 +41,7 @@ try:
     opts, args = getopt.getopt(sys.argv[1:], 'd:b:m:u:fn:T:th')
 except getopt.GetoptError as err:
     print(err)
-    help()
+    cmdline_help()
     sys.exit(2)
 
 for o, a in opts:
@@ -62,11 +62,11 @@ for o, a in opts:
     elif o == '-t':
         stop_at_100 = True
     elif o == '-h':
-        help()
+        cmdline_help()
         sys.exit(0)
 
 if dev == None:
-    help()
+    cmdline_help()
     sys.exit(1)
 
 random.seed()
