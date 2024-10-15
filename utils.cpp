@@ -288,7 +288,7 @@ int _vscprintf_so(const char * format, va_list pargs) {
 int vasprintf(char **strp, const char *fmt, va_list ap) {
     int len = _vscprintf_so(fmt, ap);
     if (len == -1) return -1;
-    char *str = (char *)malloc((size_t) len + 1);
+    char *str = reinterpret_cast<char *>(malloc(size_t(len) + 1));
     if (!str) return -1;
     int r = vsnprintf(str, len + 1, fmt, ap); /* "secure" version of vsprintf */
     if (r == -1) return free(str), -1;
@@ -311,9 +311,9 @@ void socket_set_nodelay(const int fd)
 #if !defined(TEENSY4_1) && !defined(RP2040W)
 	int flags = 1;
 #if defined(__FreeBSD__) || defined(ESP32) || defined(__MINGW32__) || defined(__APPLE__)
-	if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&flags, sizeof(flags)) == -1)
+	if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<char *>(&flags), sizeof(flags)) == -1)
 #else
-	if (setsockopt(fd, SOL_TCP, TCP_NODELAY, (void *)&flags, sizeof(flags)) == -1)
+	if (setsockopt(fd, SOL_TCP, TCP_NODELAY, reinterpret_cast<void *>(&flags), sizeof(flags)) == -1)
 #endif
 #endif
 		DOLOG(logging::ll_error, "com_client_sockets", "-", "cannot disable Nagle algorithm");
