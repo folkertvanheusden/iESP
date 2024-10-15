@@ -211,8 +211,10 @@ namespace logging {
 		if (ll >= log_level_screen)
 			printf("%s%s\n", ts_str, str);
 
+#if !defined(RP2040W)
 		free(str);
 		free(ts_str);
+#endif
 
 		fclose(lfh);
 	}
