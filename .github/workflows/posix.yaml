@@ -9,10 +9,12 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name:  Install lcov
-      run: |
-        sudo apt-get update
-        sudo apt-get -y install libiscsi-dev
+    - name: Enable no password for sudo
+        run: |
+          sudo sed -i '' 's/%admin		ALL = (ALL) ALL/%admin		ALL = (ALL) NOPASSWD: ALL/g' /etc/sudoers
+          sudo -v
+    - name: Install libiscsi-dev
+      run: sudo apt-get -y install libiscsi-dev
     - name: cmake
       run: cmake -B build
     - name: make
