@@ -249,11 +249,12 @@ std::tuple<iscsi_pdu_bhs *, iscsi_fail_reason, uint64_t> server::receive_pdu(com
 
 iscsi_fail_reason server::push_response(com_client *const cc, session *const ses, iscsi_pdu_bhs *const pdu)
 {
-	iscsi_fail_reason ifr = IFR_OK;
+	auto opcode = pdu->get_opcode();
 
+	iscsi_fail_reason ifr = IFR_OK;
 	std::optional<iscsi_response_set> response_set;
 
-	if (pdu->get_opcode() == iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_data_out) {
+	if (opcode == iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_data_out) {
 		auto     pdu_data_out = reinterpret_cast<iscsi_pdu_scsi_data_out *>(pdu);
 		uint32_t offset       = pdu_data_out->get_BufferOffset();
 		auto     data         = pdu_data_out->get_data();
@@ -364,6 +365,8 @@ iscsi_fail_reason server::push_response(com_client *const cc, session *const ses
 	}
 
 	for(auto & pdu_out: response_set.value().responses) {
+		DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "Emitting \"%s\"", pdu_opcode_to_string(pdu_out->get_opcode()).value().c_str());
+
 		for(auto & blobs: pdu_out->get()) {
 			if (blobs.data == nullptr) {
 				ifr = IFR_INVALID_FIELD;
