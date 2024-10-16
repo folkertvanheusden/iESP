@@ -62,7 +62,45 @@ void test_read_write(iscsi_context *const iscsi, const uint8_t fill)
 	printf("\n");
 }
 
-int main(int argc, char *argv[])
+void discover()
+{
+	iscsi_context *iscsi = iscsi_create_context("iqn.2024-2.com.vanheusden:client");
+	if (iscsi == NULL) {
+		printf("Failed to create context\n");
+		exit(10);
+	}
+
+	if (iscsi_connect_sync(iscsi, "localhost") != 0) {
+		printf("iscsi_connect failed: %s\n", iscsi_get_error(iscsi));
+		exit(10);
+	}
+
+	iscsi_set_session_type(iscsi, ISCSI_SESSION_DISCOVERY);
+
+	if (iscsi_login_sync(iscsi)) {
+		printf("iscsi_login failed: %s\n", iscsi_get_error(iscsi));
+		exit(10);
+	}
+
+	iscsi_discovery_address *da = iscsi_discovery_sync(iscsi);
+	if (!da) {
+		printf("iscsi_discovery_sync failed: %s\n", iscsi_get_error(iscsi));
+		exit(10);
+	}
+
+	printf("target name: %s\n", da->target_name);
+
+	iscsi_free_discovery_data(iscsi, da);
+
+	if (iscsi_disconnect(iscsi) != 0) {
+		printf("iscsi_disconnect_sync failed: %s\n", iscsi_get_error(iscsi));
+		exit(10);
+	}
+
+	iscsi_destroy_context(iscsi);
+}
+
+void main_tests()
 {
 	iscsi_context *iscsi = iscsi_create_context("iqn.2024-2.com.vanheusden:client");
 	if (iscsi == NULL) {
@@ -124,18 +162,25 @@ int main(int argc, char *argv[])
 	scsi_task *task_synchronizecache10 = iscsi_synchronizecache10_sync(iscsi, lun, lba, 1, 1, 1);
 	if (task_synchronizecache10 == NULL || task_synchronizecache10->status != SCSI_STATUS_GOOD) {
 		printf(" SYNC10 failed: %s\n", iscsi_get_error(iscsi));
-		return 1;
+		ok = false;
 	}
 	scsi_free_scsi_task(task_synchronizecache10);
 
 	scsi_task *task_synchronizecache16 = iscsi_synchronizecache16_sync(iscsi, lun, lba, 1, 1, 1);
 	if (task_synchronizecache16 == NULL || task_synchronizecache16->status != SCSI_STATUS_GOOD) {
 		printf(" SYNC16 failed: %s\n", iscsi_get_error(iscsi));
-		return 1;
+		ok = false;
 	}
 	scsi_free_scsi_task(task_synchronizecache16);
 
 	iscsi_destroy_context(iscsi);
+}
+
+int main(int argc, char *argv[])
+{
+	discover();
+
+	main_tests();
 
 	assert(ok);
 
