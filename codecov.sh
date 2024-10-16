@@ -23,7 +23,7 @@ if [ $? -ne 0 ] ; then
 fi
 
 rm -f $LOGFILE
-./build/iesp -b file -d $TMPIMG -L error,debug -l $LOGFILE -P $PIDFILE -f -S 1610 $DIGESTDISABLE
+./build/iesp -b file -d $TMPIMG -L error,debug -l $LOGFILE -P $PIDFILE -S 1610 $DIGESTDISABLE &
 LINES=`snmpwalk -c public -v2c localhost:1610 -O n .iso 2> /dev/null | grep -v 'End of MIB' | wc -l`
 
 ./build/quick-test
@@ -67,7 +67,7 @@ if [ $LINES -eq 26 ] ; then
 	SOURCES=`pwd`
 	CC=$TMPDIR/coverage1.info
 	echo "cd $TMPDIR ; geninfo $SOURCES/build/CMakeFiles/iesp.dir/ -b $SOURCES/ -o $CC --branch-coverage && genhtml $CC -o temp"
-	(cd $TMPDIR ; geninfo $SOURCES/build/CMakeFiles/iesp.dir/ -b $SOURCES/ -o $CC --branch-coverage --rc geninfo_unexecuted_blocks=1 --ignore-errors mismatch --ignore-errors gcov --gcov-ignore-parse-errors negative_hits.warn && genhtml $CC -o temp)
+	(cd $TMPDIR ; geninfo $SOURCES/build/CMakeFiles/iesp.dir/ -b $SOURCES/ -o $CC --branch-coverage --rc geninfo_unexecuted_blocks=1 --ignore-errors mismatch --ignore-errors gcov && genhtml $CC -o temp)
 
 	TJSON=$TMPDIR/test.json
 	gcovr --json-summary $TJSON
