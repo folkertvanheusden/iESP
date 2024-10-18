@@ -11,7 +11,7 @@ const char        *hst = "localhost";
 constexpr int      bs  = 4096;
 constexpr long int lba = 123;
 constexpr int      lun = 1;
-constexpr int      bc  = 3;  // block-count
+constexpr int      bc  = 2;  // block-count
 bool               ok  = true;
 
 void test_read_write(iscsi_context *const iscsi, const uint8_t fill)
