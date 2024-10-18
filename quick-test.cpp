@@ -7,7 +7,7 @@
 #include <iscsi/iscsi.h>
 #include <iscsi/scsi-lowlevel.h>
 
-
+const char        *hst = "localhost";
 constexpr int      bs  = 4096;
 constexpr long int lba = 123;
 constexpr int      lun = 1;
@@ -72,7 +72,7 @@ void discover()
 		exit(10);
 	}
 
-	if (iscsi_connect_sync(iscsi, "localhost") != 0) {
+	if (iscsi_connect_sync(iscsi, hst) != 0) {
 		printf("iscsi_connect failed: %s\n", iscsi_get_error(iscsi));
 		exit(10);
 	}
@@ -202,7 +202,7 @@ void main_tests()
 		exit(10);
 	}
 
-	if (iscsi_connect_sync(iscsi, "localhost") != 0) {
+	if (iscsi_connect_sync(iscsi, hst) != 0) {
 		printf("iscsi_connect failed: %s\n", iscsi_get_error(iscsi));
 		exit(10);
 	}
@@ -275,6 +275,9 @@ void main_tests()
 
 int main(int argc, char *argv[])
 {
+	if (argc == 2)
+		hst = argv[1];
+
 	discover();
 
 	main_tests();
