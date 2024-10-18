@@ -131,7 +131,7 @@ namespace logging {
 			Serial.println(err_log_buf);
 		}
 
-		if (ll >= ll_error)
+		if (ll >= ll_warning)
 			write_led(led_red, LOW);
 	}
 }
