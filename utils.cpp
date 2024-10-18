@@ -162,6 +162,9 @@ uint32_t get_free_heap_space()
 	return rp2040.getFreeHeap();
 #elif defined(ESP32)
 	return heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+#elif defined(TEENSY4_1)
+	extern char _heap_end[], *__brkval;
+	return reinterpret_cast<char *>(_heap_end) - __brkval;
 #else
 	return 0;
 #endif
