@@ -1,4 +1,4 @@
-#ifdef TEENSY4_1
+#if defined(TEENSY4_1)
 #include <Arduino.h>
 #endif
 #include <cassert>
@@ -28,8 +28,10 @@ const std::map<scsi::scsi_opcode, scsi_opcode_details> scsi_a3_data {
 	{ scsi::scsi_opcode::o_write_6,		{ { 0xff, 0x1f, 0xff, 0xff, 0xff, 0x07 }, 6, "write 6"         } },
 //	{ scsi::scsi_opcode::o_seek,		{
 	{ scsi::scsi_opcode::o_inquiry,		{ { 0xff, 0x01, 0xff, 0xff, 0xff, 0x07 }, 6, "inquiry"         } },
+#if !defined(TEENSY4_1) && !defined(RP2040W)
 	{ scsi::scsi_opcode::o_reserve_6,	{ { 0xff, 0x00, 0x00, 0x00, 0x00, 0x07 }, 6, "reserve 6"       } },
 	{ scsi::scsi_opcode::o_release_6,	{ { 0xff, 0x00, 0x00, 0x00, 0x00, 0x07 }, 6, "release 6"       } },
+#endif
 	{ scsi::scsi_opcode::o_mode_sense_6,	{ { 0xff, 0x08, 0xff, 0xff, 0xff, 0x07 }, 6, "mode sense 6"    } },
 	{ scsi::scsi_opcode::o_read_capacity_10,{ { 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07 }, 10, "read capacity 10" } },
 	{ scsi::scsi_opcode::o_read_10,		{ { 0xff, 0xfe, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 }, 10, "read 10"          } },
@@ -740,12 +742,17 @@ scsi_response scsi::reserve(const std::string & identifier, const uint64_t lun, 
 	response.data_is_meta = true;
 
 	DOLOG(logging::ll_debug, "scsi::reserve", identifier, "RESERVE 6");
+
+#if !defined(TEENSY4_1) && !defined(RP2040W)
 	if (reserve_device() == l_locked)
 		response.type = ir_empty_sense;
 	else {
 		DOLOG(logging::ll_debug, "scsi::reserve", identifier, "RESERVE 6 failed");
 		response.sense_data = error_reservation_conflict_1();
 	}
+#else
+	response.sense_data = error_not_implemented();
+#endif
 
 	return response;
 }
@@ -757,8 +764,13 @@ scsi_response scsi::release(const std::string & identifier, const uint64_t lun, 
 	response.data_is_meta = true;
 
 	DOLOG(logging::ll_debug, "scsi::release", identifier, "RELEASE 6");
+
+#if !defined(TEENSY4_1) && !defined(RP2040W)
 	unlock_device();
-	response.type = ir_empty_sense;
+	response.type         = ir_empty_sense;
+#else
+	response.sense_data   = error_not_implemented();
+#endif
 
 	return response;
 }
