@@ -9,7 +9,7 @@
 
 
 constexpr int      bs  = 4096;
-constexpr long int lba = 0;
+constexpr long int lba = 123;
 constexpr int      lun = 1;
 constexpr int      bc  = 3;  // block-count
 bool               ok  = true;
@@ -50,7 +50,7 @@ void test_read_write(iscsi_context *const iscsi, const uint8_t fill)
 		}
 		for(int i=0; i<bs; i++) {
 			if (task_r->datain.data[i] != fill) {
-				printf("   Data mismatch at offset %i: %02x where should've been %02x\n", i, task_r->datain.data[i], fill);
+				printf("   Data mismatch at offset %d: %02x where should've been %02x\n", i, task_r->datain.data[i], fill);
 				ok = false;
 			}
 		}
@@ -64,6 +64,8 @@ void test_read_write(iscsi_context *const iscsi, const uint8_t fill)
 
 void discover()
 {
+	printf("Discover test");
+
 	iscsi_context *iscsi = iscsi_create_context("iqn.2024-2.com.vanheusden:client");
 	if (iscsi == NULL) {
 		printf("Failed to create context\n");
@@ -88,7 +90,7 @@ void discover()
 		exit(10);
 	}
 
-	printf("target name: %s\n", da->target_name);
+	printf(" target name: %s\n", da->target_name);
 
 	iscsi_free_discovery_data(iscsi, da);
 
@@ -98,6 +100,98 @@ void discover()
 	}
 
 	iscsi_destroy_context(iscsi);
+}
+
+void test_prefetch(iscsi_context *const iscsi)
+{
+	printf("Prefetch test\n");
+	uint8_t *buffer = new uint8_t[bs]();
+
+	constexpr int try_n = 10;
+
+	// WRITE, PREFETCH, READ
+	printf(" WRITE / PREFETCH / READ\n");
+	for(int i=0; i<try_n; i++) {
+		buffer[0] = i + 99;
+
+		scsi_task *task_w = iscsi_write16_sync(iscsi, lun, lba + i, buffer, bs, bs, 0, 0, 0, 0, 0);
+		if (task_w == nullptr || task_w->status != SCSI_STATUS_GOOD) {
+			printf("  write failed: %s\n", iscsi_get_error(iscsi));
+			scsi_free_scsi_task(task_w);
+			ok = false;
+		}
+
+		scsi_free_scsi_task(task_w);
+	}
+
+	if (ok) {
+		scsi_task *task_p = iscsi_prefetch16_sync(iscsi, 1, lba, try_n, 0, 0);
+		if (task_p == NULL || task_p->status != SCSI_STATUS_GOOD) {
+			fprintf(stderr, "failed to send prefetch16 command: %s\n", iscsi_get_error(iscsi));
+			ok = false;
+		}
+
+		scsi_free_scsi_task(task_p);
+	}
+
+	if (ok) {
+		for(int i=0; i<try_n; i++) {
+			scsi_task *task_r = iscsi_read16_sync(iscsi, lun, lba + i, bs * bc, bs, 0, 0, 0, 0, 0);
+			if (task_r == nullptr || task_r->status != SCSI_STATUS_GOOD) {
+				printf("  read failed: %s\n", iscsi_get_error(iscsi));
+				ok = false;
+			}
+			if (buffer[0] != i + 99) {
+				printf("   Data mismatch at offset %d: %02x where should've been %02x\n", i, task_r->datain.data[i], i + 99);
+				ok = false;
+			}
+			scsi_free_scsi_task(task_r);
+		}
+	}
+
+	// PREFETCH, WRITE, READ
+	printf(" PREFETCH / WRITE / READ\n");
+	if (ok) {
+		scsi_task *task_p = iscsi_prefetch16_sync(iscsi, 1, lba, try_n, 0, 0);
+		if (task_p == NULL || task_p->status != SCSI_STATUS_GOOD) {
+			fprintf(stderr, "failed to send 2nd prefetch16 command: %s\n", iscsi_get_error(iscsi));
+			ok = false;
+		}
+
+		scsi_free_scsi_task(task_p);
+	}
+
+	if (ok) {
+		buffer[0] = 0;
+
+		for(int i=0; i<try_n; i++) {
+			scsi_task *task_w = iscsi_write16_sync(iscsi, lun, lba + i, buffer, bs, bs, 0, 0, 0, 0, 0);
+			if (task_w == nullptr || task_w->status != SCSI_STATUS_GOOD) {
+				printf("  write failed: %s\n", iscsi_get_error(iscsi));
+				scsi_free_scsi_task(task_w);
+				ok = false;
+			}
+
+			scsi_free_scsi_task(task_w);
+		}
+	}
+
+	if (ok) {
+		for(int i=0; i<try_n; i++) {
+			scsi_task *task_r = iscsi_read16_sync(iscsi, lun, lba + i, bs, bs, 0, 0, 0, 0, 0);
+			if (task_r == nullptr || task_r->status != SCSI_STATUS_GOOD) {
+				printf("  read failed: %s\n", iscsi_get_error(iscsi));
+				ok = false;
+			}
+			if (buffer[0]) {
+				printf("   Data mismatch at offset %d: %02x where should've been 00\n", i, task_r->datain.data[i]);
+				ok = false;
+			}
+			scsi_free_scsi_task(task_r);
+		}
+	}
+
+	printf("\n");
 }
 
 void main_tests()
@@ -159,6 +253,9 @@ void main_tests()
 	test_read_write(iscsi, 0xff);
 	test_read_write(iscsi, 0x99);
 
+	test_prefetch(iscsi);
+	
+	printf("SYNC test\n");
 	scsi_task *task_synchronizecache10 = iscsi_synchronizecache10_sync(iscsi, lun, lba, 1, 1, 1);
 	if (task_synchronizecache10 == NULL || task_synchronizecache10->status != SCSI_STATUS_GOOD) {
 		printf(" SYNC10 failed: %s\n", iscsi_get_error(iscsi));
