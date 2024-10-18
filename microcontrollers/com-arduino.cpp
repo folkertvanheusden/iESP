@@ -112,7 +112,7 @@ com_client *com_arduino::accept()
 
 	auto wc = server->accept();
 
-	return new com_client_arduino(wc);
+	return new com_client_arduino(wc, idle_poll);
 #endif
 }
 

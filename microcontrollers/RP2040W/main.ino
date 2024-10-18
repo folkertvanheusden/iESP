@@ -67,7 +67,7 @@ void setup()
 		pinMode(led_red, OUTPUT);
 
 	try {
-		c = new com_arduino(3260);
+		c = new com_arduino(3260, idle_poll);
 		wifi_connected = c->begin();
 		if (wifi_connected == false)
 			Serial.println(F("Failed to initialize com-layer"));
@@ -95,6 +95,10 @@ void setup()
 	catch(...) {
 		Serial.println(F("An exception occured during init"));
 	}
+}
+
+void idle_poll()
+{
 }
 
 void loop()
