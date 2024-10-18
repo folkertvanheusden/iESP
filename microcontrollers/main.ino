@@ -667,6 +667,12 @@ void setup() {
 	draw_status(100);
 }
 
+// because threading is problematic on the Teensy4.1
+void idle_poll()
+{
+		snmp_->poll();
+}
+
 void loop()
 {
 	draw_status(201);
@@ -691,7 +697,7 @@ void loop()
 
 		draw_status(205);
 #if defined(TEENSY4_1)
-		com_arduino c(3260);
+		com_arduino c(3260, idle_poll);
 #else
 		com_sockets c(buffer, 3260, &stop);
 #endif

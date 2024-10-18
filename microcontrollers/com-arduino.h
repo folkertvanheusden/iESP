@@ -1,4 +1,5 @@
 #pragma once
+#include <functional>
 #if defined(TEENSY4_1)
 #include <QNEthernet.h>
 namespace qn = qindesign::network;
@@ -15,12 +16,13 @@ private:
 #else
 	mutable WiFiClient wc;
 #endif
+	const std::function<void()> idle_poll;
 
 public:
 #if defined(TEENSY4_1)
-	com_client_arduino(qn::EthernetClient & wc);
+	com_client_arduino(qn::EthernetClient & wc, std::function<void()> idle_poll);
 #else
-	com_client_arduino(WiFiClient & wc);
+	com_client_arduino(WiFiClient & wc, std::function<void()> idle_poll);
 #endif
 	virtual ~com_client_arduino();
 
@@ -35,6 +37,7 @@ class com_arduino : public com
 {
 private:
 	const int   port   { 3260    };
+	const std::function<void()> idle_poll;
 #if defined(TEENSY4_1)
 	qn::EthernetServer *server { nullptr };
 #else
@@ -42,7 +45,7 @@ private:
 #endif
 
 public:
-	com_arduino(const int port);
+	com_arduino(const int port, std::function<void()> idle_poll);
 	virtual ~com_arduino();
 
 	bool begin() override;

@@ -11,15 +11,12 @@
 #include "com-arduino.h"
 #include "log.h"
 #include "utils.h"
-#if defined(TEENSY4_1)
-#include "snmp/snmp.h"  // ugly hack
-extern snmp *snmp_;
-#else
+#if !defined(TEENSY4_1)
 #include "wifi.h"
 #endif
 
 
-com_arduino::com_arduino(const int port): com(nullptr), port(port)
+com_arduino::com_arduino(const int port, std::function<void()> idle_poll): com(nullptr), port(port), idle_poll(idle_poll)
 {
 }
 
@@ -98,17 +95,14 @@ com_client *com_arduino::accept()
 	Serial.println(F("Waiting for iSCSI connection..."));
 
 	for(;;) {
-		// ugly hack
-		snmp_->poll();
-
-		qn::Ethernet.maintain();
-
 		auto wc = server->accept();  // is non-blocking
 		if (wc) {
 			Serial.println(F("New session!"));
 
-			return new com_client_arduino(wc);
+			return new com_client_arduino(wc, idle_poll);
 		}
+
+		idle_poll();
 	}
 #else
 	while(!server->hasClient()) {
@@ -123,11 +117,11 @@ com_client *com_arduino::accept()
 }
 
 #if defined(TEENSY4_1)
-com_client_arduino::com_client_arduino(qn::EthernetClient & wc): wc(wc), com_client(nullptr)
+com_client_arduino::com_client_arduino(qn::EthernetClient & wc, std::function<void()> idle_poll): com_client(nullptr), wc(wc), idle_poll(idle_poll)
 {
 }
 #else
-com_client_arduino::com_client_arduino(WiFiClient & wc): wc(wc), com_client(nullptr)
+com_client_arduino::com_client_arduino(WiFiClient & wc, std::function<void()> idle_poll): com_client(nullptr), wc(wc), idle_poll(idle_poll)
 {
 	wc.setNoDelay(true);
 }
@@ -170,10 +164,7 @@ bool com_client_arduino::recv(uint8_t *const to, const size_t n)
 	size_t   todo = n;
 
 	while(todo > 0 && wc) {
-#if defined(TEENSY4_1)
-		// ugly hack
-		snmp_->poll();
-#else
+#if !defined(TEENSY4_1)
 		watchdog_update();
 #endif
 
@@ -185,6 +176,8 @@ bool com_client_arduino::recv(uint8_t *const to, const size_t n)
 			p    += cur_n;
 			todo -= cur_n;
 		}
+
+		idle_poll();
 	}
 
 	return todo == 0;
