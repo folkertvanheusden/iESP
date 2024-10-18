@@ -128,7 +128,6 @@ bool backend_sdcard_teensy41::trim(const uint64_t block_nr, const uint32_t n_blo
 {
 	bool rc = true;
 	uint8_t *data = new uint8_t[get_block_size()];
-	arm_dcache_flush_delete(data, get_block_size() * n_blocks);
 	for(uint32_t i=0; i<n_blocks; i++) {
 		if (write(block_nr + i, 1, data) == false) {
 			DOLOG(logging::ll_error, "backend_sdcard_teensy41::trim", "-", "Cannot trim");
