@@ -846,12 +846,17 @@ iscsi_pdu_nop_in::~iscsi_pdu_nop_in()
 
 bool iscsi_pdu_nop_in::set(const iscsi_pdu_nop_out & reply_to)
 {
+	auto ping_data = reply_to.get_data();
+
 	*nop_in = { };
 	set_bits(&nop_in->b1, 0, 6, o_nop_in);  // opcode
 	set_bits(&nop_in->b2, 7, 1, true);  // reserved
-	nop_in->datalenH   = 0;
-	nop_in->datalenM   = 0;
-	nop_in->datalenL   = 0;
+	if (ping_data.has_value()) {
+		nop_in->datalenH = ping_data.value().second >> 16;
+		nop_in->datalenM = ping_data.value().second >> 8;
+		nop_in->datalenL = ping_data.value().second;
+		set_data({ ping_data.value().first, ping_data.value().second });
+	}
 	memcpy(nop_in->LUN, reply_to.get_LUN(), sizeof nop_in->LUN);
 	nop_in->Itasktag   = reply_to.get_Itasktag();
 	nop_in->TTT        = reply_to.get_TTT();
@@ -864,7 +869,7 @@ bool iscsi_pdu_nop_in::set(const iscsi_pdu_nop_out & reply_to)
 
 std::vector<blob_t> iscsi_pdu_nop_in::get() const
 {
-	return get_helper(nop_in, nullptr, 0);
+	return get_helper(nop_in, data.first, data.second);
 }
 
 /*--------------------------------------------------------------------------*/
