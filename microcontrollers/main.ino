@@ -672,6 +672,9 @@ void idle_poll()
 {
 #if defined(TEENSY4_1)
 		snmp_->poll();
+
+    extern char _heap_end[], *__brkval;
+    ram_free_kb = reinterpret_cast<char *>(_heap_end) - __brkval;
 #endif
 }
 
