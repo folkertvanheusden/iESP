@@ -2,9 +2,9 @@ cmake_minimum_required(VERSION 3.9)
 project(iesp)
 
 add_compile_options(-Wall -pedantic -D_FILE_OFFSET_BITS=64)  # -Wextra -fanalyzer
-#add_compile_options(-fsanitize=address -O0 -fno-inline)
-#add_compile_options(-fsanitize=undefined -O0 -fno-inline)
+#add_compile_options(-fsanitize=address,undefined -O0 -fno-inline)
 #add_compile_options(--coverage -O0 -fno-inline)
+#add_compile_options(-fno-inline)
 
 SET(VERSION "2.0")
 
@@ -57,8 +57,7 @@ endif ((NOT IS_WINDOWS) AND (NOT IS_MAC))
 
 set(CMAKE_BUILD_TYPE RelWithDebInfo)
 #set(CMAKE_BUILD_TYPE Debug)
-#target_link_libraries(iesp -fsanitize=address)
-#target_link_libraries(iesp -fsanitize=undefined)
+#target_link_libraries(iesp -fsanitize=address,undefined)
 #target_link_libraries(iesp --coverage)
 
 include(GNUInstallDirs)
