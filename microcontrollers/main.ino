@@ -670,7 +670,9 @@ void setup() {
 // because threading is problematic on the Teensy4.1
 void idle_poll()
 {
+#if defined(TEENSY4_1)
 		snmp_->poll();
+#endif
 }
 
 void loop()
