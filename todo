@@ -5,6 +5,8 @@
 - does not send syslog when connected to wifi only
 - use serial of SD-card as an iscsi serial!
 
+- teensy4.1: get mac-address from QNEthernet::macAddress to use as identifier?
+
 - https://mibbrowser.online/mibdb_search.php?mib=SCSI-MIB
 
 - https://stackoverflow.com/questions/15944254/physical-disk-block-size-on-posix-using-c-c
