@@ -105,7 +105,7 @@ bool backend_sdcard_teensy41::write(const uint64_t block_nr, const uint32_t n_bl
 
 	bool rc = false;
 	for(int i=0; i<5; i++) {  // 5 is arbitrarily chosen
-		arm_dcache_flush_delete(data, n_bytes_to_write);
+		arm_dcache_flush(data, n_bytes_to_write);
 		size_t bytes_written = file.write(data, n_bytes_to_write);
 		rc = bytes_written == n_bytes_to_write;
 		if (rc)
@@ -162,6 +162,7 @@ bool backend_sdcard_teensy41::read(const uint64_t block_nr, const uint32_t n_blo
 	for(int i=0; i<5; i++) {  // 5 is arbitrarily chosen
 		arm_dcache_flush_delete(data, n_bytes_to_read);
 		size_t bytes_read = file.read(data, n_bytes_to_read);
+		arm_dcache_delete(data, n_bytes_to_read);
 		rc = bytes_read == n_bytes_to_read;
 		if (rc)
 			break;
