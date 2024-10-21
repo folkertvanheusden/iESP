@@ -200,6 +200,7 @@ backend::cmpwrite_result_t backend_sdcard_teensy41::cmpwrite(const uint64_t bloc
 		// read
 		arm_dcache_flush_delete(buffer, block_size);
 		ssize_t rc     = file.read(buffer, block_size);
+		arm_dcache_delete(buffer, block_size);
 		if (rc != block_size) {
 			result = cmpwrite_result_t::CWR_READ_ERROR;
 			DOLOG(logging::ll_error, "backend_sdcard_teensy41::cmpwrite", "-", "Cannot read: %d", file.getError());
@@ -220,7 +221,7 @@ backend::cmpwrite_result_t backend_sdcard_teensy41::cmpwrite(const uint64_t bloc
 			break;
 		}
 
-		arm_dcache_flush_delete(&data_write[i * block_size], block_size);
+		arm_dcache_flush(&data_write[i * block_size], block_size);
 		ssize_t rc2 = file.write(&data_write[i * block_size], block_size);
 		if (rc2 != block_size) {
 			result = cmpwrite_result_t::CWR_WRITE_ERROR;
