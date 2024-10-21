@@ -48,10 +48,12 @@ void test_read_write(iscsi_context *const iscsi, const uint8_t fill)
 			printf("  read failed: %s\n", iscsi_get_error(iscsi));
 			ok = false;
 		}
-		for(int i=0; i<bs; i++) {
-			if (task_r->datain.data[i] != fill) {
-				printf("   Data mismatch at offset %d: %02x where should've been %02x\n", i, task_r->datain.data[i], fill);
-				ok = false;
+		else {
+			for(int i=0; i<bs; i++) {
+				if (task_r->datain.data[i] != fill) {
+					printf("   Data mismatch at offset %d: %02x where should've been %02x\n", i, task_r->datain.data[i], fill);
+					ok = false;
+				}
 			}
 		}
 		scsi_free_scsi_task(task_r);
