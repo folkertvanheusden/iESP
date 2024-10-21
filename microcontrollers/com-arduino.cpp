@@ -119,6 +119,7 @@ com_client *com_arduino::accept()
 #if defined(TEENSY4_1)
 com_client_arduino::com_client_arduino(qn::EthernetClient & wc, std::function<void()> idle_poll): com_client(nullptr), wc(wc), idle_poll(idle_poll)
 {
+	wc.setNoDelay(true);
 }
 #else
 com_client_arduino::com_client_arduino(WiFiClient & wc, std::function<void()> idle_poll): com_client(nullptr), wc(wc), idle_poll(idle_poll)
