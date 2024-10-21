@@ -53,7 +53,7 @@ namespace qn = qindesign::network;
 
 bool ota_update = false;
 std::atomic_bool stop { false };
-char name[16] { 0 };
+char name[24] { 0 };
 backend  *bs   { nullptr };
 scsi *scsi_dev { nullptr };
 
