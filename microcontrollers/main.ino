@@ -121,6 +121,10 @@ TM1637 *TM { nullptr };
 long int draw_status_ts = 0;
 
 void draw_status(const uint32_t v) {
+#if defined(TEENSY4_1)
+  CrashReport.breadcrumb(5, v);
+#endif
+
 	if (TM) {
 		draw_status_ts = millis();
 
