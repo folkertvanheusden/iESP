@@ -122,7 +122,7 @@ bool iscsi_pdu_bhs::set(const uint8_t *const in, const size_t n)
 	return true;
 }
 
-bool iscsi_pdu_bhs::set_ahs_segment(std::pair<const uint8_t *, std::size_t> ahs_in)
+bool iscsi_pdu_bhs::set_ahs_segment(std::pair<const uint8_t *, size_t> ahs_in)
 {
 	size_t offset = 0;
 
@@ -145,7 +145,7 @@ bool iscsi_pdu_bhs::set_ahs_segment(std::pair<const uint8_t *, std::size_t> ahs_
 	return offset == ahs_in.second;
 }
 
-bool iscsi_pdu_bhs::set_data(const std::pair<const uint8_t *, std::size_t> & data_in)
+bool iscsi_pdu_bhs::set_data(const std::pair<const uint8_t *, size_t> & data_in)
 {
 	if (data_in.second == 0 || data_in.second > 16777215)
 		return false;
@@ -247,7 +247,7 @@ bool has_CRC32C(const std::string & value)
 	return false;
 }
 
-bool iscsi_pdu_login_request::set_data(const std::pair<const uint8_t *, std::size_t> & data_in)
+bool iscsi_pdu_login_request::set_data(const std::pair<const uint8_t *, size_t> & data_in)
 {
 	if (iscsi_pdu_bhs::set_data(data_in) == false) {
 		DOLOG(logging::ll_warning, "iscsi_pdu_login_request::set_data", ses->get_endpoint_name(), "iscsi_pdu_bhs::set_data returned false");
@@ -575,7 +575,7 @@ iscsi_pdu_scsi_response::~iscsi_pdu_scsi_response()
 
 bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std::vector<uint8_t> & scsi_sense_data, std::optional<std::pair<residual, uint32_t> > has_residual, const std::optional<uint8_t> iscsi_status)
 {
-	size_t sense_data_size = scsi_sense_data.size();
+	size_t sense_data_size              = scsi_sense_data.size();
 	size_t reply_data_plus_sense_header = sense_data_size > 0 ? 2 + sense_data_size : 0;
 
 	*pdu_response = { };
@@ -667,12 +667,13 @@ std::vector<blob_t> iscsi_pdu_scsi_data_in::get() const
 	// resize to limit
 	auto use_pdu_data_size = pdu_data_in_data.second;
 
-	if (use_pdu_data_size > size_t(reply_to_copy->get_ExpDatLen()))
-		DOLOG(logging::ll_warning, "iscsi_pdu_scsi_data_in", ses->get_endpoint_name(), "requested less (%zu) than wat is available (%zu)", size_t(reply_to_copy->get_ExpDatLen()), use_pdu_data_size);
+	size_t expdatlen = size_t(reply_to_copy->get_ExpDatLen());
+	if (use_pdu_data_size > expdatlen)
+		DOLOG(logging::ll_warning, "iscsi_pdu_scsi_data_in", ses->get_endpoint_name(), "requested less (%zu) than wat is available (%zu)", expdatlen, use_pdu_data_size);
 	else if (use_pdu_data_size == 0)
 		DOLOG(logging::ll_warning, "iscsi_pdu_scsi_data_in", ses->get_endpoint_name(), "trying to send DATA-IN without data");
 
-	use_pdu_data_size = std::min(use_pdu_data_size, size_t(reply_to_copy->get_ExpDatLen()));
+	use_pdu_data_size = std::min(use_pdu_data_size, expdatlen);
 
 	auto   block_size = ses->get_block_size();
 	size_t n_to_do    = (use_pdu_data_size + block_size - 1) / block_size;

@@ -48,13 +48,9 @@ typedef struct {
 	std::vector<std::tuple<std::string, std::string, int> > use;
 
 	int      timeout;
-
 	size_t   nr;
-
 	int      waiting_nr;
-
 	bool     connecting_state;
-
 	uint32_t last_tick;
 
 	std::optional<std::function<bool(const int, const int, const std::string &)> > progress_indicator;

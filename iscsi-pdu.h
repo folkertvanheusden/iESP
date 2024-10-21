@@ -78,6 +78,8 @@ private:
 		uint8_t  ofields[28];     // opcode specific fields
 	} __attribute__((packed));
 
+	static_assert(sizeof(__bhs__) == 48);
+
 	__bhs__ *bhs __attribute__((packed)) { reinterpret_cast<__bhs__ *>(pdu_bytes) };
 
 protected:
@@ -118,7 +120,7 @@ public:
 	virtual std::vector<blob_t> get() const;
 
 	size_t           get_ahs_length()  const { return bhs->ahslen * 4;                                              }
-	bool             set_ahs_segment(std::pair<const uint8_t *, std::size_t> ahs_in);
+	bool             set_ahs_segment(std::pair<const uint8_t *, size_t> ahs_in);
 
 	uint64_t         get_LUN_nr()      const { return *reinterpret_cast<const uint64_t *>(bhs->lunfields);          }
 
@@ -127,7 +129,7 @@ public:
 	blob_t           get_raw()         const;
 	size_t           get_data_length() const { return (bhs->datalenH << 16) | (bhs->datalenM << 8) | bhs->datalenL; }
 	std::optional<std::pair<const uint8_t *, size_t> > get_data() const;
-	virtual bool     set_data(const std::pair<const uint8_t *, std::size_t> & data_in);
+	virtual bool     set_data(const std::pair<const uint8_t *, size_t> & data_in);
 
 	virtual std::optional<iscsi_response_set> get_response(scsi *const sd);
 };
@@ -199,7 +201,7 @@ public:
 	      uint32_t get_ExpStatSN()  const { return my_NTOHL(login_req->ExpStatSN); }
 	std::optional<std::string> get_initiator() const { return initiator;    }
 
-	virtual bool   set_data(const std::pair<const uint8_t *, std::size_t> & data_in) override;
+	virtual bool   set_data(const std::pair<const uint8_t *, size_t> & data_in) override;
 	virtual std::optional<iscsi_response_set> get_response(scsi *const sd) override;
 };
 
@@ -394,10 +396,10 @@ public:
 	std::vector<blob_t> get() const override;
 
 	uint32_t get_BufferOffset() const { return my_NTOHL(pdu_data_out->bufferoff); }
-        uint32_t get_TTT()          const { return pdu_data_out->TTT;              }
-	bool     get_F()            const { return !!(pdu_data_out->b2 & 128);     }
-	uint32_t get_Itasktag()     const { return pdu_data_out->Itasktag;         }
-	uint32_t get_ExpStatSN()    const { return pdu_data_out->ExpStatSN;        }
+        uint32_t get_TTT()          const { return pdu_data_out->TTT;                 }
+	bool     get_F()            const { return !!(pdu_data_out->b2 & 128);        }
+	uint32_t get_Itasktag()     const { return pdu_data_out->Itasktag;            }
+	uint32_t get_ExpStatSN()    const { return pdu_data_out->ExpStatSN;           }
 };
 
 class iscsi_pdu_scsi_response : public iscsi_pdu_bhs  // 0x21

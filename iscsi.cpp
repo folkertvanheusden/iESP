@@ -33,8 +33,8 @@ std::pair<uint8_t *, size_t> text_array_to_data(const std::vector<std::string> &
 		len += kv.size() + 1;
 
 	// generate
-	uint8_t *p = new uint8_t[len + 4/*padding*/]();
-	size_t offset = 0;
+	uint8_t *p      = new uint8_t[len + 4/*padding*/]();
+	size_t   offset = 0;
 	for(const auto & kv: kvs) {
 		memcpy(&p[offset], kv.c_str(), kv.size());
 		offset += kv.size() + 1;  // for 0x00
