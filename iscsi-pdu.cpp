@@ -1194,13 +1194,12 @@ std::optional<blob_t> generate_reject_pdu(const iscsi_pdu_bhs & about, const std
 
 	assert(sizeof(__reject__) == 48 * 2);
 
-	__reject__ *reject = new __reject__();
 	auto raw = about.get();
 	if (raw.empty()) {
-		delete reject;
 		DOLOG(logging::ll_error, "generate_reject_pdu", "-", "can't get data from original PDU");
 		return { };
 	}
+	__reject__ *reject = new __reject__();
 	memcpy(reject->problem_pdu, raw[0].data, 48);
 	delete [] raw[0].data;
 	reject->datalenL = 48;
