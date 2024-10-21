@@ -112,8 +112,6 @@ n = 0
 verified = 0
 verified_d = 0
 verified_t = 0
-read_error_count = 0
-write_error_count = 0
 data_total = 0
 failure_count = 0
 
@@ -126,8 +124,6 @@ def do(show_stats):
     global verified
     global verified_d
     global verified_t
-    global read_error_count
-    global write_error_count
     global data_total
     global failure_count
 
@@ -136,8 +132,6 @@ def do(show_stats):
     prev = start
 
     while True:
-        ok = True
-
         lock.acquire()
         while True:
             # pick a number of blocks to work on
@@ -188,14 +182,14 @@ def do(show_stats):
                             n_failed += 1
                             if n_failed == 3:
                                 print('Stopped outputting errors for this thread')
-                        ok = False
+                        failure_count += 1
+                        break
                     else:
                         verified += 1
 
             except OSError as e:
                 print(f'Read error: {e} at {offset} ({len(b)} bytes)', offset/blocksize)
-                read_error_count += 1
-                ok = False
+                failure_count += 1
 
         # update blocks with new data
         b = bytearray()
@@ -222,16 +216,12 @@ def do(show_stats):
             os.posix_fadvise(fd, offset, len(b), os.POSIX_FADV_DONTNEED)
         except OSError as e:
             print(f'Write/trim error: {e} at {offset} ({len(b)} bytes)', offset/blocksize)
-            write_error_count += 1
-            ok = False
+            failure_count += 1
 
         n += 1
         total_n += cur_n_blocks
 
         data_total += cur_n_blocks * blocksize
-
-        if ok == False:
-            failure_count += 1
 
         if show_stats:
             now = time.time()
