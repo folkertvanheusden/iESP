@@ -487,7 +487,7 @@ iscsi_fail_reason server::push_response(com_client *const cc, session *const ses
 			bool rc_tx = cc->send(out.data, out.n);
 			delete [] out.data;
 			if (rc_tx == false) {
-				DOLOG(logging::ll_info, "server::push_response", cc->get_endpoint_name(), "problem sending %u bytes of block %" PRIu64 " to initiator", current_lba, current_n);
+				DOLOG(logging::ll_info, "server::push_response", cc->get_endpoint_name(), "problem sending %u bytes of block %" PRIu64 " to initiator", current_n, current_lba);
 				ifr = IFR_CONNECTION;
 				break;
 			}
