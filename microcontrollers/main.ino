@@ -449,7 +449,10 @@ const char *reset_name(const esp_reset_reason_t rr)
 
 void setup() {
 	Serial.begin(115200);
-#if !defined(TEENSY4_1)
+#if defined(TEENSY4_1)
+	while(!Serial) {
+  }
+#else
 	while(!Serial)
 		yield();
 	Serial.setDebugOutput(true);
