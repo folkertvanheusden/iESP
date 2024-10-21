@@ -26,6 +26,9 @@ private:
 
 	bool reinit(const bool close_first);
 
+	// wait until it is no longer busy with something and available for writes
+	void wait_for_card();
+
 public:
 	backend_sdcard(const int led_read, const int led_write, const int pin_SD_MISO, const int pin_SD_MOSI, const int pin_SD_SCLK, const int pin_SD_CS);
 	virtual ~backend_sdcard();

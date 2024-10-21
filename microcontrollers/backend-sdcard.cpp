@@ -175,27 +175,15 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 	size_t n_bytes_to_write = n_blocks * iscsi_block_size;
 	bytes_written += n_bytes_to_write;
 
-	bool rc = false;
-	for(int k=2; k>=0; k--) {  // 2 is arbitrarily chosen
-		for(int i=0; i<5; i++) {  // 5 is arbitrarily chosen
-			size_t bytes_written = file.write(data, n_bytes_to_write);
-			rc = bytes_written == n_bytes_to_write;
-			if (rc)
-				goto ok;
-			Serial.printf("Wrote %zu bytes instead of %zu\r\n", bytes_written, n_bytes_to_write);
-			delay((i + 1) * 100); // 100ms is arbitrarily chosen
-			Serial.printf("Retrying write of %" PRIu32 " blocks starting at block number % " PRIu64 "\r\n", n_blocks, block_nr);
-		}
+	wait_for_card();
+	size_t bytes_written = file.write(data, n_bytes_to_write);
+	bool rc = bytes_written == n_bytes_to_write;
+	if (!rc)
+		Serial.printf("Wrote %zu bytes instead of %zu\r\n", bytes_written, n_bytes_to_write);
 
-		if (k)
-			reinit(true);
-	}
-ok:
 #if defined(RP2040W)
 	mutex_exit(&serial_access_lock);
 #endif
-	if (!rc)
-		DOLOG(logging::ll_error, "backend_sdcard::write", "-", "Cannot write: %d", file.getError());
 
 	write_led(led_write, LOW);
 
@@ -248,26 +236,14 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 	bytes_read += n_bytes_to_read;
 
 	bool rc = false;
-	for(int k=2; k>=0; k--) {  // 2 is arbitrarily chosen
-		for(int i=0; i<5; i++) {  // 5 is arbitrarily chosen
-			size_t bytes_read = file.read(data, n_bytes_to_read);
-			rc = bytes_read == n_bytes_to_read;
-			if (rc)
-				goto ok;
-			Serial.printf("Read %zu bytes instead of %zu\r\n", bytes_read, n_bytes_to_read);
-			delay((i + 1) * 100); // 100ms is arbitrarily chosen
-			Serial.printf("Retrying read of %" PRIu32 " blocks starting at block number % " PRIu64 "\r\n", n_blocks, block_nr);
-		}
+	size_t bytes_read = file.read(data, n_bytes_to_read);
+	rc = bytes_read == n_bytes_to_read;
+	if (!rc)
+		Serial.printf("Read %zu bytes instead of %zu\r\n", bytes_read, n_bytes_to_read);
 
-		if (k)
-			reinit(true);
-	}
-ok:
 #if defined(RP2040W)
 	mutex_exit(&serial_access_lock);
 #endif
-	if (!rc)
-		DOLOG(logging::ll_error, "backend_sdcard::read", "-", "Cannot read: %d", file.getError());
 	write_led(led_read, LOW);
 	ts_last_acces = get_micros();
 	return rc;
@@ -318,6 +294,7 @@ backend::cmpwrite_result_t backend_sdcard::cmpwrite(const uint64_t block_nr, con
 			break;
 		}
 
+		wait_for_card();
 		ssize_t rc2 = file.write(&data_write[i * block_size], block_size);
 		if (rc2 != block_size) {
 			result = cmpwrite_result_t::CWR_WRITE_ERROR;
@@ -340,4 +317,10 @@ backend::cmpwrite_result_t backend_sdcard::cmpwrite(const uint64_t block_nr, con
 	write_led(led_read, LOW);
 
 	return result;
+}
+
+void backend_sdcard::wait_for_card()
+{
+	while(sd.card()->isBusy())
+		yield();
 }

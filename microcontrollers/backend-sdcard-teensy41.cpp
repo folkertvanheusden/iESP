@@ -104,6 +104,7 @@ bool backend_sdcard_teensy41::write(const uint64_t block_nr, const uint32_t n_bl
 
 	bool rc = false;
 	for(int i=0; i<5; i++) {  // 5 is arbitrarily chosen
+		wait_for_card();
 		arm_dcache_flush(data, n_bytes_to_write);
 		size_t bytes_written = file.write(data, n_bytes_to_write);
 		rc = bytes_written == n_bytes_to_write;
@@ -220,6 +221,7 @@ backend::cmpwrite_result_t backend_sdcard_teensy41::cmpwrite(const uint64_t bloc
 			break;
 		}
 
+		wait_for_card();
 		arm_dcache_flush(&data_write[i * block_size], block_size);
 		ssize_t rc2 = file.write(&data_write[i * block_size], block_size);
 		if (rc2 != block_size) {
@@ -240,4 +242,10 @@ backend::cmpwrite_result_t backend_sdcard_teensy41::cmpwrite(const uint64_t bloc
 	write_led(led_read, LOW);
 
 	return result;
+}
+
+void backend_sdcard_teensy41::wait_for_card()
+{
+	while(file.isBusy())
+		yield();
 }
