@@ -11,7 +11,6 @@ private:
 	SdFs      sd;
 	FsFile    file;
 	uint64_t  card_size   { 0  };
-	size_t    sector_size { 0  };
 	const int led_read    { -1 };
 	const int led_write   { -1 };
 	const int pin_SD_MISO { -1 };

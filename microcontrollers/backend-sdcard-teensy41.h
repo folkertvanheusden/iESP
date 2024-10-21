@@ -9,7 +9,6 @@ class backend_sdcard_teensy41 : public backend
 private:
 	FsFile    file;
 	uint64_t  card_size   { 0  };
-	size_t    sector_size { 0  };
 	const int led_read    { -1 };
 	const int led_write   { -1 };
 
