@@ -289,7 +289,7 @@ backend::cmpwrite_result_t backend_sdcard::cmpwrite(const uint64_t block_nr, con
 
 	// DO
 	for(uint32_t i=0; i<n_blocks; i++) {
-		off_t   offset = (block_nr + i) * block_size;
+		uint64_t  offset = (block_nr + i) * block_size;
 
 		if (file.seekSet(offset) == false) {
 			DOLOG(logging::ll_error, "backend_sdcard::cmpwrite", "-", "Cannot seek to position (read)");
