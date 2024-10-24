@@ -194,6 +194,8 @@ def do(show_stats):
                     else:
                         verified += 1
 
+                data_total += cur_n_blocks * blocksize
+
             except OSError as e:
                 print(f'Read error: {e} at {offset} ({len(b)} bytes)', offset/blocksize)
                 failure_count += 1
@@ -225,16 +227,16 @@ def do(show_stats):
             print(f'Write/trim error: {e} at {offset} ({len(b)} bytes)', offset/blocksize)
             failure_count += 1
 
+        data_total += cur_n_blocks * blocksize
+
         n += 1
         total_n += cur_n_blocks
-
-        data_total += cur_n_blocks * blocksize
 
         if show_stats:
             now = time.time()
             time_diff = now - start
             if now - prev >= 1:
-                print(f'total: {n}, n/s: {int(n / time_diff)}, avg blocks per it.: {total_n / n:.2f}, percent done: {verified * 100 / n_blocks:.2f}, verify cnt: {verified}/{verified_d}/{verified_t}, failures: {failure_count}, MB/s: {data_total / time_diff / 1024 / 1024:.2f}')
+                print(f'total: {n}, n/s: {int(n / time_diff)}, avg blocks per it.: {total_n / n:.2f}, percent done: {verified * 100 / n_blocks:.2f}, verify cnt: {verified}/{verified_d}/{verified_t}, failures: {failure_count}, MB/s (r+w): {data_total / time_diff / 1024 / 1024:.2f}')
                 prev = now
 
         lock.acquire()
