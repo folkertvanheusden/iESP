@@ -287,26 +287,25 @@ iscsi_fail_reason server::push_response(com_client *const cc, session *const ses
 				return IFR_INVALID_FIELD;
 			}
 
-			scsi::scsi_rw_result rc = scsi::scsi_rw_result::rw_ok;
+			scsi::scsi_rw_result rc  = scsi::scsi_rw_result::rw_ok;
+			uint64_t             lba = session->buffer_lba + offset / block_size;
 
-			if (session->is_write_same) {
+			if (session->is_write_same) {  // makes no sense to do this in R2T?
 				uint32_t n_blocks = session->bytes_left / block_size;
 
-				if (session->write_same_is_unmap) {  // makes no sense to do this in R2T?
-					rc = s->trim(session->buffer_lba, session->bytes_left / block_size);
+				if (session->write_same_is_unmap) {
+					rc = s->trim(session->buffer_lba, n_blocks);
 				}
 				else {
-					uint64_t lba = session->buffer_lba;
-
 					for(uint32_t i=0; i<n_blocks; i++) {
-						rc = s->write(lba, block_size, data.value().first);
+						rc = s->write(lba + i, 1, data.value().first);
 						if (rc != scsi::rw_ok)
 							break;
 					}
 				}
 			}
 			else {
-				rc = s->write(session->buffer_lba + offset / block_size, data.value().second / block_size, data.value().first);
+				rc = s->write(lba, data.value().second / block_size, data.value().first);
 			}
 
 			if (rc != scsi::rw_ok) {
