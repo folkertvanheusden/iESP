@@ -105,6 +105,7 @@ For test-blockdevice.py:
 * that disk-image is given as a backend to iesp
 * test-blockdevice.py is ran as: ./test-blockdevice.py -d <devicename> -b 4096 -u 75 -n 6 -T 10 
 * any errors? then failed
+* for a microcontroller: make sure block-count (-m) multiplied by block size (-b) is 8192 bytes or less as that's the limit in there
 
 
 build status
