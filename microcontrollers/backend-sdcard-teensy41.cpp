@@ -137,7 +137,7 @@ bool backend_sdcard_teensy41::trim(const uint64_t block_nr, const uint32_t n_blo
 	}
 	delete [] data;
 	ts_last_acces = get_micros();
-	n_trims++;
+	n_trims += n_blocks;
 	return rc;
 }
 

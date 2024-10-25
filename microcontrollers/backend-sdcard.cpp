@@ -205,7 +205,7 @@ bool backend_sdcard::trim(const uint64_t block_nr, const uint32_t n_blocks)
 	}
 	delete [] data;
 	ts_last_acces = get_micros();
-	n_trims++;
+	n_trims += n_blocks;
 	return rc;
 }
 

@@ -153,6 +153,16 @@ bool idle_task_1() {
 #endif
 
 void write_led(const int gpio, const int state) {
+#if 0
+  const char *which = "?";
+  if (gpio == led_green)
+    which = "green";
+  else if (gpio == led_yellow)
+    which = "yellow";
+  else if (gpio == led_red)
+    which = "red";
+  Serial.printf("%p set led on gpio %d (%s) to %d\r\n", __builtin_return_address(0), gpio, which, state);
+#endif
 	if (gpio != -1)
 		digitalWrite(gpio, state);
 }

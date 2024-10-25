@@ -116,7 +116,7 @@ bool backend_file::trim(const uint64_t block_nr, const uint32_t n_blocks)
 #endif
 	if (rc == -1)
 		DOLOG(logging::ll_error, "backend_file::trim", identifier, "unmapping: %s", strerror(errno));
-	n_trims++;
+	n_trims += n_blocks;
 	ts_last_acces = get_micros();
 	return rc == 0;
 }

@@ -280,7 +280,7 @@ bool backend_nbd::trim(const uint64_t block_nr, const uint32_t n_blocks)
 	unlock_range(lock_list);
 
 	ts_last_acces = get_micros();
-	bytes_written += n_bytes;
+	n_trims      += n_blocks;
 
 	return rc;
 }
