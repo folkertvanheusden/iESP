@@ -23,6 +23,7 @@ trim_perc = 0
 n_threads = 2
 stop_at_100 = False
 size_limit = None
+lba_offset = 0
 
 def cmdline_help():
     print(f'Usage: {sys.argv[0]} ...arguments...')
@@ -35,12 +36,13 @@ def cmdline_help():
     print('-T trim-percentage:   how much to apply "trim"')
     print('-t                    terminate when aproximately 100% (at least) is tested')
     print('-l size               limit to size, in MB')
+    print('-o offset             LBA offset, useful in combination with -l')
     print()
     print(' ##### DO NOT RUN THIS ON A DEVICE WITH DATA! IT GETS ERASED! ###### ')
     print()
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], 'd:b:m:u:fn:T:tl:h')
+    opts, args = getopt.getopt(sys.argv[1:], 'd:b:m:u:fn:T:tl:o:h')
 except getopt.GetoptError as err:
     print(err)
     cmdline_help()
@@ -65,6 +67,8 @@ for o, a in opts:
         stop_at_100 = True
     elif o == '-l':
         size_limit = int(a) * 1024 * 1024
+    elif o == '-o':
+        lba_offset = int(a)
     elif o == '-h':
         cmdline_help()
         sys.exit(0)
@@ -83,6 +87,9 @@ print(f'Device size: {dev_size} bytes or {dev_size // 1024 // 1024 // 1024} GB')
 if size_limit != None:
     print(f'Limiting to {size_limit / 1024 / 1024 / 1024} GB')
     dev_size = size_limit
+else:
+    if lba_offset != 0:
+        dev_size -= lba_offset
 
 n_blocks = dev_size // blocksize
 if dev_size % blocksize:
@@ -144,8 +151,9 @@ def do(show_stats):
             # pick a number of blocks to work on
             cur_n_blocks = random.randint(1, max_b)
             # pick an offset (nr) in the device
-            offset = random.randint(0, dev_size - blocksize * cur_n_blocks) & ~(blocksize - 1)
-            nr = offset // blocksize
+            offset = lba_offset * blocksize
+            offset += random.randint(0, dev_size - blocksize * cur_n_blocks) & ~(blocksize - 1)
+            nr = offset // blocksize - lba_offset
             # in use?
             in_use = False
             cur_range = set(range(nr, nr + cur_n_blocks))
