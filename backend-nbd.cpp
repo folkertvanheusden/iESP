@@ -354,3 +354,8 @@ backend::cmpwrite_result_t backend_nbd::cmpwrite(const uint64_t block_nr, const 
 
 	return result;
 }
+
+std::string backend_nbd::get_serial() const
+{
+	return identifier;
+}

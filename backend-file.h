@@ -19,8 +19,9 @@ public:
 
 	bool begin() override;
 
-	uint64_t get_size_in_blocks() const override;
-	uint64_t get_block_size()     const override;
+	std::string get_serial()         const override;
+	uint64_t    get_size_in_blocks() const override;
+	uint64_t    get_block_size()     const override;
 
 	bool sync() override;
 

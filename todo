@@ -3,7 +3,6 @@
   - async writes
   - name of disk-image on SD card
 - does not send syslog when connected to wifi only
-- use serial of SD-card as an iscsi serial!
 
 - leds stay on
 

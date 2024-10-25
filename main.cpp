@@ -124,7 +124,7 @@ int main(int argc, char *argv[])
 	std::string    pid_file;
 	std::string    ip_address = "0.0.0.0";
 	int            port       = 3260;
-	std::string    dev        = "test.dat";
+	std::string    dev        = FILENAME;
 	std::string    target_name= "test";
 	int            trim_level = 1;
 	bool           use_snmp   = false;

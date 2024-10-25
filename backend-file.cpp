@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #include "backend-file.h"
+#include "gen.h"
 #include "log.h"
 #include "utils.h"
 
@@ -222,4 +223,26 @@ backend::cmpwrite_result_t backend_file::cmpwrite(const uint64_t block_nr, const
 #endif
 
 	return result;
+}
+
+std::string backend_file::get_serial() const
+{
+	std::string serial(DEFAULT_SERIAL);
+
+        FILE *fh = fopen("/var/lib/dbus/machine-id", "r");
+        if (fh) {
+                char buffer[128] { 0 };
+                if (fgets(buffer, sizeof buffer, fh) == nullptr)
+			DOLOG(logging::ll_error, "backend_file::get_serial", "-", "problem reading from dbus machine-id file: %s", strerror(errno));
+                fclose(fh);
+                char *lf = strchr(buffer, '\n');
+                if (lf)
+                        *lf = 0x00;
+                serial = buffer;
+        }
+        else {
+		DOLOG(logging::ll_error, "backend_file::get_serial", "-", "cannot open dbus machine-id file: %s", strerror(errno));
+        }
+
+	return serial;
 }

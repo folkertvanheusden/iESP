@@ -2,10 +2,10 @@
 #include <unistd.h>
 
 #include "backend-sdcard-teensy41.h"
+#include "gen.h"
 #include "log.h"
 #include "utils.h"
 
-#define FILENAME "test.dat"
 
 extern void write_led(const int gpio, const int state);
 
@@ -37,7 +37,7 @@ bool backend_sdcard_teensy41::begin()
 	file = SD.sdfs.open(FILENAME, O_RDWR);
 	if (!file)
 	{
-		DOLOG(logging::ll_error, "backend_sdcard_teensy41::begin", "-", "Cannot access test.dat on SD-card");
+		DOLOG(logging::ll_error, "backend_sdcard_teensy41::begin", "-", "Cannot access " FILENAME " on SD-card");
 		write_led(led_read,  LOW);
 		write_led(led_write, LOW);
 		return false;
@@ -250,4 +250,13 @@ void backend_sdcard_teensy41::wait_for_card()
 {
 	while(file.isBusy())
 		yield();
+}
+
+std::string backend_sdcard_teensy41::get_serial() const
+{
+	cid_t cid { };
+	if (!SD.sdfs.card()->readCID(&cid))
+		return DEFAULT_SERIAL;
+
+	return myformat("%08x", cid.psn);
 }

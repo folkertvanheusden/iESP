@@ -133,7 +133,7 @@ public:
 	void get_and_reset_stats(uint64_t *const bytes_read, uint64_t *const bytes_written, uint64_t *const n_syncs, uint64_t *const n_trims);
 
 	scsi_lock_status reserve_device();
-	bool unlock_device();
+	bool             unlock_device();
 	scsi_lock_status locking_status();
 
 	scsi_rw_result sync();

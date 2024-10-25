@@ -8,15 +8,15 @@
 class backend_sdcard : public backend
 {
 private:
-	SdFs      sd;
-	FsFile    file;
-	uint64_t  card_size   { 0  };
-	const int led_read    { -1 };
-	const int led_write   { -1 };
-	const int pin_SD_MISO { -1 };
-	const int pin_SD_MOSI { -1 };
-	const int pin_SD_SCLK { -1 };
-	const int pin_SD_CS   { -1 };
+	mutable SdFs sd;
+	FsFile       file;
+	uint64_t     card_size   { 0  };
+	const int    led_read    { -1 };
+	const int    led_write   { -1 };
+	const int    pin_SD_MISO { -1 };
+	const int    pin_SD_MOSI { -1 };
+	const int    pin_SD_SCLK { -1 };
+	const int    pin_SD_CS   { -1 };
 
 #if defined(RP2040W)
 	mutex_t    serial_access_lock;
@@ -35,8 +35,9 @@ public:
 
 	bool begin() override;
 
-	uint64_t get_size_in_blocks() const override;
-	uint64_t get_block_size()     const override;
+	std::string get_serial()         const override;
+	uint64_t    get_size_in_blocks() const override;
+	uint64_t    get_block_size()     const override;
 
 	bool sync() override;
 

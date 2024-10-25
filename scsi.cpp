@@ -49,7 +49,6 @@ const std::map<scsi::scsi_opcode, scsi_opcode_details> scsi_a3_data {
 	{ scsi::scsi_opcode::o_rep_sup_oper,	{ { 0xff, 0x1f, 0x87, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 }, 12, "report supported operations" } },
 };
 
-#define DEFAULT_SERIAL "12345678"
 #if defined(ARDUINO)
 #define MAX_WS_LEN 2
 #else
@@ -58,31 +57,8 @@ const std::map<scsi::scsi_opcode, scsi_opcode_details> scsi_a3_data {
 
 constexpr const uint8_t max_compare_and_write_block_count = 1;
 
-scsi::scsi(backend *const b, const int trim_level, io_stats_t *const is) : b(b), trim_level(trim_level), is(is)
+scsi::scsi(backend *const b, const int trim_level, io_stats_t *const is) : b(b), trim_level(trim_level), is(is), serial(b->get_serial())
 {
-#ifdef ESP32
-	uint64_t temp = ESP.getEfuseMac();
-	serial = myformat("%" PRIx64, temp);
-#elif defined(TEENSY4_1)
-        uint32_t m1 = HW_OCOTP_MAC1;
-        uint32_t m2 = HW_OCOTP_MAC0;
-	serial = myformat("%08x%08x", m1, m2);
-#else
-	FILE *fh = fopen("/var/lib/dbus/machine-id", "r");
-	if (fh) {
-		char buffer[128] { 0 };
-		if (fgets(buffer, sizeof buffer, fh) == nullptr)
-			serial = DEFAULT_SERIAL;
-		fclose(fh);
-		char *lf = strchr(buffer, '\n');
-		if (lf)
-			*lf = 0x00;
-		serial = buffer;
-	}
-	else {
-		serial = DEFAULT_SERIAL;
-	}
-#endif
 }
 
 scsi::~scsi()

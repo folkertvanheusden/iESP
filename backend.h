@@ -38,17 +38,18 @@ public:
 	backend(const std::string & identifier);
 	virtual ~backend();
 
-	virtual bool begin() = 0;
+	virtual bool        begin() = 0;
 
-	virtual uint64_t get_size_in_blocks() const = 0;
-	virtual uint64_t get_block_size()     const = 0;
+	virtual std::string get_serial()         const = 0;
+	virtual uint64_t    get_size_in_blocks() const = 0;
+	virtual uint64_t    get_block_size()     const = 0;
 
 	// mainly for thin provisioning
-	virtual uint8_t get_free_space_percentage();
+	virtual uint8_t     get_free_space_percentage();
 
 	virtual std::pair<uint64_t, uint32_t> get_idle_state();
 
-	virtual bool sync() = 0;
+	virtual bool        sync() = 0;
 
 	void get_and_reset_stats(uint64_t *const bytes_read, uint64_t *const bytes_written, uint64_t *const n_syncs, uint64_t *const n_trims);
 

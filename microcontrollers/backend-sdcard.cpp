@@ -5,8 +5,10 @@
 #include <sys/stat.h>
 
 #include "backend-sdcard.h"
+#include "gen.h"
 #include "log.h"
 #include "utils.h"
+
 
 #ifdef RP2040W
 #define SD_CS 17
@@ -18,8 +20,6 @@
 // 23 MOSI
 // 5  CS
 #endif
-
-#define FILENAME "test.dat"
 
 extern void write_led(const int gpio, const int state);
 
@@ -91,7 +91,7 @@ bool backend_sdcard::reinit(const bool close_first)
 retry:
 	if (file.open(FILENAME, O_RDWR) == false)
 	{
-		DOLOG(logging::ll_error, "backend_sdcard::reinit", "-", "Cannot access test.dat on SD-card");
+		DOLOG(logging::ll_error, "backend_sdcard::reinit", "-", "Cannot access " FILENAME " on SD-card");
 		write_led(led_read,  LOW);
 		write_led(led_write, LOW);
 		return false;
@@ -325,4 +325,13 @@ void backend_sdcard::wait_for_card()
 {
 	while(sd.card()->isBusy())
 		yield();
+}
+
+std::string backend_sdcard::get_serial() const
+{
+	cid_t cid { };
+	if (!sd.card()->readCID(&cid))
+		return DEFAULT_SERIAL;
+
+	return myformat("%08x", cid.psn());
 }
