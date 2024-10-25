@@ -5,6 +5,8 @@
 - does not send syslog when connected to wifi only
 - use serial of SD-card as an iscsi serial!
 
+- leds stay on
+
 - FUA bit
  - some sort of (write) cache?
 
