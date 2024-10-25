@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.9)
 project(iesp)
 
-add_compile_options(-Wall -pedantic -D_FILE_OFFSET_BITS=64)  # -Wextra -fanalyzer
-#add_compile_options(-fsanitize=address,undefined -O0 -fno-inline)
+add_compile_options(-Wall -pedantic -D_FILE_OFFSET_BITS=64)  # -D_GLIBCXX_DEBUG -Wextra -fanalyzer
+#add_compile_options(-fsanitize=address,undefined)
 #add_compile_options(--coverage -O0 -fno-inline)
 #add_compile_options(-fno-inline)
 
-SET(VERSION "2.0")
+SET(VERSION "2.1")
 
 add_definitions(-DVERSION=\"${VERSION}\")
 
