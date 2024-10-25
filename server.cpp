@@ -443,9 +443,10 @@ iscsi_fail_reason server::push_response(com_client *const cc, session *const ses
 		}
 
 		while(offset < offset_end) {
-			uint64_t bytes_left = offset_end - offset;
-			uint32_t current_n  = std::min(uint64_t(ses->get_max_seg_len()), std::min(bytes_left, buffer_n));
-			bool     last_block = offset + current_n == offset_end;
+			uint64_t bytes_left  = offset_end - offset;
+			uint32_t current_n   = std::min(uint64_t(ses->get_max_seg_len()), std::min(bytes_left, buffer_n));
+			uint32_t is_n_blocks = current_n / s->get_block_size();
+			bool     last_block  = offset + current_n == offset_end;
 
 			std::optional<std::pair<residual, uint32_t> > has_residual;
 			if (last_block) {
@@ -455,6 +456,7 @@ iscsi_fail_reason server::push_response(com_client *const cc, session *const ses
 					has_residual = { iSR_UNDERFLOW, iscsi_wants - scsi_has };
 			}
 
+			DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "generating response for offset %u, n %u, lba: %" PRIu64, offset, current_n, current_lba);
 			auto [ out, data_pointer ] = iscsi_pdu_scsi_data_in::gen_data_in_pdu(ses, reply_to, has_residual, offset, current_n, last_block);
 
 			scsi::scsi_rw_result rc = scsi::rw_fail_general;
@@ -467,7 +469,7 @@ iscsi_fail_reason server::push_response(com_client *const cc, session *const ses
 				delete [] temp_buffer;
 			}
 			else {
-				rc = s->read(current_lba, current_n / s->get_block_size(), data_pointer);
+				rc = s->read(current_lba, is_n_blocks, data_pointer);
 			}
 
 			if (rc != scsi::rw_ok) {
@@ -492,7 +494,7 @@ iscsi_fail_reason server::push_response(com_client *const cc, session *const ses
 			}
 
 			offset      += current_n;
-			current_lba += 1;
+			current_lba += is_n_blocks;
 			ses->add_bytes_tx(out.n);
 			is->iscsiSsnTxDataOctets += out.n;
 		}
