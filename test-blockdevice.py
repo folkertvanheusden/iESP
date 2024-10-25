@@ -187,7 +187,12 @@ def do(show_stats):
                         if n_failed < 3:
                             for offset_in_block in range(blocksize):
                                 if data[cur_b_offset+offset_in_block] != b[i][offset_in_block]:
-                                    print(f'Sector {cur_n_blocks + i} has unexpected data ({data[cur_b_offset+offset_in_block:cur_b_offset+offset_in_block+16]}... instead of {b[i][offset_in_block+0:offset_in_block+16]}... (offset: {offset_in_block})')
+                                    type_ = 'as is'
+                                    if seen[nr + i ] == duplicate:
+                                        type_ = 'duplicate'
+                                    elif seen[nr + i ] == apply_trim:
+                                        type_ = 'trim/discard'
+                                    print(f'Sector {cur_n_blocks + i} has unexpected data ({data[cur_b_offset+offset_in_block:cur_b_offset+offset_in_block+32]}... instead of {b[i][offset_in_block+0:offset_in_block+32]}... (offset: {offset_in_block}, type: "{type_}")')
                                     break
                             n_failed += 1
                             if n_failed == 3:
