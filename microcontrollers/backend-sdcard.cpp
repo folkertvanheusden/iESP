@@ -151,7 +151,7 @@ uint64_t backend_sdcard::get_block_size() const
 
 bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data)
 {
-	// Serial.printf("Write to block %" PRIu64 ", %u blocks\r\n", size_t(block_nr), n_blocks);
+//	DOLOG(logging::ll_debug, "backend_sdcard::write", "-", "Write to block %" PRIu64 ", %u blocks\r\n", block_nr, n_blocks);
 	write_led(led_write, HIGH);
 
 	uint64_t iscsi_block_size = get_block_size();
@@ -195,7 +195,7 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 bool backend_sdcard::trim(const uint64_t block_nr, const uint32_t n_blocks)
 {
 	bool rc = true;
-	uint8_t *data = new uint8_t[get_block_size()];
+	uint8_t *data = new uint8_t[get_block_size()]();
 	for(uint32_t i=0; i<n_blocks; i++) {
 		if (write(block_nr + i, 1, data) == false) {
 			DOLOG(logging::ll_error, "backend_sdcard::trim", "-", "Cannot trim");
@@ -251,7 +251,8 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 
 backend::cmpwrite_result_t backend_sdcard::cmpwrite(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data_write, const uint8_t *const data_compare)
 {
-	write_led(led_read, HIGH);
+	write_led(led_read,  HIGH);
+	write_led(led_write, HIGH);
 
 #if defined(RP2040W)
 	mutex_enter_blocking(&serial_access_lock);
@@ -314,7 +315,8 @@ backend::cmpwrite_result_t backend_sdcard::cmpwrite(const uint64_t block_nr, con
 	unlock_range(lock_list);
 #endif
 
-	write_led(led_read, LOW);
+	write_led(led_read,  LOW);
+	write_led(led_write, LOW);
 
 	return result;
 }

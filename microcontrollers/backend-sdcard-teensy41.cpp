@@ -127,7 +127,7 @@ bool backend_sdcard_teensy41::write(const uint64_t block_nr, const uint32_t n_bl
 bool backend_sdcard_teensy41::trim(const uint64_t block_nr, const uint32_t n_blocks)
 {
 	bool rc = true;
-	uint8_t *data = new uint8_t[get_block_size()];
+	uint8_t *data = new uint8_t[get_block_size()]();
 	for(uint32_t i=0; i<n_blocks; i++) {
 		if (write(block_nr + i, 1, data) == false) {
 			DOLOG(logging::ll_error, "backend_sdcard_teensy41::trim", "-", "Cannot trim");
@@ -179,7 +179,8 @@ bool backend_sdcard_teensy41::read(const uint64_t block_nr, const uint32_t n_blo
 
 backend::cmpwrite_result_t backend_sdcard_teensy41::cmpwrite(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data_write, const uint8_t *const data_compare)
 {
-	write_led(led_read, HIGH);
+	write_led(led_read,  HIGH);
+	write_led(led_write, HIGH);
 
 	auto lock_list  = lock_range(block_nr, n_blocks);
 	auto block_size = get_block_size();
@@ -239,7 +240,8 @@ backend::cmpwrite_result_t backend_sdcard_teensy41::cmpwrite(const uint64_t bloc
 
 	unlock_range(lock_list);
 
-	write_led(led_read, LOW);
+	write_led(led_read,  LOW);
+	write_led(led_write, LOW);
 
 	return result;
 }
