@@ -232,10 +232,6 @@ iscsi_pdu_login_request::iscsi_pdu_login_request(session *const ses): iscsi_pdu_
 	*login_req = { };
 }
 
-iscsi_pdu_login_request::~iscsi_pdu_login_request()
-{
-}
-
 bool has_CRC32C(const std::string & value)
 {
 	auto parts = split(value, ",");
@@ -398,10 +394,6 @@ iscsi_pdu_scsi_cmd::iscsi_pdu_scsi_cmd(session *const ses): iscsi_pdu_bhs(ses)
 	assert(offsetof(__cdb_pdu_req__, Itasktag ) == 16);
 	assert(offsetof(__cdb_pdu_req__, expdatlen) == 20);
 	assert(offsetof(__cdb_pdu_req__, CmdSN    ) == 24);
-}
-
-iscsi_pdu_scsi_cmd::~iscsi_pdu_scsi_cmd()
-{
 }
 
 bool iscsi_pdu_scsi_cmd::set(const uint8_t *const in, const size_t n)
@@ -815,10 +807,6 @@ iscsi_pdu_nop_out::iscsi_pdu_nop_out(session *const ses): iscsi_pdu_bhs(ses)
 	assert(sizeof(*nop_out) == 48);
 }
 
-iscsi_pdu_nop_out::~iscsi_pdu_nop_out()
-{
-}
-
 std::optional<iscsi_response_set> iscsi_pdu_nop_out::get_response(scsi *const sd)
 {
 	DOLOG(logging::ll_debug, "iscsi_pdu_nop_out::get_response", ses->get_endpoint_name(), "invoked");
@@ -839,10 +827,6 @@ std::optional<iscsi_response_set> iscsi_pdu_nop_out::get_response(scsi *const sd
 iscsi_pdu_nop_in::iscsi_pdu_nop_in(session *const ses): iscsi_pdu_bhs(ses)
 {
 	assert(sizeof(*nop_in) == 48);
-}
-
-iscsi_pdu_nop_in::~iscsi_pdu_nop_in()
-{
 }
 
 bool iscsi_pdu_nop_in::set(const iscsi_pdu_nop_out & reply_to)
@@ -914,10 +898,6 @@ iscsi_pdu_text_request::iscsi_pdu_text_request(session *const ses): iscsi_pdu_bh
 	assert(sizeof(*text_req) == 48);
 
 	*text_req = { };
-}
-
-iscsi_pdu_text_request::~iscsi_pdu_text_request()
-{
 }
 
 bool iscsi_pdu_text_request::set(const uint8_t *const in, const size_t n)
@@ -1020,10 +1000,6 @@ iscsi_pdu_logout_request::iscsi_pdu_logout_request(session *const ses): iscsi_pd
 	*logout_req = { };
 }
 
-iscsi_pdu_logout_request::~iscsi_pdu_logout_request()
-{
-}
-
 bool iscsi_pdu_logout_request::set(const uint8_t *const in, const size_t n)
 {
 	if (iscsi_pdu_bhs::set(in, n) == false)
@@ -1091,10 +1067,6 @@ iscsi_pdu_taskman_request::iscsi_pdu_taskman_request(session *const ses): iscsi_
 	*taskman_req = { };
 }
 
-iscsi_pdu_taskman_request::~iscsi_pdu_taskman_request()
-{
-}
-
 bool iscsi_pdu_taskman_request::set(const uint8_t *const in, const size_t n)
 {
 	if (iscsi_pdu_bhs::set(in, n) == false)
@@ -1138,10 +1110,6 @@ std::optional<iscsi_response_set> iscsi_pdu_taskman_request::get_response(scsi *
 iscsi_pdu_taskman_reply::iscsi_pdu_taskman_reply(session *const ses): iscsi_pdu_bhs(ses)
 {
 	assert(sizeof(*taskman_reply) == 48);
-}
-
-iscsi_pdu_taskman_reply::~iscsi_pdu_taskman_reply()
-{
 }
 
 bool iscsi_pdu_taskman_reply::set(const iscsi_pdu_taskman_request & reply_to)

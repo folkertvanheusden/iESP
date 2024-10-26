@@ -184,7 +184,7 @@ public:
 
 public:
 	iscsi_pdu_login_request(session *const ses);
-	virtual ~iscsi_pdu_login_request();
+	virtual ~iscsi_pdu_login_request() { }
 
 	std::vector<blob_t> get() const override;
 
@@ -285,7 +285,7 @@ public:
 
 public:
 	iscsi_pdu_scsi_cmd(session *const ses);
-	virtual ~iscsi_pdu_scsi_cmd();
+	virtual ~iscsi_pdu_scsi_cmd() { }
 
 	bool set(const uint8_t *const in, const size_t n) override;
 	std::vector<blob_t> get() const override;
@@ -482,7 +482,7 @@ public:
 
 public:
 	iscsi_pdu_nop_out(session *const ses);
-	virtual ~iscsi_pdu_nop_out();
+	virtual ~iscsi_pdu_nop_out() { }
 
 	const uint8_t  *get_LUN()        const { return nop_out->LUN;              }
 	      uint32_t  get_Itasktag()   const { return nop_out->Itasktag;         }
@@ -520,7 +520,7 @@ public:
 
 public:
 	iscsi_pdu_nop_in(session *const ses);
-	virtual ~iscsi_pdu_nop_in();
+	virtual ~iscsi_pdu_nop_in() { }
 
 	bool set(const iscsi_pdu_nop_out & reply_to);
 	std::vector<blob_t> get() const override;
@@ -600,7 +600,7 @@ public:
 
 public:
 	iscsi_pdu_text_request(session *const ses);
-	virtual ~iscsi_pdu_text_request();
+	virtual ~iscsi_pdu_text_request() { }
 
 	bool set(const uint8_t *const in, const size_t n) override;
 	std::vector<blob_t> get() const override;
@@ -681,7 +681,7 @@ public:
 
 public:
 	iscsi_pdu_logout_request(session *const ses);
-	virtual ~iscsi_pdu_logout_request();
+	virtual ~iscsi_pdu_logout_request() { }
 
 	bool set(const uint8_t *const in, const size_t n) override;
 	std::vector<blob_t> get() const override;
@@ -765,7 +765,7 @@ public:
 
 public:
 	iscsi_pdu_taskman_request(session *const ses);
-	virtual ~iscsi_pdu_taskman_request();
+	virtual ~iscsi_pdu_taskman_request() { }
 
 	bool set(const uint8_t *const in, const size_t n) override;
 	std::vector<blob_t> get() const override;
@@ -807,7 +807,7 @@ public:
 
 public:
 	iscsi_pdu_taskman_reply(session *const ses);
-	virtual ~iscsi_pdu_taskman_reply();
+	virtual ~iscsi_pdu_taskman_reply() { }
 
 	bool set(const iscsi_pdu_taskman_request & reply_to);
 	std::vector<blob_t> get() const override;
