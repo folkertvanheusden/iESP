@@ -218,13 +218,26 @@ bool com_client_sockets::recv(uint8_t *const to, const size_t n)
 	return todo == 0;
 }
 
-std::string com_client_sockets::get_endpoint_name() const
+std::string convert_sockaddr_to_name(const sockaddr *const addr, const socklen_t addr_len)
 {
         char host[256];
-#ifdef ESP32
-        sockaddr_in addr { };
+
+#if defined(ESP32)
+	auto sa_addr = reinterpret_cast<const sockaddr_in *>(addr);
+	inet_ntop(addr->sa_family, &sa_addr->sin_addr.s_addr, host, sizeof host);
+	return host + myformat(":%d", sa_addr->sin_port);
 #else
-        char         serv[16];
+        char serv[16];
+	getnameinfo(addr, addr_len, host, sizeof(host), serv, sizeof(serv), NI_NUMERICHOST | NI_NUMERICSERV);
+	return myformat("[%s]:%s", host, serv);
+#endif
+}
+
+std::string com_client_sockets::get_endpoint_name() const
+{
+#if defined(ESP32)
+        sockaddr_in  addr { };
+#else
         sockaddr_in6 addr { };
 #endif
         socklen_t addr_len = sizeof addr;
@@ -234,37 +247,26 @@ std::string com_client_sockets::get_endpoint_name() const
 		return "?:?";
 	}
 
-#ifdef ESP32
-	inet_ntop(addr.sin_family, &addr.sin_addr.s_addr, host, sizeof host);
-	return host + myformat(":%d", addr.sin_port);
-#else
-	getnameinfo(reinterpret_cast<sockaddr *>(&addr), addr_len, host, sizeof(host), serv, sizeof(serv), NI_NUMERICHOST | NI_NUMERICSERV);
-	return myformat("[%s]:%s", host, serv);
-#endif
+	return convert_sockaddr_to_name(reinterpret_cast<sockaddr *>(&addr), addr_len);
 }
 
 std::string com_client_sockets::get_local_address() const
 {
-        char host[256];
-#ifdef ESP32
-        sockaddr_in addr { };
+#if defined(ESP32)
+        sockaddr_in  addr { };
 #else
-        char         serv[16];
         sockaddr_in6 addr { };
 #endif
         socklen_t addr_len = sizeof addr;
 
         if (getsockname(fd, reinterpret_cast<sockaddr *>(&addr), &addr_len) == -1) {
-                DOLOG(logging::ll_error, "get_local_address", get_endpoint_name(), "failed to find local name of fd %d", fd);
+                DOLOG(logging::ll_error, "get_local_address", "-", "failed to find local name of fd %d", fd);
 		return "?:?";
 	}
 
-#ifdef ESP32
-	inet_ntop(addr.sin_family, &addr.sin_addr.s_addr, host, sizeof host);
-	//return host + myformat(":%d", addr.sin_port);
-	return host + std::string(":3260");  // ESP32 SDK2 returns peer port?!
-#else
-	getnameinfo(reinterpret_cast<sockaddr *>(&addr), addr_len, host, sizeof(host), serv, sizeof(serv), NI_NUMERICHOST | NI_NUMERICSERV);
-	return myformat("%s:%s", host, serv);
+#if defined(ESP32)
+	addr.sin_port = 3260;  // ESP32 SDK2 returns peer port?!
 #endif
+
+	return convert_sockaddr_to_name(reinterpret_cast<sockaddr *>(&addr), addr_len);
 }
