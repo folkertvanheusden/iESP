@@ -406,6 +406,8 @@ scsi_response scsi::write_verify(const std::string & identifier, const uint64_t 
 		name = "16";
 	}
 
+	bool fua = CDB[1] & 8;
+
 	auto backend_block_size = b->get_block_size();
 	response.amount_of_data_expected = transfer_length * backend_block_size;
 
@@ -465,10 +467,14 @@ scsi_response scsi::write_verify(const std::string & identifier, const uint64_t 
 			if (received_size == expected_size) {
 				response.type = ir_empty_sense;
 				DOLOG(logging::ll_debug, "scsi::write_verify", identifier, "received_size == expected_size");
+
+				if (fua)
+					this->sync();
 			}
 			else {  // allow R2T packets to come in
-				response.type                = ir_r2t;
-				response.r2t.buffer_lba      = lba;
+				response.type           = ir_r2t;
+				response.r2t.buffer_lba = lba;
+				response.r2t.fua        = fua;
 				if (received_blocks <= transfer_length)
 					response.r2t.bytes_left = (transfer_length - received_blocks) * backend_block_size;
 				else
@@ -484,6 +490,7 @@ scsi_response scsi::write_verify(const std::string & identifier, const uint64_t 
 		if (transfer_length) {
 			response.type           = ir_r2t;  // allow R2T packets to come in
 			response.r2t.buffer_lba = lba;
+			response.r2t.fua        = fua;
 			response.r2t.bytes_left = transfer_length * backend_block_size;
 			DOLOG(logging::ll_debug, "scsi::write_verify", identifier, "starting R2T with %u bytes left (LBA: %" PRIu64 ")", response.r2t.bytes_left, response.r2t.buffer_lba);
 		}

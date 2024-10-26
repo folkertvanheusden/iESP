@@ -27,8 +27,9 @@ struct r2t_session {
 	uint32_t bytes_left;
 	uint32_t bytes_done;
 	blob_t   PDU_initiator;
-        bool     is_write_same;  // receive 1 block, write 1 or more times
-        bool     write_same_is_unmap;
+	bool     is_write_same;  // receive 1 block, write 1 or more times
+	bool     write_same_is_unmap;
+	bool     fua;
 };
 
 typedef enum
