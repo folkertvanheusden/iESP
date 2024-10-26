@@ -16,17 +16,17 @@
 #include "wifi.h"
 
 
-std::atomic_bool stop { false   };
-com             *c    { nullptr };
+std::atomic_bool        stop { false   };
+com                    *c    { nullptr };
 backend_sdcard_rp2040w *bs   { nullptr };
-scsi            *sd   { nullptr };
-server          *s    { nullptr };
-iscsi_stats_t    is;
-io_stats_t       ios;
-volatile bool    wifi_connected { false };
-int              led_green  {  17 };
-int              led_yellow {  18 };
-int              led_red    { -1  };
+scsi                   *sd   { nullptr };
+server                 *s    { nullptr };
+iscsi_stats_t           is;
+io_stats_t              ios;
+volatile bool           wifi_connected { false };
+int                     led_green  {  17 };
+int                     led_yellow {  18 };
+int                     led_red    { -1  };
 
 bool is_network_up()
 {

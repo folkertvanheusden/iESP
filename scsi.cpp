@@ -196,8 +196,8 @@ scsi_response scsi::inquiry(const std::string & identifier, const uint64_t lun, 
 		}
 		else if (CDB[2] == 0xb0) {  // block limits
 			response.io.is_inline          = true;
-			response.io.what.data.second = 64;
-			response.io.what.data.first = new uint8_t[response.io.what.data.second]();
+			response.io.what.data.second   = 64;
+			response.io.what.data.first    = new uint8_t[response.io.what.data.second]();
 			response.io.what.data.first[0] = device_type;
 			response.io.what.data.first[1] = CDB[2];
 			response.io.what.data.first[2] = 0;
@@ -224,8 +224,8 @@ scsi_response scsi::inquiry(const std::string & identifier, const uint64_t lun, 
 		}
 		else if (CDB[2] == 0xb1) {  // block device characteristics
 			response.io.is_inline          = true;
-			response.io.what.data.second = 64;
-			response.io.what.data.first = new uint8_t[response.io.what.data.second]();
+			response.io.what.data.second   = 64;
+			response.io.what.data.first    = new uint8_t[response.io.what.data.second]();
 			response.io.what.data.first[0] = device_type;
 			response.io.what.data.first[1] = CDB[2];
 			response.io.what.data.first[2] = (response.io.what.data.second - 4)>> 8;  // page length
@@ -236,8 +236,8 @@ scsi_response scsi::inquiry(const std::string & identifier, const uint64_t lun, 
 		}
 		else if (CDB[2] == 0xb2) {  // logical block provisioning vpd page
 			response.io.is_inline          = true;
-			response.io.what.data.second = 64;
-			response.io.what.data.first = new uint8_t[response.io.what.data.second]();
+			response.io.what.data.second   = 64;
+			response.io.what.data.first    = new uint8_t[response.io.what.data.second]();
 			response.io.what.data.first[0] = device_type;
 			response.io.what.data.first[1] = CDB[2];
 			response.io.what.data.first[2] = (response.io.what.data.second - 4)>> 8;  // page length

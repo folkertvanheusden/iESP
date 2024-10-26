@@ -3,6 +3,7 @@
 #include <unistd.h>
 
 #include "backend-sdcard-rp2040w.h"
+#include "gen.h"
 #include "log.h"
 #include "utils.h"
 
@@ -266,4 +267,9 @@ backend::cmpwrite_result_t backend_sdcard_rp2040w::cmpwrite(const uint64_t block
 	write_led(led_read, LOW);
 
 	return result;
+}
+
+std::string backend_sdcard_rp2040w::get_serial() const
+{
+	return DEFAULT_SERIAL;
 }
