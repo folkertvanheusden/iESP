@@ -72,9 +72,7 @@ scsi::~scsi()
 
 scsi_response scsi::test_unit_ready(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data)
 {
-	scsi_response response { };
-	response.type         = ir_empty_sense;
-	response.data_is_meta = true;
+	scsi_response response(ir_empty_sense);
 
 	DOLOG(logging::ll_debug, "scsi::test_unit_ready", identifier, "TEST UNIT READY");
 
@@ -83,9 +81,7 @@ scsi_response scsi::test_unit_ready(const std::string & identifier, const uint64
 
 scsi_response scsi::mode_sense_6(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data)
 {
-	scsi_response response { };
-	response.type         = ir_as_is;
-	response.data_is_meta = true;
+	scsi_response response(ir_as_is);
 
 	if (locking_status() == l_locked_other) {
 		DOLOG(logging::ll_error, "scsi::mode_sense_6", identifier, "MODE SENSE 6 failed due to reservations");
@@ -114,9 +110,7 @@ scsi_response scsi::mode_sense_6(const std::string & identifier, const uint64_t 
 
 scsi_response scsi::inquiry(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data)
 {
-	scsi_response response { };
-	response.type         = ir_as_is;
-	response.data_is_meta = true;
+	scsi_response response(ir_as_is);
 
 	DOLOG(logging::ll_debug, "scsi::inquiry", identifier, "INQUIRY");
 	if (CDB[1] & 1) {
@@ -275,9 +269,7 @@ scsi_response scsi::inquiry(const std::string & identifier, const uint64_t lun, 
 
 scsi_response scsi::read_capacity_10(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data)
 {
-	scsi_response response { };
-	response.type         = ir_as_is;
-	response.data_is_meta = true;
+	scsi_response response(ir_as_is);
 
 	DOLOG(logging::ll_debug, "scsi::read_capacity_10", identifier, "READ_CAPACITY");
 	response.io.is_inline          = true;
@@ -299,9 +291,7 @@ scsi_response scsi::read_capacity_10(const std::string & identifier, const uint6
 
 scsi_response scsi::get_lba_status(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data)
 {
-	scsi_response response { };
-	response.type         = ir_as_is;
-	response.data_is_meta = true;
+	scsi_response response(ir_as_is);
 
 	uint8_t service_action = CDB[1] & 31;
 	DOLOG(logging::ll_debug, "scsi::get_lba_status", identifier, "ServiceAction: %02xh", service_action);
@@ -368,9 +358,7 @@ scsi_response scsi::get_lba_status(const std::string & identifier, const uint64_
 
 scsi_response scsi::write_verify(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data, const uint8_t opcode)
 {
-	scsi_response response { };
-	response.type         = ir_as_is;
-	response.data_is_meta = true;
+	scsi_response response(ir_as_is);
 
 	uint64_t    lba             = 0;
 	uint32_t    transfer_length = 0;
@@ -487,9 +475,7 @@ scsi_response scsi::write_verify(const std::string & identifier, const uint64_t 
 
 scsi_response scsi::read_(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data, const uint8_t opcode)
 {
-	scsi_response response { };
-	response.type         = ir_as_is;
-	response.data_is_meta = true;
+	scsi_response response(ir_as_is);
 
 	uint64_t lba             = 0;
 	uint32_t transfer_length = 0;
@@ -537,10 +523,7 @@ scsi_response scsi::read_(const std::string & identifier, const uint64_t lun, co
 
 scsi_response scsi::sync_cache(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data)
 {
-	scsi_response response { };
-	response.type         = ir_as_is;
-	response.data_is_meta = true;
-	response.type = ir_empty_sense;
+	scsi_response response(ir_empty_sense);
 
 	DOLOG(logging::ll_debug, "scsi::sync_cache", identifier, "SYNC CACHE 10");
 	this->sync();
@@ -550,9 +533,7 @@ scsi_response scsi::sync_cache(const std::string & identifier, const uint64_t lu
 
 scsi_response scsi::report_luns(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data)
 {
-	scsi_response response { };
-	response.type         = ir_as_is;
-	response.data_is_meta = true;
+	scsi_response response(ir_as_is);
 
 	DOLOG(logging::ll_debug, "scsi::report_luns", identifier, "REPORT_LUNS, report: %02xh", CDB[2]);
 
@@ -568,9 +549,7 @@ scsi_response scsi::report_luns(const std::string & identifier, const uint64_t l
 
 scsi_response scsi::report_supported_operation_codes(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data)
 {
-	scsi_response response { };
-	response.type         = ir_as_is;
-	response.data_is_meta = true;
+	scsi_response response(ir_as_is);
 
 	uint8_t service_action     = CDB[1] & 31;
 	uint8_t reporting_options  = CDB[2] & 7;
@@ -634,9 +613,7 @@ scsi_response scsi::report_supported_operation_codes(const std::string & identif
 
 scsi_response scsi::compare_and_write(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data)
 {
-	scsi_response response { };
-	response.type         = ir_as_is;
-	response.data_is_meta = true;
+	scsi_response response(ir_as_is);
 
 	uint64_t lba         = get_uint64_t(&CDB[2]);
 	uint32_t block_count = CDB[13];
@@ -679,9 +656,7 @@ scsi_response scsi::compare_and_write(const std::string & identifier, const uint
 
 scsi_response scsi::prefetch(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data, const uint8_t opcode)
 {
-	scsi_response response { };
-	response.type         = ir_as_is;
-	response.data_is_meta = true;
+	scsi_response response(ir_as_is);
 
 	DOLOG(logging::ll_debug, "scsi::prefetch", identifier, "PREFETCH 10/16");
 
@@ -713,9 +688,7 @@ scsi_response scsi::prefetch(const std::string & identifier, const uint64_t lun,
 
 scsi_response scsi::reserve(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data)
 {
-	scsi_response response { };
-	response.type         = ir_as_is;
-	response.data_is_meta = true;
+	scsi_response response(ir_as_is);
 
 	DOLOG(logging::ll_debug, "scsi::reserve", identifier, "RESERVE 6");
 
@@ -735,9 +708,7 @@ scsi_response scsi::reserve(const std::string & identifier, const uint64_t lun, 
 
 scsi_response scsi::release(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data)
 {
-	scsi_response response { };
-	response.type         = ir_as_is;
-	response.data_is_meta = true;
+	scsi_response response(ir_as_is);
 
 	DOLOG(logging::ll_debug, "scsi::release", identifier, "RELEASE 6");
 
@@ -753,9 +724,7 @@ scsi_response scsi::release(const std::string & identifier, const uint64_t lun, 
 
 scsi_response scsi::unmap(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data)
 {
-	scsi_response response { };
-	response.type         = ir_as_is;
-	response.data_is_meta = true;
+	scsi_response response(ir_as_is);
 
 	DOLOG(logging::ll_debug, "scsi::unmap", identifier, "UNMAP");
 
@@ -804,9 +773,7 @@ scsi_response scsi::unmap(const std::string & identifier, const uint64_t lun, co
 
 scsi_response scsi::write_same(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data, const uint8_t opcode)
 {
-	scsi_response response { };
-	response.type         = ir_as_is;
-	response.data_is_meta = true;
+	scsi_response response(ir_as_is);
 
 	DOLOG(logging::ll_debug, "scsi::write_same", identifier, "WRITE SAME 10/16");
 
@@ -925,7 +892,7 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 	DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "SCSI opcode: %02xh, CDB size: %zu", opcode, size);
 	DOLOG(logging::ll_debug, "scsi::send", lun_identifier, "CDB contents: %s", to_hex(CDB, size).c_str());
 
-	scsi_response response { };
+	scsi_response response(ir_as_is);
 
 	if (opcode == o_test_unit_ready)
 		response = test_unit_ready(lun_identifier, lun, CDB, size, data);

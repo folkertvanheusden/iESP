@@ -43,15 +43,23 @@ struct scsi_response
 	} io;
 
 	r2t_session r2t;
+
+	scsi_response(const iscsi_reacion_t type_in) : type(type_in) {
+		data_is_meta = true;
+		io.is_inline = false;
+		io.what.data = { };
+		io.what.location = { };
+		r2t = { };
+	}
 };
 
 class scsi
 {
 private:
-	backend    *const b      { nullptr };
+	backend    *const b          { nullptr };
+	const int         trim_level { 1       };
+	io_stats_t *const is         { nullptr };
 	std::string       serial;
-	const int         trim_level { 1   };
-	io_stats_t *const is     { nullptr };
 #if !defined(ARDUINO) && !defined(NDEBUG)
 	std::atomic_uint64_t cmd_use_count[256] { };
 #endif
