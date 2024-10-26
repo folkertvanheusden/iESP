@@ -43,7 +43,7 @@ const std::map<scsi::scsi_opcode, scsi_opcode_details> scsi_a3_data {
 	{ scsi::scsi_opcode::o_unmap,           { { 0xff, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0x07 }, 10, "unmap"           } },
 	{ scsi::scsi_opcode::o_read_16,		{ { 0xff, 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 }, 16, "read 16" } },
 	{ scsi::scsi_opcode::o_compare_and_write, { { 0xff, 0xfa, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x07 }, 16, "compare and write" } },
-	{ scsi::scsi_opcode::o_write_16,	{ { 0xff, 0xfa, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 }, 16, "write 16" } },
+	{ scsi::scsi_opcode::o_write_16,	{ { 0x8a, 0xfa, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 }, 16, "write 16" } },
 	{ scsi::scsi_opcode::o_get_lba_status,	{ { 0xff, 0x1f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 }, 16, "get lba status" } },
 	{ scsi::scsi_opcode::o_report_luns,	{ { 0xff, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 }, 12, "report luns" } },
 	{ scsi::scsi_opcode::o_rep_sup_oper,	{ { 0xff, 0x1f, 0x87, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 }, 12, "report supported operations" } },
@@ -103,6 +103,8 @@ scsi_response scsi::mode_sense_6(const std::string & identifier, const uint64_t 
 		response.io.what.data.second   = 4;
 		response.io.what.data.first    = new uint8_t[response.io.what.data.second]();
 		response.io.what.data.first[0] = response.io.what.data.second - 1;  // length
+		response.io.what.data.first[1] = 0;  // medium type
+		response.io.what.data.first[2] = 16;  // DPOFUA
 	}
 
 	return response;
@@ -232,6 +234,7 @@ scsi_response scsi::inquiry(const std::string & identifier, const uint64_t lun, 
 			response.io.what.data.first[3] = response.io.what.data.second - 4;
 			response.io.what.data.first[4] = 0x1c;  // device has an RPM of 7200 (fake!)
 			response.io.what.data.first[5] = 0x20;
+			response.io.what.data.first[8] = 0x02;  // FUAB
 			// ... set all to 'not set'
 		}
 		else if (CDB[2] == 0xb2) {  // logical block provisioning vpd page
@@ -601,10 +604,13 @@ scsi_response scsi::report_supported_operation_codes(const std::string & identif
 			auto it = scsi_a3_data.find(scsi::scsi_opcode(req_operation_code));
 			if (it != scsi_a3_data.end()) {
 				response.io.is_inline           = true;
-				response.io.what.data.second    = 4 + it->second.data.size();
+				auto cdb_size = it->second.data.size();
+				response.io.what.data.second    = 4 + cdb_size;
 				response.io.what.data.first     = new uint8_t[response.io.what.data.second]();
-				response.io.what.data.first[1]  = 3 + it->second.data.size();
-				memcpy(response.io.what.data.first + 4, it->second.data.data(), it->second.data.size());
+				response.io.what.data.first[1]  = 0x03;  // SUPPORT == 0b011
+				response.io.what.data.first[2]  = cdb_size >> 8;
+				response.io.what.data.first[3]  = cdb_size;
+				memcpy(response.io.what.data.first + 4, it->second.data.data(), cdb_size);
 
 				ok = true;
 			}
@@ -968,19 +974,6 @@ std::optional<std::vector<uint8_t> > scsi::validate_request(const uint64_t lba, 
 		if (opcode == o_read_10 || opcode == o_read_16) {
 			if (CDB[1] >> 5) {  // RDPROTECT / WRPROTECT
 				DOLOG(logging::ll_debug, "scsi::validate_request", "-", "RD/WR PROTECT not supported");
-				return error_invalid_field();
-			}
-		}
-
-		if (opcode == o_read_10 || opcode == o_read_16 || opcode == o_write_10 || opcode == o_write_16 ||
-		    opcode == o_write_verify_10 || opcode == o_compare_and_write) {
-			if (CDB[1] & 16) {  // DPO
-				DOLOG(logging::ll_debug, "scsi::validate_request", "-", "DPO not supported");
-				return error_invalid_field();
-			}
-
-			if (CDB[1] & 8) {  // FUA
-				DOLOG(logging::ll_debug, "scsi::validate_request", "-", "FUA not supported");
 				return error_invalid_field();
 			}
 		}
