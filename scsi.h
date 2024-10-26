@@ -53,6 +53,10 @@ struct scsi_response
 	}
 };
 
+typedef enum { cs_6, cs_10, cs_16 } cdb_size_t;
+
+void get_lba_len(const uint8_t *const CDB, const cdb_size_t s, uint64_t *const lba, uint32_t *const transfer_length);
+
 class scsi
 {
 private:

@@ -356,6 +356,31 @@ scsi_response scsi::get_lba_status(const std::string & identifier, const uint64_
 	return response;
 }
 
+void get_lba_len(const uint8_t *const CDB, const cdb_size_t s, uint64_t *const lba, uint32_t *const transfer_length)
+{
+	if (s == cs_6) {
+		*lba             = ((CDB[1] & 31) << 16) | (CDB[2] << 8) | CDB[3];
+		*transfer_length = CDB[4];
+		if (*transfer_length == 0)
+			*transfer_length = 256;
+	}
+	else if (s == cs_10) {
+		*lba             = get_uint32_t(&CDB[2]);
+		*transfer_length =  (CDB[7] << 8) | CDB[8];
+	}
+	else if (s == cs_16) {
+		*lba             = get_uint64_t(&CDB[2]);
+		*transfer_length = get_uint32_t(&CDB[10]);
+	}
+	else {
+		*lba = 0;
+		*transfer_length = 0;
+
+		DOLOG(logging::ll_error, "get_lba_len", "-", "unsupported LBA-length parameter %d", s);
+		assert(false);  // should not be triggered, would be missing code
+	}
+}
+
 scsi_response scsi::write_verify(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data, const uint8_t opcode)
 {
 	scsi_response response(ir_as_is);
@@ -365,21 +390,16 @@ scsi_response scsi::write_verify(const std::string & identifier, const uint64_t 
 	const char *name            = "?";
 
 	if (opcode == o_write_6) {
-		lba             = ((CDB[1] & 31) << 16) | (CDB[2] << 8) | CDB[3];
-		transfer_length = CDB[4];
-		if (transfer_length == 0)
-			transfer_length = 256;
+		get_lba_len(CDB, cs_6, &lba, &transfer_length);
 		name = "6";
 	}
 	else if (opcode == o_write_10 || opcode == o_write_verify_10) {
 		// NOTE: the verify part is not implemented, o_write_verify_10 is just a dumb write
-		lba             = get_uint32_t(&CDB[2]);
-		transfer_length = (CDB[7] << 8) | CDB[8];
+		get_lba_len(CDB, cs_10, &lba, &transfer_length);
 		name = opcode == o_write_verify_10 ? "verify-10" : "10";
 	}
 	else if (opcode == o_write_16) {
-		lba             = get_uint64_t(&CDB[2]);
-		transfer_length = get_uint32_t(&CDB[10]);
+		get_lba_len(CDB, cs_16, &lba, &transfer_length);
 		name = "16";
 	}
 
@@ -481,20 +501,15 @@ scsi_response scsi::read_(const std::string & identifier, const uint64_t lun, co
 	uint32_t transfer_length = 0;
 
 	if (opcode == o_read_16) {
-		lba             = get_uint64_t(&CDB[2]);
-		transfer_length = get_uint32_t(&CDB[10]);
+		get_lba_len(CDB, cs_16, &lba, &transfer_length);
 		DOLOG(logging::ll_debug, "scsi::read_", identifier, "READ_16, LBA %" PRIu64 ", %u sectors", lba, transfer_length);
 	}
 	else if (opcode == o_read_10) {
-		lba             = get_uint32_t(&CDB[2]);
-		transfer_length =  (CDB[7] << 8) | CDB[8];
+		get_lba_len(CDB, cs_10, &lba, &transfer_length);
 		DOLOG(logging::ll_debug, "scsi::read_", identifier, "READ_10, LBA %" PRIu64 ", %u sectors", lba, transfer_length);
 	}
 	else {
-		lba             = ((CDB[1] & 31) << 16) | (CDB[2] << 8) | CDB[3];
-		transfer_length = CDB[4];
-		if (transfer_length == 0)
-			transfer_length = 256;
+		get_lba_len(CDB, cs_6, &lba, &transfer_length);
 		DOLOG(logging::ll_debug, "scsi::read_", identifier, "READ_6, LBA %" PRIu64 ", %u sectors", lba, transfer_length);
 	}
 
@@ -664,13 +679,11 @@ scsi_response scsi::prefetch(const std::string & identifier, const uint64_t lun,
 	uint32_t transfer_length = 0;
 
 	if (opcode == o_prefetch_16) {
-		lba             = get_uint64_t(&CDB[2]);  // TODO not checked in the documentation
-		transfer_length = get_uint32_t(&CDB[10]);
+		get_lba_len(CDB, cs_16, &lba, &transfer_length);
 		DOLOG(logging::ll_debug, "scsi::prefetch", identifier, "PREFETCH_16, LBA %" PRIu64 ", %u sectors", lba, transfer_length);
 	}
 	else if (opcode == o_prefetch_10) {
-		lba             = get_uint32_t(&CDB[2]);
-		transfer_length =  (CDB[7] << 8) | CDB[8];
+		get_lba_len(CDB, cs_10, &lba, &transfer_length);
 		DOLOG(logging::ll_debug, "scsi::prefetch", identifier, "PREFETCH_10, LBA %" PRIu64 ", %u sectors", lba, transfer_length);
 	}
 
@@ -783,13 +796,11 @@ scsi_response scsi::write_same(const std::string & identifier, const uint64_t lu
 	response.r2t.write_same_is_unmap = CDB[1] & 8;
 
 	if (opcode == o_write_same_16) {
-		lba             = get_uint64_t(&CDB[2]);  // TODO not checked in the documentation
-		transfer_length = get_uint32_t(&CDB[10]);
+		get_lba_len(CDB, cs_16, &lba, &transfer_length);
 		DOLOG(logging::ll_debug, "scsi::write_same", identifier, "WRITE_SAME_16, LBA %" PRIu64 ", %u sectors, is unmap: %d", lba, transfer_length, response.r2t.write_same_is_unmap);
 	}
 	else if (opcode == o_write_same_10) {
-		lba             = get_uint32_t(&CDB[2]);
-		transfer_length = (CDB[7] << 8) | CDB[8];
+		get_lba_len(CDB, cs_10, &lba, &transfer_length);
 		DOLOG(logging::ll_debug, "scsi::write_same", identifier, "WRITE_SAME_10, LBA %" PRIu64 ", %u sectors, is unmap: %d", lba, transfer_length, response.r2t.write_same_is_unmap);
 	}
 
