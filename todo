@@ -2,7 +2,6 @@
 - configurable:
   - async writes
   - name of disk-image on SD card
-- does not send syslog when connected to wifi only
 
 - leds stay on
 
@@ -10,9 +9,6 @@
         [SKIPPED] Not an iSCSI device. Skipping test
         [SKIPPED] Not an iSCSI device. Skipping test
   what is this?!
-
-- FUA bit
- - some sort of (write) cache?
 
 - https://mibbrowser.online/mibdb_search.php?mib=SCSI-MIB
 
