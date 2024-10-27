@@ -185,12 +185,12 @@ bool com_client_sockets::recv(uint8_t *const to, const size_t n)
 		int rc = poll(fds, 1, 100);
 		if (rc == -1) {
 			DOLOG(logging::ll_error, "com_client_sockets::recv", get_endpoint_name(), "poll failed with error %s", strerror(errno));
-			break;
+			return false;
 		}
 
 		if (*stop == true) {
 			DOLOG(logging::ll_info, "com_client_sockets::recv", get_endpoint_name(), "abort due external stop");
-			break;
+			return false;
 		}
 #endif
 
@@ -202,12 +202,12 @@ bool com_client_sockets::recv(uint8_t *const to, const size_t n)
 #endif
 			if (n_read == -1) {
 				DOLOG(logging::ll_error, "com_client_sockets::recv", get_endpoint_name(), "read failed with error %s", strerror(errno));
-				break;
+				return false;
 			}
 
 			if (n_read == 0) {
 				DOLOG(logging::ll_info, "com_client_sockets::recv", get_endpoint_name(), "socket closed");
-				break;
+				return false;
 			}
 
 			offset += n_read;
