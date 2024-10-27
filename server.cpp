@@ -159,6 +159,7 @@ std::tuple<iscsi_pdu_bhs *, iscsi_fail_reason, uint64_t> server::receive_pdu(com
 			uint8_t *ahs_temp = new uint8_t[ahs_len]();
 			if (cc->recv(ahs_temp, ahs_len) == false) {
 				ok = false;
+				pdu_error = IFR_CONNECTION;
 				DOLOG(logging::ll_info, "server::receive_pdu", cc->get_endpoint_name(), "AHS receive error");
 			}
 			else {
@@ -176,6 +177,7 @@ std::tuple<iscsi_pdu_bhs *, iscsi_fail_reason, uint64_t> server::receive_pdu(com
 
 			if (cc->recv(reinterpret_cast<uint8_t *>(&remote_header_digest), sizeof remote_header_digest) == false) {
 				ok = false;
+				pdu_error = IFR_CONNECTION;
 				DOLOG(logging::ll_info, "server::receive_pdu", cc->get_endpoint_name(), "header digest receive error");
 			}
 			else {
@@ -204,6 +206,7 @@ std::tuple<iscsi_pdu_bhs *, iscsi_fail_reason, uint64_t> server::receive_pdu(com
 			uint8_t *data_temp = new uint8_t[padded_data_length]();
 			if (cc->recv(data_temp, padded_data_length) == false) {
 				ok = false;
+				pdu_error = IFR_CONNECTION;
 				DOLOG(logging::ll_info, "server::receive_pdu", cc->get_endpoint_name(), "data receive error");
 			}
 			else {
@@ -222,6 +225,7 @@ std::tuple<iscsi_pdu_bhs *, iscsi_fail_reason, uint64_t> server::receive_pdu(com
 
 				if (cc->recv(reinterpret_cast<uint8_t *>(&remote_data_digest), sizeof remote_data_digest) == false) {
 					ok = false;
+					pdu_error = IFR_CONNECTION;
 					DOLOG(logging::ll_info, "server::receive_pdu", cc->get_endpoint_name(), "data digest receive error");
 				}
 				else {
