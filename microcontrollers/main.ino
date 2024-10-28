@@ -20,19 +20,16 @@
 #elif defined(WEMOS32_ETH)
 #include <ESP32-ENC28J60.h>
 #elif !defined(TEENSY4_1)
-#if defined(WT_ETH01)
-#ifdef ETH_CLK_MODE
-#undef ETH_CLK_MODE
-#endif
-#define ETH_CLK_MODE  ETH_CLOCK_GPIO0_IN
-#define ETH_POWER_PIN GPIO_NUM_16
-#define ETH_POWER_PIN_ALTERNATIVE 16
-#define ETH_TYPE      ETH_PHY_LAN8720
-#define ETH_ADDR     1
-#define ETH_MDC_PIN   GPIO_NUM_23
-#define ETH_MDIO_PIN  GPIO_NUM_18
-#endif
 #include <ETH.h>
+#if defined(WT_ETH01)
+#define ETH_ADDR        1
+#define ETH_POWER_PIN   16//-1 //16 // Do not use it, it can cause conflict during the software reset.
+#define ETH_POWER_PIN_ALTERNATIVE 16 //17
+#define ETH_MDC_PIN    23
+#define ETH_MDIO_PIN   18
+#define ETH_TYPE       ETH_PHY_LAN8720
+#define ETH_CLK_MODE    ETH_CLOCK_GPIO17_OUT // ETH_CLOCK_GPIO0_IN
+#endif
 #endif
 #if defined(ESP32)
 #include <esp_pthread.h>
@@ -608,8 +605,8 @@ void setup() {
   pinMode(ETH_POWER_PIN_ALTERNATIVE, OUTPUT);
   digitalWrite(ETH_POWER_PIN_ALTERNATIVE, HIGH);
 
-	ETH.begin();  // ESP32-WT-ETH01, w32-eth01
-  //ETH.begin(ETH_ADDR, ETH_POWER_PIN, ETH_MDC_PIN, ETH_MDIO_PIN, ETH_TYPE, ETH_CLK_MODE);
+  if (ETH.begin(ETH_TYPE, ETH_ADDR, ETH_MDC_PIN, ETH_MDIO_PIN, ETH_POWER_PIN, ETH_CLK_MODE) == false)
+    Serial.println(F("Ethernet init FAILED"));
 #endif
 	initlogger();
 
