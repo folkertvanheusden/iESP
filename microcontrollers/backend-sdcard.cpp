@@ -13,12 +13,6 @@
 #ifdef RP2040W
 #define SD_CS 17
 #define SDCARD_SPI SPI1
-#else
-// Ethernet:
-// 18 SCK
-// 19 MISO
-// 23 MOSI
-// 5  CS
 #endif
 
 extern void write_led(const int gpio, const int state);
@@ -67,7 +61,16 @@ bool backend_sdcard::reinit(const bool close_first)
 #else
 	bool ok = false;
 	SPI.begin(pin_SD_SCLK, pin_SD_MISO, pin_SD_MOSI, pin_SD_CS);
-
+#if defined(WT_ETH01)
+	for(int sp=22; sp>=14; sp -= 2) {
+		Serial.printf("Trying %d MHz...\r\n", sp);
+		if (sd.begin(SdSpiConfig(pin_SD_CS, DEDICATED_SPI, SD_SCK_MHZ(sp)))) {
+			ok = true;
+			Serial.printf("Accessing SD card at %d MHz\r\n", sp);
+			break;
+		}
+	}
+#else
 	for(int sp=50; sp>=14; sp -= 4) {
 		Serial.printf("Trying %d MHz...\r\n", sp);
 		if (sd.begin(SdSpiConfig(pin_SD_CS, SHARED_SPI, SD_SCK_MHZ(sp)))) {
@@ -76,6 +79,7 @@ bool backend_sdcard::reinit(const bool close_first)
 			break;
 		}
 	}
+#endif
 
 	if (ok == false) {
 		Serial.printf("SD-card mount failed (assuming CS is on pin %d)\r\n", pin_SD_CS);

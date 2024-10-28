@@ -20,6 +20,18 @@
 #elif defined(WEMOS32_ETH)
 #include <ESP32-ENC28J60.h>
 #elif !defined(TEENSY4_1)
+#if defined(WT_ETH01)
+#ifdef ETH_CLK_MODE
+#undef ETH_CLK_MODE
+#endif
+#define ETH_CLK_MODE  ETH_CLOCK_GPIO0_IN
+#define ETH_POWER_PIN GPIO_NUM_16
+#define ETH_POWER_PIN_ALTERNATIVE 16
+#define ETH_TYPE      ETH_PHY_LAN8720
+#define ETH_ADDR     1
+#define ETH_MDC_PIN   GPIO_NUM_23
+#define ETH_MDIO_PIN  GPIO_NUM_18
+#endif
 #include <ETH.h>
 #endif
 #if defined(ESP32)
@@ -27,7 +39,9 @@
 #endif
 #include <LittleFS.h>
 #include <NTP.h>
+#if !defined(WT_ETH01)
 #include <TM1637.h>
+#endif
 
 #if defined(TEENSY4_1)
 #include "backend-sdcard-teensy41.h"
@@ -58,9 +72,9 @@ backend  *bs   { nullptr };
 scsi *scsi_dev { nullptr };
 
 #if defined(WT_ETH01)
-int led_green  = 4;
-int led_yellow = 5;
-int led_red    = 35;
+int led_green  = -1;
+int led_yellow = -1;
+int led_red    = -1;
 #elif defined(WEMOS32_ETH) || defined(WEMOS32)
 int led_green  = -1;
 int led_yellow = -1;
@@ -74,10 +88,17 @@ int led_green  = -1;
 int led_yellow = -1;
 int led_red    = -1;
 #endif
+#if defined(WT_ETH01)
+int pin_SD_MISO= -1;
+int pin_SD_MOSI= -1;
+int pin_SD_SCLK= -1;
+int pin_SD_CS  = -1;
+#else
 int pin_SD_MISO= 19;
 int pin_SD_MOSI= 23;
 int pin_SD_SCLK= 18;
 int pin_SD_CS  =  5;
+#endif
 
 snmp      *snmp_      { nullptr };
 snmp_data *snmp_data_ { nullptr };
@@ -116,7 +137,9 @@ int eth_wait_seconds = 10;
 int update_df_interval = 0;
 int percentage_diskspace = 0;
 
+#if !defined(WT_ETH01)
 TM1637 *TM { nullptr };
+#endif
 
 long int draw_status_ts = 0;
 
@@ -125,12 +148,16 @@ void draw_status(const uint32_t v) {
   CrashReport.breadcrumb(5, v);
 #endif
 
+#if defined(WT_ETH01)
+  Serial.printf("draw_status: %04x\r\n", v);
+#else
 	if (TM) {
 		draw_status_ts = millis();
 
 		TM->setBrightness(8);
 		TM->displayInt(v);
 	}
+#endif
 }
 
 int get_diskspace(void *const context)
@@ -301,7 +328,7 @@ void enable_OTA() {
 }
 #endif
 
-volatile bool eth_connected = false;
+volatile bool eth_connected  = false;
 volatile bool wifi_connected = false;
 
 bool is_network_up()
@@ -330,8 +357,10 @@ void loopw(void *)
 	for(;;) {
 		auto now = millis();
 		if (now - draw_status_ts > 5000) {
+#if !defined(WT_ETH01)
 			if (TM)
 				TM->setBrightness(1);
+#endif
 			draw_status_ts = now;
 		}
 
@@ -475,7 +504,7 @@ void setup() {
 	}
 #endif
 
-#if !defined(TEENSY4_1)
+#if !defined(TEENSY4_1) && !defined(WT_ETH01)
 	TM = new TM1637();
 	TM->begin(21, 22, 4);  // TEENSY4.1: pins
 	TM->setBrightness(1);
@@ -543,8 +572,8 @@ void setup() {
 #if defined(TEENSY4_1)
 	qn::Ethernet.setHostname(name);
 #else
-	set_hostname(name);
 	wifi_connected = setup_wifi();
+	set_hostname(name);
 #endif
 #if defined(WEMOS32_ETH)
 	//begin(int MISO_GPIO, int MOSI_GPIO, int SCLK_GPIO, int CS_GPIO, int INT_GPIO, int SPI_CLOCK_MHZ, int SPI_HOST, bool use_mac_from_efuse=false)
@@ -576,21 +605,23 @@ void setup() {
 #elif defined(WEMOS32)
 //
 #else
+  pinMode(ETH_POWER_PIN_ALTERNATIVE, OUTPUT);
+  digitalWrite(ETH_POWER_PIN_ALTERNATIVE, HIGH);
+
 	ETH.begin();  // ESP32-WT-ETH01, w32-eth01
+  //ETH.begin(ETH_ADDR, ETH_POWER_PIN, ETH_MDC_PIN, ETH_MDIO_PIN, ETH_TYPE, ETH_CLK_MODE);
 #endif
 	initlogger();
 
 	draw_status(8);
-
 	ntp.begin();
 
 	draw_status(10);
-
 #if !defined(TEENSY4_1)
 	esp_register_freertos_idle_hook_for_cpu(idle_task_0, 0);
 	esp_register_freertos_idle_hook_for_cpu(idle_task_1, 1);
 #endif
-
+ 
 #if defined(ESP32)
 	esp_pthread_cfg_t cfg = esp_pthread_get_default_config();
 	Serial.printf("Original pthread stack size: %d\r\n", cfg.stack_size);
@@ -602,6 +633,7 @@ void setup() {
 #if defined(TEENSY4_1)
 	bs = new backend_sdcard_teensy41(led_green, led_yellow);
 #else
+  Serial.printf("LEDgreen: %d, LEDyellow: %d, MISO: %d, MOSI: %d, SCLK: %d, CS: %d\r\n", led_green, led_yellow, pin_SD_MISO, pin_SD_MOSI, pin_SD_SCLK, pin_SD_CS);
 	bs = new backend_sdcard(led_green, led_yellow, pin_SD_MISO, pin_SD_MOSI, pin_SD_SCLK, pin_SD_CS);
 #endif
 

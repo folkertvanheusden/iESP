@@ -1,9 +1,13 @@
 #include <Arduino.h>
 #include <esp_wifi.h>
 #include <string>
+#if defined(WT_ETH01)
+#include <ETH.h>
+#endif
 
 #include "log.h"
 #include "main.h"
+#include "utils.h"
 #include "wifi.h"
 
 
