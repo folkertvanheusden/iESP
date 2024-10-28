@@ -1,6 +1,6 @@
 #if defined(ESP32) || defined(RP2040W) || defined(TEENSY4_1)
 #include <Arduino.h>
-#ifndef TEENSY4_1
+#if !defined(TEENSY4_1)
 #include <WiFi.h>
 #endif
 #endif
@@ -21,6 +21,7 @@
 
 #include "iscsi-pdu.h"
 #include "log.h"
+#include "main.h"
 #include "server.h"
 #include "utils.h"
 
@@ -545,6 +546,10 @@ void server::handler()
 
 		std::thread *th = new std::thread([=, this]() {
 #endif
+			write_led(led_green,  LOW);
+			write_led(led_yellow, LOW);
+			write_led(led_red,    LOW);
+
 			std::string endpoint = cc->get_endpoint_name();
 
 #if defined(ESP32) || defined(RP2040W) || defined(TEENSY4_1)
@@ -562,13 +567,11 @@ void server::handler()
 			auto          block_size   = s->get_block_size();
 
 			do {
+#if defined(LED_BUILTIN) && defined(ARDUINO)
+				digitalWrite(LED_BUILTIN, LOW);
+#endif
 				auto incoming = receive_pdu(cc, &ses);
 				iscsi_pdu_bhs *pdu = std::get<0>(incoming);
-				if (!pdu) {
-					DOLOG(logging::ll_info, "server::handler", endpoint, "no PDU received, aborting socket connection");
-					is->iscsiInstSsnFailures++;
-					break;
-				}
 
 				is->iscsiSsnCmdPDUs++;
 
@@ -590,14 +593,20 @@ void server::handler()
 						reason = 0x09;
 					}
 					else if (ifr == IFR_IO_ERROR) {
-			                        auto *temp = new iscsi_pdu_scsi_response(ses) /* 0x21 */;
+						if (pdu) {
+							auto *temp = new iscsi_pdu_scsi_response(ses) /* 0x21 */;
 
-						if (temp->set(*reinterpret_cast<iscsi_pdu_scsi_cmd *>(pdu), s->error_read_error(), { }, 0x09) == false) {
-							reason = IFR_CONNECTION;
-							DOLOG(logging::ll_info, "server::handler", ses->get_endpoint_name(), "iscsi_pdu_scsi_response::set returned error");
+							if (temp->set(*reinterpret_cast<iscsi_pdu_scsi_cmd *>(pdu), s->error_read_error(), { }, 0x09) == false) {
+								// do not override ifr: IO error is far more important than any other error
+								DOLOG(logging::ll_info, "server::handler", ses->get_endpoint_name(), "iscsi_pdu_scsi_response::set returned error");
+							}
+
+							reject = temp->get()[0];
+							delete temp;
 						}
-
-						reject = temp->get()[0];
+						else {
+							DOLOG(logging::ll_info, "server::handler", ses->get_endpoint_name(), "No PDU to respond to");
+						}
 					}
 					else if (ifr == IFR_DIGEST) {
 						is->iscsiInstSsnDigestErrors++;
@@ -673,6 +682,10 @@ void server::handler()
 					ses->reset_bytes_tx();
 					busy       = 0;
 				}
+
+#if defined(LED_BUILTIN) && defined(ARDUINO)
+				digitalWrite(LED_BUILTIN, HIGH);
+#endif
 			}
 			while(ok);
 #if defined(ESP32)

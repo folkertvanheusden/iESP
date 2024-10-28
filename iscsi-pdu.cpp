@@ -592,7 +592,7 @@ bool iscsi_pdu_scsi_response::set(const iscsi_pdu_scsi_cmd & reply_to, const std
 		else if (has_residual.value().first == iSR_OVERFLOW)
 			set_bits(&pdu_response->b2, 2, 1, true);  // O (residual overflow)
 		else
-			assert(false);
+			return false;
 
 		pdu_response->ResidualCt = my_HTONL(has_residual.value().second);
 	}
