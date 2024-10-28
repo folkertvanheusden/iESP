@@ -12,8 +12,8 @@
 	"led-green": -1,
 	"led-yellow": -1,
 	"led-red": -1,
-	"SD_MISO": 19,
-	"SD_MOSI": 23,
-	"SD_SCLK": 18,
-	"SD_CS": 5
+	"SD-MISO": 19,
+	"SD-MOSI": 23,
+	"SD-SCLK": 18,
+	"SD-CS": 5
 }
