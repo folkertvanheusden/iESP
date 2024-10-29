@@ -48,3 +48,5 @@ void socket_set_nodelay(const int fd);
 #define my_NTOHLL(x) ((1==my_NTOHL(1)) ? (x) : (((uint64_t)my_NTOHL((x) & 0xFFFFFFFFUL)) << 32) | my_NTOHL((uint32_t)((x) >> 32)))
 
 extern uint64_t running_since;
+
+void my_yield();

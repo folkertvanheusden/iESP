@@ -321,3 +321,14 @@ void socket_set_nodelay(const int fd)
 #endif
 		DOLOG(logging::ll_error, "com_client_sockets", "-", "cannot disable Nagle algorithm");
 }
+
+void my_yield()
+{
+#if defined(ESP32)
+	vTaskDelay(1 / portTICK_PERIOD_MS);
+#elif defined(__FreeBSD__) || defined(__MINGW32__) || defined(linux) || defined(__APPLE__)
+	// don't
+#else
+	yield();
+#endif
+}
