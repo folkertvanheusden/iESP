@@ -333,7 +333,7 @@ bool is_network_up()
 	return eth_connected || wifi_connected;
 }
 
-#ifndef TEENSY4_1
+#if !defined(TEENSY4_1)
 void heap_caps_alloc_failed_hook(size_t requested_size, uint32_t caps, const char *function_name)
 {
 	write_led(led_red, HIGH);
@@ -574,8 +574,15 @@ void setup() {
 #endif
 #if defined(WEMOS32_ETH)
 	//begin(int MISO_GPIO, int MOSI_GPIO, int SCLK_GPIO, int CS_GPIO, int INT_GPIO, int SPI_CLOCK_MHZ, int SPI_HOST, bool use_mac_from_efuse=false)
+#define ENC_SPI_HOST   3
+#define SPI_CLOCK_MHZ  8
+#define INT_GPIO       4
+#define MISO_GPIO 19
+#define MOSI_GPIO 23
+#define SCLK_GPIO 18
+#define CS_GPIO   5
 	bool eth_ok = false;
-	if (ETH.begin(19, 23, 18, 5, 4, 9, 1, false) == true) {  // ENC28J60
+	if (ETH.begin(MISO_GPIO, MOSI_GPIO, SCLK_GPIO, CS_GPIO, INT_GPIO, SPI_CLOCK_MHZ, ENC_SPI_HOST) == true) {  // ENC28J60
 		eth_ok = true;
 		Serial.println(F("ENC28J60 ok!"));
 	}
@@ -605,7 +612,7 @@ void setup() {
   pinMode(ETH_POWER_PIN_ALTERNATIVE, OUTPUT);
   digitalWrite(ETH_POWER_PIN_ALTERNATIVE, HIGH);
 
-  if (ETH.begin(ETH_TYPE, ETH_ADDR, ETH_MDC_PIN, ETH_MDIO_PIN, ETH_POWER_PIN, ETH_CLK_MODE) == false)
+  if (ETH.begin() == false)
     Serial.println(F("Ethernet init FAILED"));
 #endif
 	initlogger();

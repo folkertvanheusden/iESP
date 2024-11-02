@@ -3,6 +3,8 @@
 #include <string>
 #if defined(WT_ETH01)
 #include <ETH.h>
+#elif defined(WEMOS32_ETH)
+#include <ESP32-ENC28J60.h>
 #endif
 
 #include "log.h"
