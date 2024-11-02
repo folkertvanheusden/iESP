@@ -21,7 +21,6 @@
 
 #include "iscsi-pdu.h"
 #include "log.h"
-#include "main.h"
 #include "server.h"
 #include "utils.h"
 
@@ -546,10 +545,6 @@ void server::handler()
 
 		std::thread *th = new std::thread([=, this]() {
 #endif
-			write_led(led_green,  LOW);
-			write_led(led_yellow, LOW);
-			write_led(led_red,    LOW);
-
 			std::string endpoint = cc->get_endpoint_name();
 
 #if defined(ESP32) || defined(RP2040W) || defined(TEENSY4_1)
