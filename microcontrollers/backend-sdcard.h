@@ -1,4 +1,7 @@
 #include <mutex>
+#if defined(WT_ETH01)
+#define SPI_DRIVER_SELECT 1
+#endif
 #include <SdFat.h>
 #include <string>
 

@@ -64,7 +64,7 @@ bool backend_sdcard::reinit(const bool close_first)
 #if defined(WT_ETH01)
 	for(int sp=22; sp>=14; sp -= 2) {
 		Serial.printf("Trying %d MHz...\r\n", sp);
-		if (sd.begin(SdSpiConfig(pin_SD_CS, DEDICATED_SPI, SD_SCK_MHZ(sp)))) {
+		if (sd.begin(SdSpiConfig(pin_SD_CS, SHARED_SPI, SD_SCK_MHZ(sp)))) {
 			ok = true;
 			Serial.printf("Accessing SD card at %d MHz\r\n", sp);
 			break;
