@@ -734,23 +734,29 @@ void loop()
 {
 	draw_status(201);
 	{
-		char buffer[16];
+		char        buffer[16];
+    const char *connection = "?";
 #if defined(TEENSY4_1)
 		auto ip = qn::Ethernet.localIP();
 		snprintf(buffer, sizeof buffer, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+    connection = "Ethernet";
 #elif defined(WEMOS32)
 		auto ip = WiFi.localIP();
 		snprintf(buffer, sizeof buffer, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+    connection = "WiFi";
 #else
 		auto ipe = ETH.localIP();
 		auto ipw = WiFi.localIP();
-		if (ipe == IPAddress(uint32_t(0)))  // not connected to Ethernet? then use WiFi IP-address
+		if (ipe == IPAddress(uint32_t(0))) {  // not connected to Ethernet? then use WiFi IP-address
 			snprintf(buffer, sizeof buffer, "%d.%d.%d.%d", ipw[0], ipw[1], ipw[2], ipw[3]);
-		else
+      connection = "WiFi";
+    }
+		else {
 			snprintf(buffer, sizeof buffer, "%d.%d.%d.%d", ipe[0], ipe[1], ipe[2], ipe[3]);
+      connection = "Ethernet";
+    }
 #endif
-		Serial.print(F("Will listen on (in a bit): "));
-		Serial.println(buffer);
+		Serial.printf("Will listen on (in a bit): %s (%s)\r\n", buffer, connection);
 
 		draw_status(205);
 #if defined(TEENSY4_1)
