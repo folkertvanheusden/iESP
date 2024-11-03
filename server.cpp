@@ -413,7 +413,11 @@ iscsi_fail_reason server::push_response(com_client *const cc, session *const ses
 
 		DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "SCSI: stream %u sectors starting at LBA %" PRIu64 ", iSCSI: %u", stream_parameters.n_sectors, stream_parameters.lba, reply_to.get_ExpDatLen());
 
+#if defined(ARDUINO)
+		uint64_t buffer_n    = std::max(MAX_DATA_SEGMENT_SIZE, get_free_heap_space() / 2);
+#else
 		uint64_t buffer_n    = MAX_DATA_SEGMENT_SIZE;
+#endif
 
 		uint32_t scsi_has    = stream_parameters.n_sectors * s->get_block_size();
 		uint32_t iscsi_wants = reply_to.get_ExpDatLen();
@@ -430,7 +434,7 @@ iscsi_fail_reason server::push_response(com_client *const cc, session *const ses
                         if (scsi_has < iscsi_wants)
                                 residual_state = { iSR_UNDERFLOW, iscsi_wants - scsi_has };
                         else if (scsi_has > iscsi_wants)
-                                residual_state = { iSR_OVERFLOW, scsi_has - iscsi_wants };
+                                residual_state = { iSR_OVERFLOW,  scsi_has - iscsi_wants };
 
                         if (temp->set(reply_to, { }, residual_state, { }) == false) {
                                 ifr = IFR_MISC;
