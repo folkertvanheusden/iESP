@@ -111,7 +111,7 @@ void WiFiEvent(WiFiEvent_t event)
 			break;
 	}
 
-	DOLOG(logging::ll_info, "WiFiEvent", "-", "%s", msg.c_str());
+	Serial.printf("WiFiEvent: %s\r\n", msg.c_str());
 	write_led(led_red, LOW);
 }
 
