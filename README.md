@@ -17,8 +17,10 @@ compiling
 ---------
 For the ESP32/Teensy4.1:
 * cd microcontrollers
-* pio run -t upload -e ESP32-wemos  # Wemos32
-* pio run -t upload -e Teensy4_1 # Teensy4.1
+* adjust the settings in data/cfg-iESP.json (see cfg-iESP.json.example)
+* pio run -t upload -e ESP32-wemos     # Wemos32    (WiFi)
+* pio run -t upload -e ESP32-WT-ETH01  # WT32-ETH01 (Ethernet)
+* pio run -t upload -e Teensy4_1       # Teensy4.1  (Ethernet)
 
 For the Raspberry Pi Pico (RP2040W):
 * cd microcontrollers/RP2040
