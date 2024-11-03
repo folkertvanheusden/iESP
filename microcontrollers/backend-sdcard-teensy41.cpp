@@ -32,6 +32,8 @@ bool backend_sdcard_teensy41::begin()
 		return false;
 	}
 
+	Serial.printf("Card serial: %s\r\n", get_serial().c_str());
+
 	SD.sdfs.ls(LS_DATE | LS_SIZE);
 
 	file = SD.sdfs.open(FILENAME, O_RDWR);

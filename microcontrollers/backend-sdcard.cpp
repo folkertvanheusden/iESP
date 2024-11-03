@@ -34,8 +34,10 @@ backend_sdcard::backend_sdcard(const int led_read, const int led_write, const in
 bool backend_sdcard::begin()
 {
 	for(int i=0; i<3; i++) {
-		if (reinit(i))
+		if (reinit(i)) {
+			Serial.printf("Card serial: %s\r\n", get_serial().c_str());
 			return true;
+		}
 	}
 
 	Serial.println(F("SD-card init failed"));
