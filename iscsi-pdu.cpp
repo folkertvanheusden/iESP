@@ -341,6 +341,9 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 			"DefaultTime2Wait=2",
 			"DefaultTime2Retain=20",
 			"InitialR2T=Yes",
+			myformat("FirstBurstLength=%d", MAX_DATA_SEGMENT_SIZE),
+			myformat("MaxBurstLength=%d", MAX_DATA_SEGMENT_SIZE),
+			myformat("MaxRecvDataSegmentLength=%d", MAX_DATA_SEGMENT_SIZE),
 		};
 		for(const auto & kv : kvs)
 			DOLOG(logging::ll_debug, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "send KV \"%s\"", kv.c_str());
