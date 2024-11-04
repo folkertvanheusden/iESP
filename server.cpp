@@ -197,6 +197,15 @@ std::tuple<iscsi_pdu_bhs *, iscsi_fail_reason, uint64_t> server::receive_pdu(com
 			DOLOG(logging::ll_debug, "server::receive_pdu", cc->get_endpoint_name(), "initiator is pushing too much data (%zu bytes, max is %u)", data_length, MAX_DATA_SEGMENT_SIZE);
 			ok        = false;
 			pdu_error = IFR_INVALID_FIELD;
+
+			uint8_t temp[32];
+			size_t temp_len = data_length;
+			while(temp_len) {
+				if (cc->recv(temp, std::min(temp_len, sizeof temp)) == false) {
+					pdu_error = IFR_CONNECTION;
+					break;
+				}
+			}
 		}
 		else if (data_length) {
 			size_t padded_data_length = (data_length + 3) & ~3;
