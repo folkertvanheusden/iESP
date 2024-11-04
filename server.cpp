@@ -423,7 +423,7 @@ iscsi_fail_reason server::push_response(com_client *const cc, session *const ses
 		DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "SCSI: stream %u sectors starting at LBA %" PRIu64 ", iSCSI: %u", stream_parameters.n_sectors, stream_parameters.lba, reply_to.get_ExpDatLen());
 
 #if defined(ARDUINO)
-		uint64_t buffer_n    = std::max(MAX_DATA_SEGMENT_SIZE, get_free_heap_space() / 2);
+		uint64_t buffer_n    = std::max((long unsigned)MAX_DATA_SEGMENT_SIZE, get_free_heap_space() / 2);
 #else
 		uint64_t buffer_n    = MAX_DATA_SEGMENT_SIZE;
 #endif
