@@ -18,8 +18,10 @@ private:
 	uint32_t          data_sn       { 0       };
 	uint32_t          block_size    { 0       };
 
-	uint64_t          bytes_rx      { 0       };
-	uint64_t          bytes_tx      { 0       };
+	struct {
+		uint64_t  bytes_rx      { 0       };
+		uint64_t  bytes_tx      { 0       };
+	} statistics;
 
 	uint32_t          max_seg_len   { MAX_DATA_SEGMENT_SIZE };
 
@@ -47,12 +49,12 @@ public:
 	void     set_max_seg_len(const uint32_t v) { max_seg_len = v; }
 	uint32_t get_max_seg_len() const { return max_seg_len; }
 
-	void     add_bytes_rx(const uint64_t n) { bytes_rx += n; }
-	uint64_t get_bytes_rx() const { return bytes_rx; }
-	void     reset_bytes_rx() { bytes_rx = 0; }
-	void     add_bytes_tx(const uint64_t n) { bytes_tx += n; }
-	uint64_t get_bytes_tx() const { return bytes_tx; }
-	void     reset_bytes_tx() { bytes_tx = 0; }
+	void     add_bytes_rx(const uint64_t n) { statistics.bytes_rx += n; }
+	uint64_t get_bytes_rx() const { return statistics.bytes_rx; }
+	void     reset_bytes_rx() { statistics.bytes_rx = 0; }
+	void     add_bytes_tx(const uint64_t n) { statistics.bytes_tx += n; }
+	uint64_t get_bytes_tx() const { return statistics.bytes_tx; }
+	void     reset_bytes_tx() { statistics.bytes_tx = 0; }
 
 	uint32_t get_inc_datasn(const uint32_t itt);
 
