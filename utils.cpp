@@ -34,8 +34,7 @@ ssize_t READ(const int fd, uint8_t *whereto, size_t len)
 {
 	ssize_t cnt = len;
 
-	while(len > 0)
-	{
+	while(len > 0) {
 		ssize_t rc = read(fd, whereto, len);
 		if (rc <= 0)
 			return rc;
@@ -68,8 +67,7 @@ std::vector<std::string> split(std::string in, const std::string & splitter)
 	std::vector<std::string> out;
 	size_t splitter_size = splitter.size();
 
-	for(;;)
-	{
+	for(;;) {
 		size_t pos = in.find(splitter);
 		if (pos == std::string::npos)
 			break;
@@ -78,8 +76,7 @@ std::vector<std::string> split(std::string in, const std::string & splitter)
 		out.push_back(before);
 
 		size_t bytes_left = in.size() - (pos + splitter_size);
-		if (bytes_left == 0)
-		{
+		if (bytes_left == 0) {
 			out.push_back("");
 			return out;
 		}
