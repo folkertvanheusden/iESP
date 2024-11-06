@@ -57,7 +57,7 @@ const std::map<scsi::scsi_opcode, scsi_opcode_details> scsi_a3_data {
 
 constexpr const uint8_t max_compare_and_write_block_count = 1;
 
-scsi::scsi(backend *const b, const int trim_level, io_stats_t *const is) : b(b), trim_level(trim_level), is(is), serial(b->get_serial())
+scsi::scsi(backend *const b, const int trim_level) : b(b), trim_level(trim_level), serial(b->get_serial())
 {
 }
 
@@ -384,7 +384,7 @@ void get_lba_len(const uint8_t *const CDB, const cdb_size_t s, uint64_t *const l
 	}
 }
 
-scsi_response scsi::write_verify(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data, const uint8_t opcode)
+scsi_response scsi::write_verify(io_stats_t *const is, const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data, const uint8_t opcode)
 {
 	scsi_response response(ir_as_is);
 
@@ -432,7 +432,7 @@ scsi_response scsi::write_verify(const std::string & identifier, const uint64_t 
 
 		uint32_t work_n_blocks  = std::min(transfer_length, uint32_t(received_blocks));
 		if (received_blocks > 0) {
-			rc = write(lba, work_n_blocks, data.first);
+			rc = write(is, lba, work_n_blocks, data.first);
 			ok = rc == scsi_rw_result::rw_ok;
 		}
 
@@ -441,10 +441,10 @@ scsi_response scsi::write_verify(const std::string & identifier, const uint64_t 
 			uint8_t *temp_buffer = new uint8_t[backend_block_size];
 
 			// received_blocks is rounded down above
-			rc = read(lba + work_n_blocks, 1, temp_buffer);
+			rc = read(is, lba + work_n_blocks, 1, temp_buffer);
 			if (rc == scsi_rw_result::rw_ok) {
 				memcpy(temp_buffer, &data.first[work_n_blocks * backend_block_size], fragment_size);
-				rc = write(lba + received_blocks, 1, temp_buffer);
+				rc = write(is, lba + received_blocks, 1, temp_buffer);
 			}
 
 			ok = rc == scsi_rw_result::rw_ok;
@@ -469,7 +469,7 @@ scsi_response scsi::write_verify(const std::string & identifier, const uint64_t 
 				DOLOG(logging::ll_debug, "scsi::write_verify", identifier, "received_size == expected_size");
 
 				if (fua)
-					this->sync();
+					this->sync(is);
 			}
 			else {  // allow R2T packets to come in
 				response.type           = ir_r2t;
@@ -546,12 +546,12 @@ scsi_response scsi::read_(const std::string & identifier, const uint64_t lun, co
 	return response;
 }
 
-scsi_response scsi::sync_cache(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data)
+scsi_response scsi::sync_cache(io_stats_t *const is, const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data)
 {
 	scsi_response response(ir_empty_sense);
 
 	DOLOG(logging::ll_debug, "scsi::sync_cache", identifier, "SYNC CACHE 10");
-	this->sync();
+	this->sync(is);
 
 	return response;
 }
@@ -639,7 +639,7 @@ scsi_response scsi::report_supported_operation_codes(const std::string & identif
 	return response;
 }
 
-scsi_response scsi::compare_and_write(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data)
+scsi_response scsi::compare_and_write(io_stats_t *const is, const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data)
 {
 	scsi_response response(ir_as_is);
 
@@ -664,7 +664,7 @@ scsi_response scsi::compare_and_write(const std::string & identifier, const uint
 		response.sense_data = error_compare_and_write_count();
 	}
 	else {
-		auto result = cmpwrite(lba, block_count, &data.first[block_count * block_size], &data.first[0]);
+		auto result = cmpwrite(is, lba, block_count, &data.first[block_count * block_size], &data.first[0]);
 
 		if (result == scsi_rw_result::rw_ok)
 			response.type = ir_empty_sense;
@@ -748,7 +748,7 @@ scsi_response scsi::release(const std::string & identifier, const uint64_t lun, 
 	return response;
 }
 
-scsi_response scsi::unmap(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data)
+scsi_response scsi::unmap(io_stats_t *const is, const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data)
 {
 	scsi_response response(ir_as_is);
 
@@ -775,7 +775,7 @@ scsi_response scsi::unmap(const std::string & identifier, const uint64_t lun, co
 		else if (transfer_length > 0) {  // 0 is not an error but the backend may not handle it well
 			DOLOG(logging::ll_debug, "scsi::unmap", identifier, "UNMAP trim LBA %" PRIu64 ", %u blocks", lba, transfer_length);
 
-			rc = trim(lba, transfer_length);
+			rc = trim(is, lba, transfer_length);
 			if (rc != rw_ok) {
 				DOLOG(logging::ll_error, "scsi::unmap", identifier, "UNMAP trim failed");
 				break;
@@ -797,7 +797,7 @@ scsi_response scsi::unmap(const std::string & identifier, const uint64_t lun, co
 	return response;
 }
 
-scsi_response scsi::write_same(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data, const uint8_t opcode)
+scsi_response scsi::write_same(io_stats_t *const is, const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data, const uint8_t opcode)
 {
 	scsi_response response(ir_as_is);
 
@@ -858,16 +858,16 @@ scsi_response scsi::write_same(const std::string & identifier, const uint64_t lu
 				else {
 					for(uint64_t i=lba; i<b->get_size_in_blocks() && rc == rw_ok; i++) {
 						rc = response.r2t.write_same_is_unmap ?
-							trim(i, 1) :
-							write(i, 1, data.first);
+							trim(is, i, 1) :
+							write(is, i, 1, data.first);
 					}
 				}
 			}
 			else {
 				for(uint32_t i=0; i<transfer_length && rc == rw_ok; i++, lba++) {
 					rc = response.r2t.write_same_is_unmap ?
-						trim(lba, 1) :
-						write(lba, 1, data.first);
+						trim(is, lba, 1) :
+						write(is, lba, 1, data.first);
 				}
 			}
 
@@ -903,7 +903,7 @@ scsi_response scsi::write_same(const std::string & identifier, const uint64_t lu
 	return response;
 }
 
-std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data)
+std::optional<scsi_response> scsi::send(io_stats_t *const is, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data)
 {
 	assert(size >= 16);
 
@@ -929,17 +929,17 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 	else if (opcode == o_get_lba_status)
 		response = get_lba_status(lun_identifier, lun, CDB, size, data);
 	else if (opcode == o_write_6 || opcode == o_write_10 || opcode == o_write_verify_10 || opcode == o_write_16)
-		response = write_verify(lun_identifier, lun, CDB, size, data, opcode);
+		response = write_verify(is, lun_identifier, lun, CDB, size, data, opcode);
 	else if (opcode == o_read_16 || opcode == o_read_10 || opcode == o_read_6)  // 0x88, 0x28, 0x08
 		response = read_(lun_identifier, lun, CDB, size, data, opcode);
 	else if (opcode == o_sync_cache_10)  // 0x35
-		response = sync_cache(lun_identifier, lun, CDB, size, data);
+		response = sync_cache(is, lun_identifier, lun, CDB, size, data);
 	else if (opcode == o_report_luns)  // 0xa0
 		response = report_luns(lun_identifier, lun, CDB, size, data);
 	else if (opcode == o_rep_sup_oper)  // 0xa3
 		response = report_supported_operation_codes(lun_identifier, lun, CDB, size, data);
 	else if (opcode == o_compare_and_write)  // 0x89
-		response = compare_and_write(lun_identifier, lun, CDB, size, data);
+		response = compare_and_write(is, lun_identifier, lun, CDB, size, data);
 	else if (opcode == o_prefetch_10 || opcode == o_prefetch_16)  // 0x34 & 0x90
 		response = prefetch(lun_identifier, lun, CDB, size, data, opcode);
 	else if (opcode == o_reserve_6)
@@ -947,9 +947,9 @@ std::optional<scsi_response> scsi::send(const uint64_t lun, const uint8_t *const
 	else if (opcode == o_release_6)
 		response = release(lun_identifier, lun, CDB, size, data);
 	else if (opcode == o_unmap)
-		response = unmap(lun_identifier, lun, CDB, size, data);
+		response = unmap(is, lun_identifier, lun, CDB, size, data);
 	else if (opcode == o_write_same_10 || opcode == o_write_same_16)  // 0x41 & 0x93
-		response = write_same(lun_identifier, lun, CDB, size, data, opcode);
+		response = write_same(is, lun_identifier, lun, CDB, size, data, opcode);
 	else {
 		DOLOG(logging::ll_warning, "scsi::send", lun_identifier, "opcode %02xh not implemented", opcode);
 		response.sense_data = error_not_implemented();
@@ -1026,12 +1026,12 @@ uint64_t scsi::get_block_size() const
 	return b->get_block_size();
 }
 
-scsi::scsi_rw_result scsi::sync()
+scsi::scsi_rw_result scsi::sync(io_stats_t *const is)
 {
 	if (locking_status() != l_locked_other) {  // locked by myself or not locked?
-		auto start = get_micros();
-		bool result = b->sync();
-		is->io_wait_cur += get_micros() - start;
+		auto start   = get_micros();
+		bool result  = b->sync();
+		is->io_wait += get_micros() - start;
 		return result ? rw_ok : rw_fail_general;
 	}
 
@@ -1043,7 +1043,7 @@ void scsi::get_and_reset_stats(uint64_t *const bytes_read, uint64_t *const bytes
 	return b->get_and_reset_stats(bytes_read, bytes_written, n_syncs, n_trims);
 }
 
-scsi::scsi_rw_result scsi::write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data)
+scsi::scsi_rw_result scsi::write(io_stats_t *const is, const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data)
 {
 	is->n_writes++;
 	is->bytes_written += n_blocks * b->get_block_size();
@@ -1072,7 +1072,7 @@ scsi::scsi_rw_result scsi::write(const uint64_t block_nr, const uint32_t n_block
 			result = b->write(block_nr, n_blocks, data);
 		}
 
-		is->io_wait_cur += get_micros() - start;
+		is->io_wait += get_micros() - start;
 
 		return result ? rw_ok : rw_fail_general;
 	}
@@ -1080,7 +1080,7 @@ scsi::scsi_rw_result scsi::write(const uint64_t block_nr, const uint32_t n_block
 	return rw_fail_locked;
 }
 
-scsi::scsi_rw_result scsi::trim(const uint64_t block_nr, const uint32_t n_blocks)
+scsi::scsi_rw_result scsi::trim(io_stats_t *const is, const uint64_t block_nr, const uint32_t n_blocks)
 {
 	if (locking_status() != l_locked_other) {  // locked by myself or not locked?
 		auto start = get_micros();
@@ -1088,19 +1088,19 @@ scsi::scsi_rw_result scsi::trim(const uint64_t block_nr, const uint32_t n_blocks
 			scsi::scsi_rw_result rc   = rw_ok;
 			uint8_t             *zero = new uint8_t[get_block_size()]();
 			for(uint32_t i=0; i<n_blocks; i++) {
-				rc = write(block_nr + i, 1, zero);
+				rc = write(is, block_nr + i, 1, zero);
 				if (rc != rw_ok)
 					break;
 			}
 			delete [] zero;
 
-			is->io_wait_cur += get_micros() - start;
+			is->io_wait += get_micros() - start;
 
 			return rc;
 		}
 		else {
-			bool result = b->trim(block_nr, n_blocks);
-			is->io_wait_cur += get_micros() - start;
+			bool result  = b->trim(block_nr, n_blocks);
+			is->io_wait += get_micros() - start;
 			if (result)
 				return rw_ok;
 		}
@@ -1111,22 +1111,22 @@ scsi::scsi_rw_result scsi::trim(const uint64_t block_nr, const uint32_t n_blocks
 	return rw_fail_locked;
 }
 
-scsi::scsi_rw_result scsi::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_t *const data)
+scsi::scsi_rw_result scsi::read(io_stats_t *const is, const uint64_t block_nr, const uint32_t n_blocks, uint8_t *const data)
 {
 	is->n_reads++;
 	is->bytes_read += n_blocks * b->get_block_size();
 
 	if (locking_status() != l_locked_other) {  // locked by myself or not locked?
-		auto start  = get_micros();
-		bool result = b->read(block_nr, n_blocks, data);
-		is->io_wait_cur += get_micros() - start;
+		auto start   = get_micros();
+		bool result  = b->read(block_nr, n_blocks, data);
+		is->io_wait += get_micros() - start;
 		return result ? rw_ok : rw_fail_general;
 	}
 	
 	return rw_fail_locked;
 }
 
-scsi::scsi_rw_result scsi::cmpwrite(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const write_data, const uint8_t *const compare_data)
+scsi::scsi_rw_result scsi::cmpwrite(io_stats_t *const is, const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const write_data, const uint8_t *const compare_data)
 {
 	is->n_reads++;
 	is->n_writes++;
@@ -1134,10 +1134,10 @@ scsi::scsi_rw_result scsi::cmpwrite(const uint64_t block_nr, const uint32_t n_bl
 	is->bytes_written += n_blocks * b->get_block_size();
 
 	if (locking_status() != l_locked_other) {
-		auto start  = get_micros();
-		auto result = b->cmpwrite(block_nr, n_blocks, write_data, compare_data);
+		auto start   = get_micros();
+		auto result  = b->cmpwrite(block_nr, n_blocks, write_data, compare_data);
 
-		is->io_wait_cur += get_micros() - start;
+		is->io_wait += get_micros() - start;
 
 		if (result == backend::cmpwrite_result_t::CWR_OK)
 			return rw_ok;

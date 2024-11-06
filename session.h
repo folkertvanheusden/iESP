@@ -4,6 +4,7 @@
 #include <optional>
 
 #include "com.h"
+#include "gen.h"
 #include "iscsi.h"
 
 
@@ -19,9 +20,10 @@ private:
 	uint32_t          block_size    { 0       };
 
 	struct {
-		uint64_t  bytes_rx      { 0       };
-		uint64_t  bytes_tx      { 0       };
-		uint32_t  pdu_count     { 0       };
+		uint64_t   bytes_rx     { 0       };
+		uint64_t   bytes_tx     { 0       };
+		uint32_t   pdu_count    { 0       };
+		io_stats_t is           {         };
 	} statistics;
 
 	uint32_t          max_seg_len   { MAX_DATA_SEGMENT_SIZE };
@@ -59,6 +61,7 @@ public:
 	void     inc_pdu_count()                { statistics.pdu_count++;      }
 	uint32_t get_pdu_count() const          { return statistics.pdu_count; }
 	void     reset_pdu_count()              { statistics.pdu_count = 0;    }
+	io_stats_t *get_io_stats()              { return &statistics.is;       }
 
 	uint32_t get_inc_datasn(const uint32_t itt);
 

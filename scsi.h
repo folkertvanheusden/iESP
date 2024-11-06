@@ -13,17 +13,6 @@
 #include "iscsi-pdu.h"
 
 
-typedef struct {
-	uint64_t n_reads;
-	uint64_t bytes_read;
-	uint64_t n_writes;
-	uint64_t bytes_written;
-	// 1.3.6.1.4.1.2021.11.54: "The number of 'ticks' (typically 1/100s) spent waiting for IO."
-	// https://www.circitor.fr/Mibs/Html/U/UCD-SNMP-MIB.php#ssCpuRawWait
-	uint32_t io_wait;  // will be updated once per second
-	uint64_t io_wait_cur;  // work, in microseconds!
-} io_stats_t;
-
 struct scsi_response
 {
 	iscsi_reacion_t              type;
@@ -62,7 +51,6 @@ class scsi
 private:
 	backend    *const b          { nullptr };
 	const int         trim_level { 1       };
-	io_stats_t *const is         { nullptr };
 	std::string       serial;
 #if !defined(ARDUINO) && !defined(NDEBUG)
 	std::atomic_uint64_t cmd_use_count[256] { };
@@ -78,23 +66,23 @@ private:
 	scsi_response inquiry(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
 	scsi_response read_capacity_10(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
 	scsi_response get_lba_status(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
-	scsi_response write_verify(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data, const uint8_t opcode);
+	scsi_response write_verify(io_stats_t *const is, const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data, const uint8_t opcode);
 	scsi_response read_(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data, const uint8_t opcode);
-	scsi_response sync_cache(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
+	scsi_response sync_cache(io_stats_t *const is, const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
 	scsi_response report_luns(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
 	scsi_response report_supported_operation_codes(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
-	scsi_response compare_and_write(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
+	scsi_response compare_and_write(io_stats_t *const is, const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
 	scsi_response prefetch(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data, const uint8_t opcode);
 	scsi_response reserve(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
 	scsi_response release(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
-	scsi_response unmap(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
-	scsi_response write_same(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data, const uint8_t opcode);
+	scsi_response unmap(io_stats_t *const is, const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
+	scsi_response write_same(io_stats_t *const is, const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data, const uint8_t opcode);
 
 	std::optional<std::vector<uint8_t> > validate_request(const uint64_t lba, const uint32_t n_blocks, const uint8_t *const CDB) const;
 	std::optional<std::vector<uint8_t> > validate_request(const uint64_t lba) const;
 
 public:
-	scsi(backend *const b, const int trim_level, io_stats_t *const is);
+	scsi(backend *const b, const int trim_level);
 	virtual ~scsi();
 
 	enum scsi_opcode {
@@ -148,13 +136,13 @@ public:
 	bool             unlock_device();
 	scsi_lock_status locking_status();
 
-	scsi_rw_result sync();
-	scsi_rw_result write   (const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data);
-	scsi_rw_result trim    (const uint64_t block_nr, const uint32_t n_blocks);
-	scsi_rw_result read    (const uint64_t block_nr, const uint32_t n_blocks,       uint8_t *const data);
-	scsi_rw_result cmpwrite(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const write_data, const uint8_t *const compare_data);
+	scsi_rw_result sync    (io_stats_t *const is);
+	scsi_rw_result write   (io_stats_t *const is, const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data);
+	scsi_rw_result trim    (io_stats_t *const is, const uint64_t block_nr, const uint32_t n_blocks);
+	scsi_rw_result read    (io_stats_t *const is, const uint64_t block_nr, const uint32_t n_blocks,       uint8_t *const data);
+	scsi_rw_result cmpwrite(io_stats_t *const is, const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const write_data, const uint8_t *const compare_data);
 
-	std::optional<scsi_response> send(const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
+	std::optional<scsi_response> send(io_stats_t *const is, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
 
 	std::vector<uint8_t> error_reservation_conflict_1()  const;
 	std::vector<uint8_t> error_reservation_conflict_2()  const;

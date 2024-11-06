@@ -307,18 +307,18 @@ iscsi_fail_reason server::push_response(com_client *const cc, session *const ses
 				uint32_t n_blocks = session->bytes_left / block_size;
 
 				if (session->write_same_is_unmap) {
-					rc = s->trim(session->buffer_lba, n_blocks);
+					rc = s->trim(ses->get_io_stats(), session->buffer_lba, n_blocks);
 				}
 				else {
 					for(uint32_t i=0; i<n_blocks; i++) {
-						rc = s->write(lba + i, 1, data.value().first);
+						rc = s->write(ses->get_io_stats(), lba + i, 1, data.value().first);
 						if (rc != scsi::rw_ok)
 							break;
 					}
 				}
 			}
 			else {
-				rc = s->write(lba, data.value().second / block_size, data.value().first);
+				rc = s->write(ses->get_io_stats(), lba, data.value().second / block_size, data.value().first);
 			}
 
 			if (rc != scsi::rw_ok) {
@@ -327,7 +327,7 @@ iscsi_fail_reason server::push_response(com_client *const cc, session *const ses
 			}
 
 			if (session->fua) {
-				if (s->sync() == false) {
+				if (s->sync(ses->get_io_stats()) == false) {
 					DOLOG(logging::ll_error, "server::push_response", cc->get_endpoint_name(), "DATA-OUT problem syncing data");
 					return IFR_IO_ERROR;
 				}
@@ -487,13 +487,13 @@ iscsi_fail_reason server::push_response(com_client *const cc, session *const ses
 
 			if (current_n < s->get_block_size()) {
 				uint8_t *temp_buffer = new uint8_t[s->get_block_size()];
-				rc = s->read(current_lba, 1, temp_buffer);
+				rc = s->read(ses->get_io_stats(), current_lba, 1, temp_buffer);
 				if (rc == scsi::rw_ok)
 					memcpy(data_pointer, temp_buffer, current_n);
 				delete [] temp_buffer;
 			}
 			else {
-				rc = s->read(current_lba, is_n_blocks, data_pointer);
+				rc = s->read(ses->get_io_stats(), current_lba, is_n_blocks, data_pointer);
 			}
 
 			if (rc != scsi::rw_ok) {
@@ -679,11 +679,17 @@ void server::handler()
 					uint64_t n_syncs       = 0;
 					uint64_t n_trims       = 0;
 					s->get_and_reset_stats(&bytes_read, &bytes_written, &n_syncs, &n_trims);
-#if defined(ARDUINO)
-					Serial.printf("%.3f] PDU/s: %.2f, send: %.2f kB/s, recv: %.2f kB/s, written: %.2f kB/s, read: %.2f kB/s, syncs: %.2f/s, unmaps: %.2f MB/s, load: %.2f%%, mem: %" PRIu32 "\r\n", now / 1000., ses->get_pdu_count() / dtook, ses->get_bytes_tx() / dkB, ses->get_bytes_rx() / dkB, bytes_written / dkB, bytes_read / dkB, n_syncs / dtook, n_trims * block_size / 1024 / 1024 / dtook, busy * 0.1 / took, get_free_heap_space());
-#else
-					DOLOG(logging::ll_info, "server::handler", endpoint, "PDU/s: %.2f, send: %.2f kB/s, recv: %.2f kB/s, written: %.2f kB/s, read: %.2f kB/s, syncs: %.2f/s, unmaps: %.2f kB/s, load: %.2f%%", ses->get_pdu_count() / dtook, ses->get_bytes_tx() / dkB, ses->get_bytes_rx() / dkB, bytes_written / dkB, bytes_read / dkB, n_syncs / dtook, n_trims * block_size / 1024 / 1024 / dtook, busy * 0.1 / took);
-#endif
+
+					DOLOG(logging::ll_info, "server::handler", endpoint,
+						"PDU/s: %.2f, "
+						"send: %.2f kB/s, recv: %.2f kB/s, "
+						"written: %.2f kB/s, read: %.2f kB/s, "
+						"syncs: %.2f/s, unmaps: %.2f kB/s, load: %.2f%%",
+						ses->get_pdu_count() / dtook,
+						ses->get_bytes_tx() / dkB, ses->get_bytes_rx() / dkB,
+						bytes_written / dkB, bytes_read / dkB,
+						n_syncs / dtook, n_trims * block_size / 1024 / 1024 / dtook, busy * 0.1 / took);
+
 					ses->reset_pdu_count();
 					ses->reset_bytes_rx();
 					ses->reset_bytes_tx();
@@ -701,7 +707,7 @@ void server::handler()
 			DOLOG(logging::ll_debug, "server::handler", endpoint, "session finished");
 #endif
 
-			s->sync();
+			s->sync(ses->get_io_stats());
 			if (s->locking_status() == scsi::l_locked) {
 				DOLOG(logging::ll_debug, "server::handler", endpoint, "unlocking device");
 				s->unlock_device();

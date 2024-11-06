@@ -189,8 +189,7 @@ int main(int argc, char *argv[])
 
 	init_my_getrandom();
 
-	io_stats_t    ios { };
-	iscsi_stats_t is  { };
+	iscsi_stats_t is { };
 
 	backend *b = nullptr;
 
@@ -210,7 +209,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "Failed to initialize storage backend\n");
 		return 1;
 	}
-	scsi sd(b, trim_level, &ios);
+	scsi sd(b, trim_level);
 
 	com_sockets c(ip_address, port, &stop);
 	if (c.begin() == false) {
@@ -234,7 +233,7 @@ int main(int argc, char *argv[])
 	snmp      *snmp_       { nullptr };
 	snmp_data *snmp_data_  { nullptr };
 	if (use_snmp)
-		init_snmp(&snmp_, &snmp_data_, &ios, &is, get_diskspace, b, &cpu_usage, &ram_free_kb, &stop, snmp_port);
+		init_snmp(&snmp_, &snmp_data_, &is, get_diskspace, b, &cpu_usage, &ram_free_kb, &stop, snmp_port);
 
 	server s(&sd, &c, &is, target_name, digest_chk);
 
