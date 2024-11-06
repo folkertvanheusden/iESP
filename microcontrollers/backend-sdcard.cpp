@@ -17,14 +17,15 @@
 
 extern void write_led(const int gpio, const int state);
 
-backend_sdcard::backend_sdcard(const int led_read, const int led_write, const int pin_SD_MISO, const int pin_SD_MOSI, const int pin_SD_SCLK, const int pin_SD_CS):
+backend_sdcard::backend_sdcard(const int led_read, const int led_write, const int pin_SD_MISO, const int pin_SD_MOSI, const int pin_SD_SCLK, const int pin_SD_CS, const std::optional<int> spi_speed):
 	backend("SD-card"),
 	led_read(led_read),
 	led_write(led_write),
 	pin_SD_MISO(pin_SD_MISO),
 	pin_SD_MOSI(pin_SD_MOSI),
 	pin_SD_SCLK(pin_SD_SCLK),
-	pin_SD_CS(pin_SD_CS)
+	pin_SD_CS(pin_SD_CS),
+	spi_speed(spi_speed)
 {
 #if defined(RP2040W)
 	mutex_init(&serial_access_lock);
@@ -64,24 +65,29 @@ bool backend_sdcard::reinit(const bool close_first)
 	bool ok = false;
 	SPI.begin(pin_SD_SCLK, pin_SD_MISO, pin_SD_MOSI, pin_SD_CS);
 #if defined(WT_ETH01)
-	for(int sp=22; sp>=14; sp -= 2) {
-		Serial.printf("Trying %d MHz...\r\n", sp);
-		if (sd.begin(SdSpiConfig(pin_SD_CS, SHARED_SPI, SD_SCK_MHZ(sp)))) {
-			ok = true;
-			Serial.printf("Accessing SD card at %d MHz\r\n", sp);
-			break;
-		}
-	}
+	const int start_speed = 22;
+	const int end_speed   = 14;
+	const int steps       = 2;
 #else
-	for(int sp=50; sp>=14; sp -= 4) {
-		Serial.printf("Trying %d MHz...\r\n", sp);
-		if (sd.begin(SdSpiConfig(pin_SD_CS, SHARED_SPI, SD_SCK_MHZ(sp)))) {
-			ok = true;
-			Serial.printf("Accessing SD card at %d MHz\r\n", sp);
-			break;
+	const int start_speed = 50;
+	const int end_speed   = 14;
+	const int steps       = 4;
+#endif
+	if (spi_speed.has_value()) {
+		ok = sd.begin(SdSpiConfig(pin_SD_CS, SHARED_SPI, SD_SCK_MHZ(spi_speed.value())));
+		if (ok)
+			Serial.printf("Accessing SD card at %d MHz\r\n", spi_speed.value());
+	}
+	else {
+		for(int sp=start_speed; sp>=end_speed; sp -= steps) {
+			Serial.printf("Trying %d MHz...\r\n", sp);
+			if (sd.begin(SdSpiConfig(pin_SD_CS, SHARED_SPI, SD_SCK_MHZ(sp)))) {
+				ok = true;
+				Serial.printf("Accessing SD card at %d MHz\r\n", sp);
+				break;
+			}
 		}
 	}
-#endif
 
 	if (ok == false) {
 		Serial.printf("SD-card mount failed (assuming CS is on pin %d)\r\n", pin_SD_CS);

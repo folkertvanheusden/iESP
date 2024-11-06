@@ -1,4 +1,5 @@
 #include <mutex>
+#include <optional>
 #if defined(WT_ETH01)
 #define SPI_DRIVER_SELECT 1
 #endif
@@ -20,6 +21,7 @@ private:
 	const int    pin_SD_MOSI { -1 };
 	const int    pin_SD_SCLK { -1 };
 	const int    pin_SD_CS   { -1 };
+	const std::optional<int> spi_speed;
 
 #if defined(RP2040W)
 	mutex_t    serial_access_lock;
@@ -33,7 +35,7 @@ private:
 	void wait_for_card();
 
 public:
-	backend_sdcard(const int led_read, const int led_write, const int pin_SD_MISO, const int pin_SD_MOSI, const int pin_SD_SCLK, const int pin_SD_CS);
+	backend_sdcard(const int led_read, const int led_write, const int pin_SD_MISO, const int pin_SD_MOSI, const int pin_SD_SCLK, const int pin_SD_CS, const std::optional<int> spi_speed);
 	virtual ~backend_sdcard();
 
 	bool begin() override;

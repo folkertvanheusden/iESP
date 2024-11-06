@@ -90,11 +90,13 @@ int pin_SD_MISO= -1;
 int pin_SD_MOSI= -1;
 int pin_SD_SCLK= -1;
 int pin_SD_CS  = -1;
+std::optional<int> spi_speed { 14 };
 #else
 int pin_SD_MISO= 19;
 int pin_SD_MOSI= 23;
 int pin_SD_SCLK= 18;
 int pin_SD_CS  =  5;
+std::optional<int> spi_speed;
 #endif
 
 snmp      *snmp_      { nullptr };
@@ -277,6 +279,9 @@ bool load_configuration() {
 
 	if (cfg.containsKey("log-level"))
 		logging::log_level_syslog = logging::parse_ll(cfg["log-level"].as<std::string>());
+
+	if (cfg.containsKey("spi-speed"))
+		spi_speed = cfg["spi-speed"].as<int>();
 
 	data_file.close();
 
@@ -638,7 +643,7 @@ void setup() {
 	bs = new backend_sdcard_teensy41(led_green, led_yellow);
 #else
   Serial.printf("LEDgreen: %d, LEDyellow: %d, MISO: %d, MOSI: %d, SCLK: %d, CS: %d\r\n", led_green, led_yellow, pin_SD_MISO, pin_SD_MOSI, pin_SD_SCLK, pin_SD_CS);
-	bs = new backend_sdcard(led_green, led_yellow, pin_SD_MISO, pin_SD_MOSI, pin_SD_SCLK, pin_SD_CS);
+	bs = new backend_sdcard(led_green, led_yellow, pin_SD_MISO, pin_SD_MOSI, pin_SD_SCLK, pin_SD_CS, spi_speed);
 #endif
 
 	draw_status(13);

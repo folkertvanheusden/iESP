@@ -15,5 +15,6 @@
 	"SD-MISO": 19,
 	"SD-MOSI": 23,
 	"SD-SCLK": 18,
-	"SD-CS": 5
+	"SD-CS": 5,
+	"spi-speed": 16
 }
