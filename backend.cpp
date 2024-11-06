@@ -49,7 +49,7 @@ uint8_t backend::get_free_space_percentage()
 	for(int i=0; i<100; i++) {
 		uint64_t block_nr = 0;
 
-		// random in case a filesystem or whatever places static data at every xth position
+		// random, in case a filesystem or whatever places static data at every xth position
 		uint64_t rnd = 0;
 		if (my_getrandom(&rnd, sizeof rnd) == false) {
 			DOLOG(logging::ll_error, "random", identifier, "random generator returned an error");
