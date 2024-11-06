@@ -1,13 +1,13 @@
 Name:       iesp
 Version:    2.2
 Release:    0
-Summary:    A simple iSCSI target server application.
+Summary:    An iSCSI target server application.
 License:    MIT
 Source0:    %{name}-%{version}.tgz
 URL:        https://github.com/folkertvanheusden/iesp
 
 %description
-A simple iSCSI target server application.
+An iSCSI target server application.
 
 %prep
 %setup -q -n %{name}-%{version}
