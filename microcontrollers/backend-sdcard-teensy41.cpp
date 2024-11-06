@@ -64,12 +64,8 @@ backend_sdcard_teensy41::~backend_sdcard_teensy41()
 bool backend_sdcard_teensy41::sync()
 {
 	write_led(led_write, HIGH);
-
-	n_syncs++;
-
 	if (file.sync() == false)
 		DOLOG(logging::ll_error, "backend_sdcard_teensy41::sync", "-", "Cannot sync data to SD-card");
-
 	write_led(led_write, LOW);
 
 	ts_last_acces = get_micros();
@@ -138,7 +134,6 @@ bool backend_sdcard_teensy41::trim(const uint64_t block_nr, const uint32_t n_blo
 	}
 	delete [] data;
 	ts_last_acces = get_micros();
-	n_trims += n_blocks;
 	return rc;
 }
 

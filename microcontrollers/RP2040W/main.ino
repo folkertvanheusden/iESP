@@ -22,7 +22,6 @@ backend_sdcard_rp2040w *bs   { nullptr };
 scsi                   *sd   { nullptr };
 server                 *s    { nullptr };
 iscsi_stats_t           is;
-io_stats_t              ios;
 volatile bool           wifi_connected { false };
 int                     led_green  {  17 };
 int                     led_yellow {  18 };
@@ -79,7 +78,7 @@ void setup()
 		bs->begin();
 
 		Serial.println(F("Create SCSI instance"));
-		sd = new scsi(bs, 1, &ios);
+		sd = new scsi(bs, 1);
 
 		Serial.println(F("Instantiate iSCSI server"));
 		s = new server(sd, c, &is, "test", false);
