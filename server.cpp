@@ -499,7 +499,7 @@ iscsi_fail_reason server::push_response(com_client *const cc, session *const ses
 			if (rc != scsi::rw_ok) {
 				delete [] out.data;
 				DOLOG(logging::ll_error, "server::push_response", cc->get_endpoint_name(), "reading %u bytes failed: %d", current_n, rc);
-				ifr = IFR_IO_ERROR;  // TODO push a pdu with a scsi read error
+				ifr = IFR_IO_ERROR;
 				break;
 			}
 
