@@ -41,11 +41,10 @@ uint32_t my_NTOHL(const uint32_t x);
 uint16_t my_NTOHS(const uint16_t x);
 uint32_t my_HTONL(const uint32_t x);
 uint16_t my_HTONS(const uint16_t x);
-
-void socket_set_nodelay(const int fd);
-
 #define my_HTONLL(x) ((1==my_HTONL(1)) ? (x) : (((uint64_t)my_HTONL((x) & 0xFFFFFFFFUL)) << 32) | my_HTONL((uint32_t)((x) >> 32)))
 #define my_NTOHLL(x) ((1==my_NTOHL(1)) ? (x) : (((uint64_t)my_NTOHL((x) & 0xFFFFFFFFUL)) << 32) | my_NTOHL((uint32_t)((x) >> 32)))
+
+void socket_set_nodelay(const int fd);
 
 extern uint64_t running_since;
 
