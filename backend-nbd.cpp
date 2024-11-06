@@ -243,7 +243,6 @@ bool backend_nbd::invoke_nbd(const uint32_t command, const uint64_t offset, cons
 
 bool backend_nbd::sync()
 {
-	n_syncs++;
 	ts_last_acces = get_micros();
 
 	return invoke_nbd(NBD_CMD_FLUSH, 0, 0, nullptr);
@@ -262,7 +261,6 @@ bool backend_nbd::write(const uint64_t block_nr, const uint32_t n_blocks, const 
 	unlock_range(lock_list);
 
 	ts_last_acces = get_micros();
-	bytes_written += n_bytes;
 
 	return rc;
 }
@@ -280,7 +278,6 @@ bool backend_nbd::trim(const uint64_t block_nr, const uint32_t n_blocks)
 	unlock_range(lock_list);
 
 	ts_last_acces = get_micros();
-	n_trims      += n_blocks;
 
 	return rc;
 }
@@ -299,7 +296,6 @@ bool backend_nbd::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_t
 	unlock_range(lock_list);
 
 	ts_last_acces = get_micros();
-	bytes_read += n_bytes;
 
 	return rc;
 }
@@ -324,7 +320,6 @@ backend::cmpwrite_result_t backend_nbd::cmpwrite(const uint64_t block_nr, const 
 			result = cmpwrite_result_t::CWR_READ_ERROR;
 			break;
 		}
-		bytes_read += block_size;
 
 		// compare
 		if (memcmp(buffer, &data_compare[i * block_size], block_size) != 0) {
@@ -344,8 +339,6 @@ backend::cmpwrite_result_t backend_nbd::cmpwrite(const uint64_t block_nr, const 
 			result = cmpwrite_result_t::CWR_WRITE_ERROR;
 		}
 		else {
-			bytes_written += block_size;
-
 			ts_last_acces = get_micros();
 		}
 	}

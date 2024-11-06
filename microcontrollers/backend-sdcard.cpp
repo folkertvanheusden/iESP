@@ -185,11 +185,9 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 	}
 
 	size_t n_bytes_to_write = n_blocks * iscsi_block_size;
-	bytes_written += n_bytes_to_write;
-
 	wait_for_card();
-	size_t bytes_written = file.write(data, n_bytes_to_write);
-	bool rc = bytes_written == n_bytes_to_write;
+	size_t bytes_written    = file.write(data, n_bytes_to_write);
+	bool   rc = bytes_written == n_bytes_to_write;
 	if (!rc)
 		Serial.printf("Wrote %zu bytes instead of %zu\r\n", bytes_written, n_bytes_to_write);
 
@@ -245,11 +243,8 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 	}
 
 	size_t n_bytes_to_read = n_blocks * iscsi_block_size;
-	bytes_read += n_bytes_to_read;
-
-	bool rc = false;
-	size_t bytes_read = file.read(data, n_bytes_to_read);
-	rc = bytes_read == n_bytes_to_read;
+	size_t bytes_read      = file.read(data, n_bytes_to_read);
+	bool   rc = bytes_read == n_bytes_to_read;
 	if (!rc)
 		Serial.printf("Read %zu bytes instead of %zu\r\n", bytes_read, n_bytes_to_read);
 
@@ -292,7 +287,6 @@ backend::cmpwrite_result_t backend_sdcard::cmpwrite(const uint64_t block_nr, con
 			result = cmpwrite_result_t::CWR_READ_ERROR;
 			break;
 		}
-		bytes_read += block_size;
 
 		// compare
 		if (memcmp(buffer, &data_compare[i * block_size], block_size) != 0) {
@@ -313,8 +307,6 @@ backend::cmpwrite_result_t backend_sdcard::cmpwrite(const uint64_t block_nr, con
 			result = cmpwrite_result_t::CWR_WRITE_ERROR;
 			break;
 		}
-
-		bytes_written += block_size;
 
 		ts_last_acces = get_micros();
 	}

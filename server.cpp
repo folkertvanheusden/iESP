@@ -672,13 +672,9 @@ void server::handler()
 				auto took = now - prev_output;
 				if (took >= interval) {
 					prev_output = now;
-					double   dtook = took / 1000.;
-					double   dkB   = dtook * 1024;
-					uint64_t bytes_read    = 0;
-					uint64_t bytes_written = 0;
-					uint64_t n_syncs       = 0;
-					uint64_t n_trims       = 0;
-					s->get_and_reset_stats(&bytes_read, &bytes_written, &n_syncs, &n_trims);
+					double                  dtook = took / 1000.;
+					double                  dkB   = dtook * 1024;
+					const io_stats_t *const is    = ses->get_io_stats();
 
 					DOLOG(logging::ll_info, "server::handler", endpoint,
 						"PDU/s: %.2f, "
@@ -687,8 +683,8 @@ void server::handler()
 						"syncs: %.2f/s, unmaps: %.2f kB/s, load: %.2f%%",
 						ses->get_pdu_count() / dtook,
 						ses->get_bytes_tx() / dkB, ses->get_bytes_rx() / dkB,
-						bytes_written / dkB, bytes_read / dkB,
-						n_syncs / dtook, n_trims * block_size / 1024 / 1024 / dtook, busy * 0.1 / took);
+						is->bytes_written / dkB, is->bytes_read / dkB,
+						is->n_syncs / dtook, is->n_trims * block_size / 1024 / 1024 / dtook, busy * 0.1 / took);
 
 					ses->reset_pdu_count();
 					ses->reset_bytes_rx();

@@ -1031,16 +1031,12 @@ scsi::scsi_rw_result scsi::sync(io_stats_t *const is)
 	if (locking_status() != l_locked_other) {  // locked by myself or not locked?
 		auto start   = get_micros();
 		bool result  = b->sync();
+		is->n_syncs++;
 		is->io_wait += get_micros() - start;
 		return result ? rw_ok : rw_fail_general;
 	}
 
 	return rw_fail_locked;
-}
-
-void scsi::get_and_reset_stats(uint64_t *const bytes_read, uint64_t *const bytes_written, uint64_t *const n_syncs, uint64_t *const n_trims)
-{
-	return b->get_and_reset_stats(bytes_read, bytes_written, n_syncs, n_trims);
 }
 
 scsi::scsi_rw_result scsi::write(io_stats_t *const is, const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data)
@@ -1083,6 +1079,8 @@ scsi::scsi_rw_result scsi::write(io_stats_t *const is, const uint64_t block_nr, 
 scsi::scsi_rw_result scsi::trim(io_stats_t *const is, const uint64_t block_nr, const uint32_t n_blocks)
 {
 	if (locking_status() != l_locked_other) {  // locked by myself or not locked?
+		is->n_trims += n_blocks;
+
 		auto start = get_micros();
 		if (trim_level == 0) {  // 0 = do not trim/unmap
 			scsi::scsi_rw_result rc   = rw_ok;

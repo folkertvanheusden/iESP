@@ -20,11 +20,6 @@ class backend
 {
 protected:
 	const std::string identifier;
-
-	uint64_t bytes_read    { 0 };
-	uint64_t bytes_written { 0 };
-	uint64_t n_syncs       { 0 };
-	uint64_t n_trims       { 0 };
 	uint64_t ts_last_acces { 0 };
 
 #if !(defined(ARDUINO) || defined(TEENSY4_1) || defined(RP2040W))
@@ -50,8 +45,6 @@ public:
 	virtual std::pair<uint64_t, uint32_t> get_idle_state();
 
 	virtual bool        sync() = 0;
-
-	void get_and_reset_stats(uint64_t *const bytes_read, uint64_t *const bytes_written, uint64_t *const n_syncs, uint64_t *const n_trims);
 
 	enum cmpwrite_result_t { CWR_OK, CWR_MISMATCH, CWR_READ_ERROR, CWR_WRITE_ERROR };
 
