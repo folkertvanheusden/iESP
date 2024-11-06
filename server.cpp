@@ -566,7 +566,6 @@ void server::handler()
 			DOLOG(logging::ll_info, "server::handler", "-", "new session with %s", endpoint.c_str());
 #endif
 			auto          prev_output  = get_millis();
-			uint32_t      pdu_count    = 0;
 			unsigned long busy         = 0;
 			const long    interval     = 5000;
 			session      *ses          = nullptr;
@@ -648,7 +647,7 @@ void server::handler()
 
 				delete pdu;
 
-				pdu_count++;
+				ses->inc_pdu_count();
 
 				if (ifr == IFR_OK)
 					fail_counter = 0;
@@ -681,11 +680,11 @@ void server::handler()
 					uint64_t n_trims       = 0;
 					s->get_and_reset_stats(&bytes_read, &bytes_written, &n_syncs, &n_trims);
 #if defined(ARDUINO)
-					Serial.printf("%.3f] PDU/s: %.2f, send: %.2f kB/s, recv: %.2f kB/s, written: %.2f kB/s, read: %.2f kB/s, syncs: %.2f/s, unmaps: %.2f MB/s, load: %.2f%%, mem: %" PRIu32 "\r\n", now / 1000., pdu_count / dtook, ses->get_bytes_tx() / dkB, ses->get_bytes_rx() / dkB, bytes_written / dkB, bytes_read / dkB, n_syncs / dtook, n_trims * block_size / 1024 / 1024 / dtook, busy * 0.1 / took, get_free_heap_space());
+					Serial.printf("%.3f] PDU/s: %.2f, send: %.2f kB/s, recv: %.2f kB/s, written: %.2f kB/s, read: %.2f kB/s, syncs: %.2f/s, unmaps: %.2f MB/s, load: %.2f%%, mem: %" PRIu32 "\r\n", now / 1000., ses->get_pdu_count() / dtook, ses->get_bytes_tx() / dkB, ses->get_bytes_rx() / dkB, bytes_written / dkB, bytes_read / dkB, n_syncs / dtook, n_trims * block_size / 1024 / 1024 / dtook, busy * 0.1 / took, get_free_heap_space());
 #else
-					DOLOG(logging::ll_info, "server::handler", endpoint, "PDU/s: %.2f, send: %.2f kB/s, recv: %.2f kB/s, written: %.2f kB/s, read: %.2f kB/s, syncs: %.2f/s, unmaps: %.2f kB/s, load: %.2f%%", pdu_count / dtook, ses->get_bytes_tx() / dkB, ses->get_bytes_rx() / dkB, bytes_written / dkB, bytes_read / dkB, n_syncs / dtook, n_trims * block_size / 1024 / 1024 / dtook, busy * 0.1 / took);
+					DOLOG(logging::ll_info, "server::handler", endpoint, "PDU/s: %.2f, send: %.2f kB/s, recv: %.2f kB/s, written: %.2f kB/s, read: %.2f kB/s, syncs: %.2f/s, unmaps: %.2f kB/s, load: %.2f%%", ses->get_pdu_count() / dtook, ses->get_bytes_tx() / dkB, ses->get_bytes_rx() / dkB, bytes_written / dkB, bytes_read / dkB, n_syncs / dtook, n_trims * block_size / 1024 / 1024 / dtook, busy * 0.1 / took);
 #endif
-					pdu_count  = 0;
+					ses->reset_pdu_count();
 					ses->reset_bytes_rx();
 					ses->reset_bytes_tx();
 					busy       = 0;
