@@ -7,13 +7,10 @@
 
 - teensy4.1: get rid of retry-loop in sd-card code
 
-- io-wait: 100ths of a second, once a second
--- need to collect stats from backend in maintenance-thread and feed the results to snmp
-
 - in libiscsi test-set:
         [SKIPPED] Not an iSCSI device. Skipping test
         [SKIPPED] Not an iSCSI device. Skipping test
-  what is this?!
+  what is this?
 
 - https://mibbrowser.online/mibdb_search.php?mib=SCSI-MIB
 
