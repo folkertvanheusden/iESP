@@ -129,8 +129,6 @@ bool backend_sdcard::sync()
 {
 	write_led(led_write, HIGH);
 
-	n_syncs++;
-
 #if defined(RP2040W)
 	mutex_enter_blocking(&serial_access_lock);
 #else
@@ -215,7 +213,6 @@ bool backend_sdcard::trim(const uint64_t block_nr, const uint32_t n_blocks)
 	}
 	delete [] data;
 	ts_last_acces = get_micros();
-	n_trims += n_blocks;
 	return rc;
 }
 
