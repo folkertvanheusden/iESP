@@ -73,8 +73,13 @@ This software has a custom SNMP library (SNMP agent).
 * .1.3.6.1.2.1.142.1.6.3.1.1    - logouts
 * .1.3.6.1.4.1.2021.100.2       - software version (not in Posix version)
 * .1.3.6.1.4.1.2021.100.3       - build date
+* .1.3.6.1.4.1.2021.11.54       - I/O wait in 100ths of a second
 * .1.3.6.1.4.1.2021.11.9.0      - CPU usage
 * .1.3.6.1.4.1.2021.13.15.1.1.2 - device name
+* .1.3.6.1.4.1.2021.13.15.1.1.3 - number of bytes read
+* .1.3.6.1.4.1.2021.13.15.1.1.4 - number of bytes written
+* .1.3.6.1.4.1.2021.13.15.1.1.5 - number of reads
+* .1.3.6.1.4.1.2021.13.15.1.1.6 - number of writes
 * .1.3.6.1.4.1.2021.4.11.0      - free RAM (kB heap space, only on microcontrollers)
 * .1.3.6.1.4.1.2021.9.1.9.1     - disk free estimate (will only work when using TRIM/UNMAP/DISCARD)
 

@@ -18,11 +18,13 @@
 
 struct backend_stats_t {
 	uint64_t bytes_read;
+	uint64_t n_reads;
 	uint64_t bytes_written;
+	uint64_t n_writes;
 	uint64_t n_syncs;
 	uint64_t n_trims;
-	uint64_t io_wait;  // total, in uS
-	uint64_t io_wait_ticks;  // updated by maintenance_thread
+	uint32_t io_wait;  // total, in uS
+	uint32_t io_wait_ticks;  // updated by maintenance_thread
 };
 
 class backend
