@@ -16,16 +16,19 @@
 #define LOCK_SPREADER 31
 #endif
 
-class backend
-{
-protected:
-	const std::string identifier;
-
+struct backend_stats_t {
 	uint64_t bytes_read    { 0 };
 	uint64_t bytes_written { 0 };
 	uint64_t n_syncs       { 0 };
 	uint64_t n_trims       { 0 };
-	uint64_t ts_last_acces { 0 };
+};
+
+class backend
+{
+protected:
+	const std::string identifier;
+	backend_stats_t   bs;
+	uint64_t          ts_last_acces { 0 };
 
 #if !(defined(ARDUINO) || defined(TEENSY4_1) || defined(RP2040W))
 	std::array<std::mutex, N_BACKEND_LOCKS> locks;

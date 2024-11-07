@@ -95,6 +95,7 @@ bool backend_sdcard_rp2040w::sync()
 		DOLOG(logging::ll_error, "backend_sdcard_rp2040w::sync", "-", "Cannot sync data to SD-card");
 	write_led(led_write, LOW);
 
+	bs.n_syncs++;
 	ts_last_acces = get_micros();
 
 	return true;
@@ -125,6 +126,7 @@ bool backend_sdcard_rp2040w::write(const uint64_t block_nr, const uint32_t n_blo
 	}
 
 	size_t n_bytes_to_write = n_blocks * iscsi_block_size;
+	bs.bytes_written += n_bytes_to_write;
 
 	bool rc = false;
 	for(int i=0; i<5; i++) {  // 5 is arbitrarily chosen
@@ -160,6 +162,7 @@ bool backend_sdcard_rp2040w::trim(const uint64_t block_nr, const uint32_t n_bloc
 	}
 	delete [] data;
 	ts_last_acces = get_micros();
+	bs.n_trims++;
 	return rc;
 }
 
@@ -178,6 +181,7 @@ bool backend_sdcard_rp2040w::read(const uint64_t block_nr, const uint32_t n_bloc
 	}
 
 	size_t n_bytes_to_read = n_blocks * iscsi_block_size;
+	bs.bytes_read += n_bytes_to_read;
 
 	bool rc = false;
 	for(int i=0; i<5; i++) {  // 5 is arbitrarily chosen

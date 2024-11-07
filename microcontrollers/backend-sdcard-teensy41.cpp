@@ -98,7 +98,7 @@ bool backend_sdcard_teensy41::write(const uint64_t block_nr, const uint32_t n_bl
 	}
 
 	size_t n_bytes_to_write = n_blocks * iscsi_block_size;
-	bytes_written += n_bytes_to_write;
+	bs.bytes_written += n_bytes_to_write;
 
 	bool rc = false;
 	for(int i=0; i<5; i++) {  // 5 is arbitrarily chosen
@@ -153,7 +153,7 @@ bool backend_sdcard_teensy41::read(const uint64_t block_nr, const uint32_t n_blo
 	}
 
 	size_t n_bytes_to_read = n_blocks * iscsi_block_size;
-	bytes_read += n_bytes_to_read;
+	bs.bytes_read += n_bytes_to_read;
 
 	bool rc = false;
 	for(int i=0; i<5; i++) {  // 5 is arbitrarily chosen
@@ -204,7 +204,7 @@ backend::cmpwrite_result_t backend_sdcard_teensy41::cmpwrite(const uint64_t bloc
 			DOLOG(logging::ll_error, "backend_sdcard_teensy41::cmpwrite", "-", "Cannot read: %d", file.getError());
 			break;
 		}
-		bytes_read += block_size;
+		bs.bytes_read += block_size;
 
 		// compare
 		if (memcmp(buffer, &data_compare[i * block_size], block_size) != 0) {
@@ -228,7 +228,7 @@ backend::cmpwrite_result_t backend_sdcard_teensy41::cmpwrite(const uint64_t bloc
 			break;
 		}
 
-		bytes_written += block_size;
+		bs.bytes_written += block_size;
 
 		ts_last_acces = get_micros();
 	}

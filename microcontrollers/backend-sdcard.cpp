@@ -128,6 +128,7 @@ backend_sdcard::~backend_sdcard()
 bool backend_sdcard::sync()
 {
 	write_led(led_write, HIGH);
+	bs.n_syncs++;
 
 #if defined(RP2040W)
 	mutex_enter_blocking(&serial_access_lock);
@@ -141,7 +142,6 @@ bool backend_sdcard::sync()
 #if defined(RP2040W)
 	mutex_exit(&serial_access_lock);
 #endif
-
 	write_led(led_write, LOW);
 
 	ts_last_acces = get_micros();
@@ -183,11 +183,11 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 	}
 
 	size_t n_bytes_to_write = n_blocks * iscsi_block_size;
-	bytes_written += n_bytes_to_write;
+	bs.bytes_written += n_bytes_to_write;
 
 	wait_for_card();
 	size_t bytes_written = file.write(data, n_bytes_to_write);
-	bool rc = bytes_written == n_bytes_to_write;
+	bool   rc            = bytes_written == n_bytes_to_write;
 	if (!rc)
 		Serial.printf("Wrote %zu bytes instead of %zu\r\n", bytes_written, n_bytes_to_write);
 
@@ -214,6 +214,7 @@ bool backend_sdcard::trim(const uint64_t block_nr, const uint32_t n_blocks)
 		}
 	}
 	delete [] data;
+	bs.n_trims++;
 	ts_last_acces = get_micros();
 	return rc;
 }
@@ -242,10 +243,10 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 	}
 
 	size_t n_bytes_to_read = n_blocks * iscsi_block_size;
-	bytes_read += n_bytes_to_read;
+	bs.bytes_read += n_bytes_to_read;
 
 	size_t bytes_read = file.read(data, n_bytes_to_read);
-	bool rc = bytes_read == n_bytes_to_read;
+	bool   rc         = bytes_read == n_bytes_to_read;
 	if (!rc)
 		Serial.printf("Read %zu bytes instead of %zu\r\n", bytes_read, n_bytes_to_read);
 
@@ -288,7 +289,7 @@ backend::cmpwrite_result_t backend_sdcard::cmpwrite(const uint64_t block_nr, con
 			result = cmpwrite_result_t::CWR_READ_ERROR;
 			break;
 		}
-		bytes_read += block_size;
+		bs.bytes_read += block_size;
 
 		// compare
 		if (memcmp(buffer, &data_compare[i * block_size], block_size) != 0) {
@@ -310,7 +311,7 @@ backend::cmpwrite_result_t backend_sdcard::cmpwrite(const uint64_t block_nr, con
 			break;
 		}
 
-		bytes_written += block_size;
+		bs.bytes_written += block_size;
 
 		ts_last_acces = get_micros();
 	}

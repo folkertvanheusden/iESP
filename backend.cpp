@@ -17,15 +17,15 @@ backend::~backend()
 
 void backend::get_and_reset_stats(uint64_t *const bytes_read, uint64_t *const bytes_written, uint64_t *const n_syncs, uint64_t *const n_trims)
 {
-	*bytes_read    = this->bytes_read;
-	*bytes_written = this->bytes_written;
-	*n_syncs       = this->n_syncs;
-	*n_trims       = this->n_trims;
+	*bytes_read    = bs.bytes_read;
+	*bytes_written = bs.bytes_written;
+	*n_syncs       = bs.n_syncs;
+	*n_trims       = bs.n_trims;
 
-	this->bytes_read    = 0;
-	this->bytes_written = 0;
-	this->n_syncs       = 0;
-	this->n_trims       = 0;
+	bs.bytes_read    = 0;
+	bs.bytes_written = 0;
+	bs.n_syncs       = 0;
+	bs.n_trims       = 0;
 }
 
 std::pair<uint64_t, uint32_t> backend::get_idle_state()
