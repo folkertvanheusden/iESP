@@ -1079,7 +1079,7 @@ scsi::scsi_rw_result scsi::write(io_stats_t *const is, const uint64_t block_nr, 
 scsi::scsi_rw_result scsi::trim(io_stats_t *const is, const uint64_t block_nr, const uint32_t n_blocks)
 {
 	if (locking_status() != l_locked_other) {  // locked by myself or not locked?
-		is->n_trims += n_blocks;
+		is->blocks_trimmed += n_blocks;
 
 		auto start = get_micros();
 		if (trim_level == 0) {  // 0 = do not trim/unmap
