@@ -64,11 +64,15 @@ backend_sdcard_teensy41::~backend_sdcard_teensy41()
 bool backend_sdcard_teensy41::sync()
 {
 	write_led(led_write, HIGH);
+	auto start = get_micros();
 	if (file.sync() == false)
 		DOLOG(logging::ll_error, "backend_sdcard_teensy41::sync", "-", "Cannot sync data to SD-card");
+	auto end   = get_micros();
+	if (file.sync() == false)
 	write_led(led_write, LOW);
 
-	ts_last_acces = get_micros();
+	bs.io_wait   += end-start;
+	ts_last_acces = end;
 
 	return true;
 }
@@ -90,6 +94,7 @@ bool backend_sdcard_teensy41::write(const uint64_t block_nr, const uint32_t n_bl
 
 	uint64_t iscsi_block_size = get_block_size();
 	uint64_t byte_address     = block_nr * iscsi_block_size;  // iSCSI to bytes
+	auto     start            = get_micros();
 
 	if (file.seekSet(byte_address) == false) {
 		DOLOG(logging::ll_error, "backend_sdcard_teensy41::write", "-", "Cannot seek to %" PRIu64, byte_address);
@@ -117,15 +122,18 @@ bool backend_sdcard_teensy41::write(const uint64_t block_nr, const uint32_t n_bl
 
 	write_led(led_write, LOW);
 
-	ts_last_acces = get_micros();
+	auto end      = get_micros();
+	bs.io_wait   += end-start;
+	ts_last_acces = end;
 
 	return rc;
 }
 
 bool backend_sdcard_teensy41::trim(const uint64_t block_nr, const uint32_t n_blocks)
 {
-	bool rc = true;
-	uint8_t *data = new uint8_t[get_block_size()]();
+	bool     rc    = true;
+	uint8_t *data  = new uint8_t[get_block_size()]();
+	auto     start = get_micros();
 	for(uint32_t i=0; i<n_blocks; i++) {
 		if (write(block_nr + i, 1, data) == false) {
 			DOLOG(logging::ll_error, "backend_sdcard_teensy41::trim", "-", "Cannot trim");
@@ -134,7 +142,9 @@ bool backend_sdcard_teensy41::trim(const uint64_t block_nr, const uint32_t n_blo
 		}
 	}
 	delete [] data;
-	ts_last_acces = get_micros();
+	auto end      = get_micros();
+	bs.io_wait   += end-start;
+	ts_last_acces = end;
 	return rc;
 }
 
@@ -145,6 +155,7 @@ bool backend_sdcard_teensy41::read(const uint64_t block_nr, const uint32_t n_blo
 
 	uint64_t iscsi_block_size = get_block_size();
 	uint64_t byte_address     = block_nr * iscsi_block_size;  // iSCSI to bytes
+	auto     start            = get_micros();
 
 	if (file.seekSet(byte_address) == false) {
 		DOLOG(logging::ll_error, "backend_sdcard_teensy41::read", "-", "Cannot seek to %" PRIu64, byte_address);
@@ -167,10 +178,12 @@ bool backend_sdcard_teensy41::read(const uint64_t block_nr, const uint32_t n_blo
 		delay((i + 1) * 100); // 100ms is arbitrarily chosen
 		DOLOG(logging::ll_error, "backend_sdcard_teensy41::read", "-", "Retrying read of %" PRIu32 " blocks starting at block number % " PRIu64, n_blocks, block_nr);
 	}
+	auto end = get_micros();
 	if (!rc)
 		DOLOG(logging::ll_error, "backend_sdcard_teensy41::read", "-", "Cannot read: %d", file.getError());
 	write_led(led_read, LOW);
-	ts_last_acces = get_micros();
+	bs.io_wait   += end-start;
+	ts_last_acces = end;
 	return rc;
 }
 
@@ -184,6 +197,7 @@ backend::cmpwrite_result_t backend_sdcard_teensy41::cmpwrite(const uint64_t bloc
 
 	cmpwrite_result_t result = cmpwrite_result_t::CWR_OK;
 	uint8_t          *buffer = new uint8_t[block_size]();
+	auto              start  = get_micros();
 
 	// DO
 	for(uint32_t i=0; i<n_blocks; i++) {
@@ -232,6 +246,8 @@ backend::cmpwrite_result_t backend_sdcard_teensy41::cmpwrite(const uint64_t bloc
 
 		ts_last_acces = get_micros();
 	}
+	auto end    = get_micros();
+	bs.io_wait += end-start;
 
 	delete [] buffer;
 

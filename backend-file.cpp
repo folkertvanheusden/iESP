@@ -54,22 +54,24 @@ uint64_t backend_file::get_block_size() const
 
 bool backend_file::sync()
 {
-	bs.n_syncs++;
-	ts_last_acces = get_micros();
+	bool ok    = false;
+	auto start = get_micros();
 #if defined(__MINGW32__)
-	if (_commit(fd) == 0)
-		return true;
+	ok = _commit(fd) == 0;
 #elif defined(__APPLE__)
-	if (fsync(fd) == 0)
-		return true;
+	ok = fsync(fd) == 0;
 #else
-	if (fdatasync(fd) == 0)
-		return true;
+	ok = fdatasync(fd) == 0;
 #endif
+	auto end = get_micros();
+	if (!ok)
+		DOLOG(logging::ll_error, "backend_file::sync", identifier, "failed: %s", strerror(errno));
 
-	DOLOG(logging::ll_error, "backend_file::sync", identifier, "failed: %s", strerror(errno));
+	bs.n_syncs++;
+	bs.io_wait   += end-start;
+	ts_last_acces = get_micros();
 
-	return false;
+	return ok;
 }
 
 bool backend_file::write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data)
@@ -78,6 +80,7 @@ bool backend_file::write(const uint64_t block_nr, const uint32_t n_blocks, const
 	off_t  offset     = block_nr * block_size;
 	size_t n_bytes    = n_blocks * block_size;
 	DOLOG(logging::ll_debug, "backend_file::write", identifier, "block %" PRIu64 " (%lu), %d blocks, block size: %" PRIu64, block_nr, offset, n_blocks, block_size);
+	auto   start      = get_micros();
 #if defined(__MINGW32__)
 	std::unique_lock<std::mutex> lck(io_lock);
 	int rc = lseek(fd, offset, SEEK_SET);
@@ -88,9 +91,11 @@ bool backend_file::write(const uint64_t block_nr, const uint32_t n_blocks, const
 	ssize_t rc = pwrite(fd, data, n_bytes, offset);
 	unlock_range(lock_list);
 #endif
+	auto end = get_micros();
 	if (rc == -1)
 		DOLOG(logging::ll_error, "backend_file::write", identifier, "ERROR writing: %s", strerror(errno));
-	ts_last_acces = get_micros();
+	ts_last_acces     = end;
+	bs.io_wait       += end-start;
 	bs.bytes_written += n_bytes;
 	return rc == ssize_t(n_bytes);
 }
@@ -101,6 +106,7 @@ bool backend_file::trim(const uint64_t block_nr, const uint32_t n_blocks)
 	off_t  offset     = block_nr * block_size;
 	size_t n_bytes    = n_blocks * block_size;
 	DOLOG(logging::ll_debug, "backend_file::trim", identifier, "block %" PRIu64 " (%lu), %d blocks, block size: %" PRIu64, block_nr, offset, n_blocks, block_size);
+	auto   start      = get_micros();
 #if defined(linux)
 	int rc = fallocate(fd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, offset, n_bytes);
 #else
@@ -115,10 +121,12 @@ bool backend_file::trim(const uint64_t block_nr, const uint32_t n_blocks)
 		}
 	}
 #endif
+	auto end = get_micros();
 	if (rc == -1)
 		DOLOG(logging::ll_error, "backend_file::trim", identifier, "unmapping: %s", strerror(errno));
-	bs.n_trims += n_blocks;
-	ts_last_acces = get_micros();
+	bs.n_trims   += n_blocks;
+	bs.io_wait   += end-start;
+	ts_last_acces = end;
 	return rc == 0;
 }
 
@@ -128,6 +136,7 @@ bool backend_file::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_
 	off_t    offset     = block_nr * block_size;
 	size_t   n_bytes    = n_blocks * block_size;
 	DOLOG(logging::ll_debug, "backend_file::read", identifier, "block %" PRIu64 " (%lu), %d blocks (%zu), block size: %" PRIu64, block_nr, offset, n_blocks, n_bytes, block_size);
+	auto     start      = get_micros();
 #if defined(__MINGW32__)
 	std::unique_lock<std::mutex> lck(io_lock);
 	ssize_t rc = 0;
@@ -140,11 +149,13 @@ bool backend_file::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_
 	ssize_t rc = pread(fd, data, n_bytes, offset);
 	unlock_range(lock_list);
 #endif
+	auto end = get_micros();
 	if (rc == -1)
 		DOLOG(logging::ll_error, "backend_file::read", identifier, "error reading: %s", strerror(errno));
 	else if (rc != ssize_t(n_bytes))
 		DOLOG(logging::ll_error, "backend_file::read", identifier, "short read, requested: %zu, received: %zd", n_bytes, rc);
-	ts_last_acces = get_micros();
+	ts_last_acces  = end;
+	bs.io_wait    += end-start;
 	bs.bytes_read += n_bytes;
 	return rc == ssize_t(n_bytes);
 }
@@ -157,7 +168,7 @@ backend::cmpwrite_result_t backend_file::cmpwrite(const uint64_t block_nr, const
 
 	cmpwrite_result_t result = cmpwrite_result_t::CWR_OK;
 	uint8_t          *buffer = new uint8_t[block_size]();
-
+	auto              start  = get_micros();
 #if defined(__MINGW32__)
 	std::unique_lock<std::mutex> lck(io_lock);
 #else
@@ -215,6 +226,9 @@ backend::cmpwrite_result_t backend_file::cmpwrite(const uint64_t block_nr, const
 			ts_last_acces = get_micros();
 		}
 	}
+
+	auto end    = get_micros();
+	bs.io_wait += end-start;
 
 	delete [] buffer;
 

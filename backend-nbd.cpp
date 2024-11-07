@@ -140,6 +140,8 @@ uint64_t backend_nbd::get_block_size() const
 
 bool backend_nbd::invoke_nbd(const uint32_t command, const uint64_t offset, const uint32_t n_bytes, uint8_t *const data)
 {
+	auto start = get_micros();
+
 	do {
 		if (!connect(true)) {
 			DOLOG(logging::ll_debug, "backend_nbd::invoke_nbd", identifier, "(re-)connect");
@@ -237,6 +239,9 @@ bool backend_nbd::invoke_nbd(const uint32_t command, const uint64_t offset, cons
 		}
 	}
 	while(fd == -1);
+
+	auto end    = get_micros();
+	bs.io_wait += end-start;
 
 	return fd != -1;
 }

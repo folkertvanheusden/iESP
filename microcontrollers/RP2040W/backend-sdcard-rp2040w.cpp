@@ -91,12 +91,15 @@ backend_sdcard_rp2040w::~backend_sdcard_rp2040w()
 bool backend_sdcard_rp2040w::sync()
 {
 	write_led(led_write, HIGH);
+	auto start = get_micros();
 	if (file.sync() != FR_OK)
 		DOLOG(logging::ll_error, "backend_sdcard_rp2040w::sync", "-", "Cannot sync data to SD-card");
+	auto end   = get_micros();
 	write_led(led_write, LOW);
 
 	bs.n_syncs++;
-	ts_last_acces = get_micros();
+	ts_last_acces = end;
+	bs.io_wait   += end-start;
 
 	return true;
 }
@@ -118,6 +121,7 @@ bool backend_sdcard_rp2040w::write(const uint64_t block_nr, const uint32_t n_blo
 
 	uint64_t iscsi_block_size = get_block_size();
 	uint64_t byte_address     = block_nr * iscsi_block_size;  // iSCSI to bytes
+	auto     start            = get_micros();
 
 	if (file.lseek(byte_address) != FR_OK) {
 		DOLOG(logging::ll_error, "backend_sdcard_rp2040w::write", "-", "Cannot seek to %" PRIu64, byte_address);
@@ -139,20 +143,23 @@ bool backend_sdcard_rp2040w::write(const uint64_t block_nr, const uint32_t n_blo
 		delay((i + 1) * 100); // 100ms is arbitrarily chosen
 		Serial.printf("Retrying write of %" PRIu32 " blocks starting at block number % " PRIu64 "\r\n", n_blocks, block_nr);
 	}
+	auto end = get_micros();
 	if (!rc)
 		DOLOG(logging::ll_error, "backend_sdcard_rp2040w::write", "-", "Cannot write: %d", file.error());
 
 	write_led(led_write, LOW);
 
-	ts_last_acces = get_micros();
+	bs.io_wait   += end-start;
+	ts_last_acces = end;
 
 	return rc;
 }
 
 bool backend_sdcard_rp2040w::trim(const uint64_t block_nr, const uint32_t n_blocks)
 {
-	bool rc = true;
-	uint8_t *data = new uint8_t[get_block_size()];
+	bool     rc    = true;
+	uint8_t *data  = new uint8_t[get_block_size()];
+	auto     start = get_micros();
 	for(uint32_t i=0; i<n_blocks; i++) {
 		if (write(block_nr + i, 1, data) == false) {
 			DOLOG(logging::ll_error, "backend_sdcard_rp2040w::trim", "-", "Cannot trim");
@@ -161,7 +168,9 @@ bool backend_sdcard_rp2040w::trim(const uint64_t block_nr, const uint32_t n_bloc
 		}
 	}
 	delete [] data;
-	ts_last_acces = get_micros();
+	auto      end = get_micros();
+	ts_last_acces = end;
+	bs.io_wait   += end-start;
 	bs.n_trims++;
 	return rc;
 }
@@ -173,7 +182,7 @@ bool backend_sdcard_rp2040w::read(const uint64_t block_nr, const uint32_t n_bloc
 
 	uint64_t iscsi_block_size = get_block_size();
 	uint64_t byte_address     = block_nr * iscsi_block_size;  // iSCSI to bytes
-
+	auto     start            = get_micros();
 	if (file.lseek(byte_address) != FR_OK) {
 		DOLOG(logging::ll_error, "backend_sdcard_rp2040w::read", "-", "Cannot seek to %" PRIu64, byte_address);
 		write_led(led_read, LOW);
@@ -194,10 +203,12 @@ bool backend_sdcard_rp2040w::read(const uint64_t block_nr, const uint32_t n_bloc
 		delay((i + 1) * 100); // 100ms is arbitrarily chosen
 		DOLOG(logging::ll_error, "backend_sdcard_rp2040w::read", "-", "Retrying read of %" PRIu32 " blocks starting at block number % " PRIu64, n_blocks, block_nr);
 	}
+	auto end = get_micros();
 	if (!rc)
 		DOLOG(logging::ll_error, "backend_sdcard_rp2040w::read", "-", "Cannot read: %d", file.error());
 	write_led(led_read, LOW);
-	ts_last_acces = get_micros();
+	bs.io_wait   += end-start;
+	ts_last_acces = end;
 	return rc;
 }
 
@@ -210,6 +221,7 @@ backend::cmpwrite_result_t backend_sdcard_rp2040w::cmpwrite(const uint64_t block
 
 	cmpwrite_result_t result = cmpwrite_result_t::CWR_OK;
 	uint8_t          *buffer = new uint8_t[block_size]();
+	uint64_t          start  = get_micros();
 
 	// DO
 	for(uint32_t i=0; i<n_blocks; i++) {
@@ -253,6 +265,8 @@ backend::cmpwrite_result_t backend_sdcard_rp2040w::cmpwrite(const uint64_t block
 
 		ts_last_acces = get_micros();
 	}
+	uint64_t end  = get_micros();
+	bs.io_wait   += end-start;
 
 	delete [] buffer;
 

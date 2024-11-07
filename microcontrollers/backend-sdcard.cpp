@@ -136,14 +136,17 @@ bool backend_sdcard::sync()
 	std::lock_guard<std::mutex> lck(serial_access_lock);
 #endif
 
+	auto start = get_micros();
 	if (file.sync() == false)
 		DOLOG(logging::ll_error, "backend_sdcard::sync", "-", "Cannot sync data to SD-card");
+	auto end   = get_micros();
 
 #if defined(RP2040W)
 	mutex_exit(&serial_access_lock);
 #endif
 	write_led(led_write, LOW);
 
+	bs.io_wait   += end-start;
 	ts_last_acces = get_micros();
 
 	return true;
@@ -166,6 +169,7 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 
 	uint64_t iscsi_block_size = get_block_size();
 	uint64_t byte_address     = block_nr * iscsi_block_size;  // iSCSI to bytes
+	auto     start            = get_micros();
 
 #if defined(RP2040W)
 	mutex_enter_blocking(&serial_access_lock);
@@ -188,6 +192,7 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 	wait_for_card();
 	size_t bytes_written = file.write(data, n_bytes_to_write);
 	bool   rc            = bytes_written == n_bytes_to_write;
+	auto   end           = get_micros();
 	if (!rc)
 		Serial.printf("Wrote %zu bytes instead of %zu\r\n", bytes_written, n_bytes_to_write);
 
@@ -197,15 +202,17 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 
 	write_led(led_write, LOW);
 
-	ts_last_acces = get_micros();
+	bs.io_wait   += end-start;
+	ts_last_acces = end;
 
 	return rc;
 }
 
 bool backend_sdcard::trim(const uint64_t block_nr, const uint32_t n_blocks)
 {
-	bool rc = true;
-	uint8_t *data = new uint8_t[get_block_size()]();
+	bool     rc    = true;
+	uint8_t *data  = new uint8_t[get_block_size()]();
+	auto     start = get_micros();
 	for(uint32_t i=0; i<n_blocks; i++) {
 		if (write(block_nr + i, 1, data) == false) {
 			DOLOG(logging::ll_error, "backend_sdcard::trim", "-", "Cannot trim");
@@ -213,9 +220,11 @@ bool backend_sdcard::trim(const uint64_t block_nr, const uint32_t n_blocks)
 			break;
 		}
 	}
+	auto end = get_micros();
 	delete [] data;
 	bs.n_trims++;
-	ts_last_acces = get_micros();
+	bs.io_wait   += end-start;
+	ts_last_acces = end;
 	return rc;
 }
 
@@ -226,6 +235,7 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 
 	uint64_t iscsi_block_size = get_block_size();
 	uint64_t byte_address     = block_nr * iscsi_block_size;  // iSCSI to bytes
+	uint64_t start            = get_micros();
 
 #if defined(RP2040W)
 	mutex_enter_blocking(&serial_access_lock);
@@ -247,6 +257,7 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 
 	size_t bytes_read = file.read(data, n_bytes_to_read);
 	bool   rc         = bytes_read == n_bytes_to_read;
+	auto   end        = get_micros();
 	if (!rc)
 		Serial.printf("Read %zu bytes instead of %zu\r\n", bytes_read, n_bytes_to_read);
 
@@ -254,7 +265,8 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 	mutex_exit(&serial_access_lock);
 #endif
 	write_led(led_read, LOW);
-	ts_last_acces = get_micros();
+	bs.io_wait   += end-start;
+	ts_last_acces = end;
 	return rc;
 }
 
@@ -272,6 +284,7 @@ backend::cmpwrite_result_t backend_sdcard::cmpwrite(const uint64_t block_nr, con
 
 	cmpwrite_result_t result = cmpwrite_result_t::CWR_OK;
 	uint8_t          *buffer = new uint8_t[block_size]();
+	auto              start  = get_micros();
 
 	// DO
 	for(uint32_t i=0; i<n_blocks; i++) {
@@ -315,6 +328,9 @@ backend::cmpwrite_result_t backend_sdcard::cmpwrite(const uint64_t block_nr, con
 
 		ts_last_acces = get_micros();
 	}
+
+	auto end    = get_micros();
+	bs.io_wait += end-start;
 
 	delete [] buffer;
 
