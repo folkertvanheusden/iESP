@@ -8,7 +8,7 @@
 - teensy4.1: get rid of retry-loop in sd-card code
 
 - io-wait: 100ths of a second, once a second
-- io-wait in backend-file/nbd
+-- need to collect stats from backend in maintenance-thread and feed the results to snmp
 
 - in libiscsi test-set:
         [SKIPPED] Not an iSCSI device. Skipping test
