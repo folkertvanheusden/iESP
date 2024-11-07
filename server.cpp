@@ -565,13 +565,13 @@ void server::handler()
 #else
 			DOLOG(logging::ll_info, "server::handler", "-", "new session with %s", endpoint.c_str());
 #endif
-			auto          prev_output  = get_millis();
-			unsigned long busy         = 0;
-			const long    interval     = 1000;
-			session      *ses          = nullptr;
-			bool          ok           = true;
-			int           fail_counter = 0;
-			auto          block_size   = s->get_block_size();
+			auto           prev_output  = get_millis();
+			unsigned long  busy         = 0;
+			constexpr long interval     = 5000;
+			session       *ses          = nullptr;
+			bool           ok           = true;
+			int            fail_counter = 0;
+			auto           block_size   = s->get_block_size();
 
 			do {
 #if defined(LED_BUILTIN) && defined(ARDUINO)
@@ -652,6 +652,8 @@ void server::handler()
 				if (ifr == IFR_OK)
 					fail_counter = 0;
 				else {
+					ses->inc_error_count();
+
 					fail_counter++;
 					if (fail_counter >= 16) {
 						ok = false;
@@ -680,11 +682,13 @@ void server::handler()
 						"PDU/s: %.2f, "
 						"send: %.2f kB/s, recv: %.2f kB/s, "
 						"written: %.2f kB/s, read: %.2f kB/s, "
-						"syncs: %.2f/s, unmaps: %.2f kB/s, load: %.2f%%",
+						"syncs: %.2f/s, unmaps: %.2f kB/s, "
+						"load: %.2f%%, errors: %u",
 						ses->get_pdu_count() / dtook,
 						ses->get_bytes_tx() / dkB, ses->get_bytes_rx() / dkB,
 						is->bytes_written / dkB, is->bytes_read / dkB,
-						is->n_syncs / dtook, is->n_trims * block_size / 1024 / 1024 / dtook, busy * 0.1 / took);
+						is->n_syncs / dtook, is->n_trims * block_size / 1024 / 1024 / dtook,
+						busy * 0.1 / took, ses->get_error_count());
 
 					ses->reset_pdu_count();
 					ses->reset_bytes_rx();
