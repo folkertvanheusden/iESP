@@ -683,12 +683,12 @@ void server::handler()
 						"send: %.2f kB/s, recv: %.2f kB/s, "
 						"written: %.2f kB/s, read: %.2f kB/s, "
 						"syncs: %.2f/s, unmaps: %.2f kB/s, "
-						"load: %.2f%%, errors: %u",
+						"load: %.2f%%, errors: %u, mem: %u",
 						ses->get_pdu_count() / dtook,
 						ses->get_bytes_tx() / dkB, ses->get_bytes_rx() / dkB,
 						is->bytes_written / dkB, is->bytes_read / dkB,
 						is->n_syncs / dtook, is->n_trims * block_size / 1024 / 1024 / dtook,
-						busy * 0.1 / took, ses->get_error_count());
+						busy * 0.1 / took, ses->get_error_count(), get_free_heap_space());
 
 					ses->reset_pdu_count();
 					ses->reset_bytes_rx();
