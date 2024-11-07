@@ -150,6 +150,7 @@ bool backend_sdcard_rp2040w::write(const uint64_t block_nr, const uint32_t n_blo
 	write_led(led_write, LOW);
 
 	bs.io_wait   += end-start;
+	bs.n_writes++;
 	ts_last_acces = end;
 
 	return rc;
@@ -208,6 +209,7 @@ bool backend_sdcard_rp2040w::read(const uint64_t block_nr, const uint32_t n_bloc
 		DOLOG(logging::ll_error, "backend_sdcard_rp2040w::read", "-", "Cannot read: %d", file.error());
 	write_led(led_read, LOW);
 	bs.io_wait   += end-start;
+	bs.n_reads++;
 	ts_last_acces = end;
 	return rc;
 }
@@ -267,6 +269,8 @@ backend::cmpwrite_result_t backend_sdcard_rp2040w::cmpwrite(const uint64_t block
 	}
 	uint64_t end  = get_micros();
 	bs.io_wait   += end-start;
+	bs.n_reads++;
+	bs.n_writes++;
 
 	delete [] buffer;
 

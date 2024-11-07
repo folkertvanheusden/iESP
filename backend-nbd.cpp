@@ -267,6 +267,7 @@ bool backend_nbd::write(const uint64_t block_nr, const uint32_t n_blocks, const 
 
 	ts_last_acces = get_micros();
 	bs.bytes_written += n_bytes;
+	bs.n_writes++;
 
 	return rc;
 }
@@ -304,6 +305,7 @@ bool backend_nbd::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_t
 
 	ts_last_acces  = get_micros();
 	bs.bytes_read += n_bytes;
+	bs.n_reads++;
 
 	return rc;
 }
@@ -355,6 +357,9 @@ backend::cmpwrite_result_t backend_nbd::cmpwrite(const uint64_t block_nr, const 
 	}
 
 	unlock_range(lock_list);
+
+	bs.n_reads++;
+	bs.n_writes++;
 
 	return result;
 }

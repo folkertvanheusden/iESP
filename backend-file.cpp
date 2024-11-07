@@ -97,6 +97,7 @@ bool backend_file::write(const uint64_t block_nr, const uint32_t n_blocks, const
 	ts_last_acces     = end;
 	bs.io_wait       += end-start;
 	bs.bytes_written += n_bytes;
+	bs.n_writes++;
 	return rc == ssize_t(n_bytes);
 }
 
@@ -157,6 +158,7 @@ bool backend_file::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_
 	ts_last_acces  = end;
 	bs.io_wait    += end-start;
 	bs.bytes_read += n_bytes;
+	bs.n_reads++;
 	return rc == ssize_t(n_bytes);
 }
 
@@ -229,6 +231,8 @@ backend::cmpwrite_result_t backend_file::cmpwrite(const uint64_t block_nr, const
 
 	auto end    = get_micros();
 	bs.io_wait += end-start;
+	bs.n_reads++;
+	bs.n_writes++;
 
 	delete [] buffer;
 

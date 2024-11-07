@@ -124,6 +124,7 @@ bool backend_sdcard_teensy41::write(const uint64_t block_nr, const uint32_t n_bl
 
 	auto end      = get_micros();
 	bs.io_wait   += end-start;
+	bs.n_writes++;
 	ts_last_acces = end;
 
 	return rc;
@@ -183,6 +184,7 @@ bool backend_sdcard_teensy41::read(const uint64_t block_nr, const uint32_t n_blo
 		DOLOG(logging::ll_error, "backend_sdcard_teensy41::read", "-", "Cannot read: %d", file.getError());
 	write_led(led_read, LOW);
 	bs.io_wait   += end-start;
+	bs.n_reads++;
 	ts_last_acces = end;
 	return rc;
 }
@@ -248,6 +250,8 @@ backend::cmpwrite_result_t backend_sdcard_teensy41::cmpwrite(const uint64_t bloc
 	}
 	auto end    = get_micros();
 	bs.io_wait += end-start;
+	bs.n_reads++;
+	bs.n_writes++;
 
 	delete [] buffer;
 

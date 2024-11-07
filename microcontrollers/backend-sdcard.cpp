@@ -203,6 +203,7 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 	write_led(led_write, LOW);
 
 	bs.io_wait   += end-start;
+	bs.n_writes++;
 	ts_last_acces = end;
 
 	return rc;
@@ -266,6 +267,7 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 #endif
 	write_led(led_read, LOW);
 	bs.io_wait   += end-start;
+	bs.n_reads++;
 	ts_last_acces = end;
 	return rc;
 }
@@ -331,6 +333,8 @@ backend::cmpwrite_result_t backend_sdcard::cmpwrite(const uint64_t block_nr, con
 
 	auto end    = get_micros();
 	bs.io_wait += end-start;
+	bs.n_reads++;
+	bs.n_writes++;
 
 	delete [] buffer;
 
