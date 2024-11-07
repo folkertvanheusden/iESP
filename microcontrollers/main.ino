@@ -62,11 +62,12 @@ namespace qn = qindesign::network;
 #include "snmp/snmp.h"
 
 
-bool ota_update = false;
-std::atomic_bool stop { false };
-char name[24] { 0 };
-backend  *bs   { nullptr };
-scsi *scsi_dev { nullptr };
+bool      ota_update { false   };
+char      name[24]   { 0       };
+backend  *bs         { nullptr };
+scsi     *scsi_dev   { nullptr };
+backend_stats_t bstats { };
+std::atomic_bool stop { false  };
 
 #if defined(WT_ETH01)
 int led_green  = -1;
@@ -393,6 +394,9 @@ void loopw(void *)
 
 			ram_free_kb = get_free_heap_space() / 1024;  // in kB
 
+      bs->get_and_reset_stats(&bstats);
+      bstats.io_wait_ticks = bstats.io_wait * 10000;
+
 			cu_count = 0;
 		}
 	}
@@ -643,7 +647,7 @@ void setup() {
 #endif
 
 	draw_status(13);
-	init_snmp(&snmp_, &snmp_data_, &is, get_diskspace, bs, &cpu_usage, &ram_free_kb, &stop, 161);
+	init_snmp(&snmp_, &snmp_data_, &is, get_diskspace, bs, &bstats, &cpu_usage, &ram_free_kb, &stop, 161);
 
 	draw_status(14);
 	if (bs->begin() == false) {
