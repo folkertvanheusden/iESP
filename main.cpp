@@ -46,7 +46,7 @@ uint64_t get_cpu_usage_us()
 	return 0;
 }
 
-void maintenance_thread(backend *const b, std::atomic_bool *const stop, int *const cpu_usage, int *const ram_free_kb)
+void maintenance_thread(backend *const b, backend_stats_t *const bs, std::atomic_bool *const stop, int *const cpu_usage, int *const ram_free_kb)
 {
 	uint64_t prev_w_poll   = 0;
 
@@ -72,6 +72,9 @@ void maintenance_thread(backend *const b, std::atomic_bool *const stop, int *con
 
 			prev_w_poll = now;
 		}
+
+		b->get_and_reset_stats(bs);
+		bs->io_wait_ticks = bs->io_wait * 10000;
 	}
 }
 
@@ -228,16 +231,17 @@ int main(int argc, char *argv[])
 	}
 #endif
 
-	int        cpu_usage   { 0       };
-	int        ram_free_kb { 0       };
-	snmp      *snmp_       { nullptr };
-	snmp_data *snmp_data_  { nullptr };
+	backend_stats_t bs          {         };
+	int             cpu_usage   { 0       };
+	int             ram_free_kb { 0       };
+	snmp           *snmp_       { nullptr };
+	snmp_data      *snmp_data_  { nullptr };
 	if (use_snmp)
-		init_snmp(&snmp_, &snmp_data_, &is, get_diskspace, b, &cpu_usage, &ram_free_kb, &stop, snmp_port);
+		init_snmp(&snmp_, &snmp_data_, &is, get_diskspace, b, &bs, &cpu_usage, &ram_free_kb, &stop, snmp_port);
 
 	server s(&sd, &c, &is, target_name, digest_chk);
 
-	std::thread *mth = new std::thread(maintenance_thread, b, &stop, &cpu_usage, &ram_free_kb);
+	std::thread *mth = new std::thread(maintenance_thread, b, &bs, &stop, &cpu_usage, &ram_free_kb);
 
 	if (pid_file.empty() == false) {
 		FILE *fh = fopen(pid_file.c_str(), "w");

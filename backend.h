@@ -17,11 +17,12 @@
 #endif
 
 struct backend_stats_t {
-	uint64_t bytes_read    { 0 };
-	uint64_t bytes_written { 0 };
-	uint64_t n_syncs       { 0 };
-	uint64_t n_trims       { 0 };
-	uint64_t io_wait       { 0 };  // in uS
+	uint64_t bytes_read;
+	uint64_t bytes_written;
+	uint64_t n_syncs;
+	uint64_t n_trims;
+	uint64_t io_wait;  // total, in uS
+	uint64_t io_wait_ticks;  // updated by maintenance_thread
 };
 
 class backend
@@ -55,7 +56,7 @@ public:
 
 	virtual bool        sync() = 0;
 
-	void get_and_reset_stats(uint64_t *const bytes_read, uint64_t *const bytes_written, uint64_t *const n_syncs, uint64_t *const n_trims, uint64_t *const io_wait);
+	void                get_and_reset_stats(backend_stats_t *const target);
 
 	enum cmpwrite_result_t { CWR_OK, CWR_MISMATCH, CWR_READ_ERROR, CWR_WRITE_ERROR };
 

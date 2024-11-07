@@ -15,19 +15,10 @@ backend::~backend()
 {
 }
 
-void backend::get_and_reset_stats(uint64_t *const bytes_read, uint64_t *const bytes_written, uint64_t *const n_syncs, uint64_t *const n_trims, uint64_t *const io_wait)
+void backend::get_and_reset_stats(backend_stats_t *const target)
 {
-	*bytes_read    = bs.bytes_read;
-	*bytes_written = bs.bytes_written;
-	*n_syncs       = bs.n_syncs;
-	*n_trims       = bs.n_trims;
-	*io_wait       = bs.io_wait;
-
-	bs.bytes_read    = 0;
-	bs.bytes_written = 0;
-	bs.n_syncs       = 0;
-	bs.n_trims       = 0;
-	bs.io_wait       = 0;
+	memcpy(target, &bs, sizeof bs);
+	memset(&bs, 0x00, sizeof bs);
 }
 
 std::pair<uint64_t, uint32_t> backend::get_idle_state()
