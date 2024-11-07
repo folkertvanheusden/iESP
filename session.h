@@ -62,6 +62,7 @@ public:
 	uint32_t get_pdu_count() const          { return statistics.pdu_count; }
 	void     reset_pdu_count()              { statistics.pdu_count = 0;    }
 	io_stats_t *get_io_stats()              { return &statistics.is;       }
+	void     reset_io_stats()               { statistics.is.reset();       }
 
 	uint32_t get_inc_datasn(const uint32_t itt);
 

@@ -13,14 +13,27 @@ struct data_descriptor {
 	uint32_t n_sectors;
 };
 
-typedef struct {
-	uint64_t n_reads;
-	uint64_t bytes_read;
-	uint64_t n_writes;
-	uint64_t bytes_written;
-	uint64_t n_syncs;
-	uint64_t n_trims;
+struct io_stats_t {
+	uint64_t n_reads       { 0 };
+	uint64_t bytes_read    { 0 };
+	uint64_t n_writes      { 0 };
+	uint64_t bytes_written { 0 };
+	uint64_t n_syncs       { 0 };
+	uint64_t n_trims       { 0 };
 	// 1.3.6.1.4.1.2021.11.54: "The number of 'ticks' (typically 1/100s) spent waiting for IO."
 	// https://www.circitor.fr/Mibs/Html/U/UCD-SNMP-MIB.php#ssCpuRawWait
-	uint32_t io_wait;
-} io_stats_t;
+	uint64_t io_wait       { 0 };
+
+	io_stats_t() {
+	}
+
+	void reset() {
+		n_reads = 0;
+		bytes_read = 0;
+		n_writes = 0;
+		bytes_written = 0;
+		n_syncs = 0;
+		n_trims = 0;
+		io_wait = 0;
+	}
+};

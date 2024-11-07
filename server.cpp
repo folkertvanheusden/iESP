@@ -567,7 +567,7 @@ void server::handler()
 #endif
 			auto          prev_output  = get_millis();
 			unsigned long busy         = 0;
-			const long    interval     = 5000;
+			const long    interval     = 1000;
 			session      *ses          = nullptr;
 			bool          ok           = true;
 			int           fail_counter = 0;
@@ -689,7 +689,8 @@ void server::handler()
 					ses->reset_pdu_count();
 					ses->reset_bytes_rx();
 					ses->reset_bytes_tx();
-					busy       = 0;
+					ses->reset_io_stats();
+					busy = 0;
 				}
 
 #if defined(LED_BUILTIN) && defined(ARDUINO)
