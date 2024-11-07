@@ -22,7 +22,6 @@ private:
 	struct {
 		uint64_t   bytes_rx     { 0       };
 		uint64_t   bytes_tx     { 0       };
-		uint32_t   pdu_count    { 0       };
 		unsigned   error_count  { 0       };
 		io_stats_t is;
 	} statistics;
@@ -59,9 +58,6 @@ public:
 	void     add_bytes_tx(const uint64_t n) { statistics.bytes_tx += n;      }
 	uint64_t get_bytes_tx() const           { return statistics.bytes_tx;    }
 	void     reset_bytes_tx()               { statistics.bytes_tx = 0;       }
-	void     inc_pdu_count()                { statistics.pdu_count++;        }
-	uint32_t get_pdu_count() const          { return statistics.pdu_count;   }
-	void     reset_pdu_count()              { statistics.pdu_count = 0;      }
 	io_stats_t *get_io_stats()              { return &statistics.is;         }
 	void     reset_io_stats()               { statistics.is.reset();         }
 	void     inc_error_count()              { statistics.error_count++;      }

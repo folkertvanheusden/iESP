@@ -647,8 +647,6 @@ void server::handler()
 
 				delete pdu;
 
-				ses->inc_pdu_count();
-
 				if (ifr == IFR_OK)
 					fail_counter = 0;
 				else {
@@ -679,18 +677,17 @@ void server::handler()
 					const io_stats_t *const is    = ses->get_io_stats();
 
 					DOLOG(logging::ll_info, "server::handler", endpoint,
-						"PDU/s: %.2f, IOPS: %.2f "
+						"IOPS: %.2f "
 						"send: %.2f kB/s, recv: %.2f kB/s, "
 						"written: %.2f kB/s, read: %.2f kB/s, "
 						"syncs: %.2f/s, unmapped: %.2f kB/s, "
 						"load: %.2f%%, errors: %u, mem: %u",
-						ses->get_pdu_count() / dtook, is->get_n_iops() / dtook,
+						is->get_n_iops() / dtook,
 						ses->get_bytes_tx() / dkB, ses->get_bytes_rx() / dkB,
 						is->bytes_written / dkB, is->bytes_read / dkB,
 						is->n_syncs / dtook, is->blocks_trimmed * block_size / 1024 / 1024 / dtook,
 						busy * 0.1 / took, ses->get_error_count(), get_free_heap_space());
 
-					ses->reset_pdu_count();
 					ses->reset_bytes_rx();
 					ses->reset_bytes_tx();
 					ses->reset_io_stats();
