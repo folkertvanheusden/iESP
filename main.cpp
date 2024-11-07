@@ -46,7 +46,7 @@ uint64_t get_cpu_usage_us()
 	return 0;
 }
 
-void maintenance_thread(std::atomic_bool *const stop, int *const cpu_usage, int *const ram_free_kb)
+void maintenance_thread(backend *const b, std::atomic_bool *const stop, int *const cpu_usage, int *const ram_free_kb)
 {
 	uint64_t prev_w_poll   = 0;
 
@@ -237,7 +237,7 @@ int main(int argc, char *argv[])
 
 	server s(&sd, &c, &is, target_name, digest_chk);
 
-	std::thread *mth = new std::thread(maintenance_thread, &stop, &cpu_usage, &ram_free_kb);
+	std::thread *mth = new std::thread(maintenance_thread, b, &stop, &cpu_usage, &ram_free_kb);
 
 	if (pid_file.empty() == false) {
 		FILE *fh = fopen(pid_file.c_str(), "w");
