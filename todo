@@ -5,8 +5,6 @@
 
 - leds stay on
 
-- teensy4.1: get rid of retry-loop in sd-card code
-
 - in libiscsi test-set:
         [SKIPPED] Not an iSCSI device. Skipping test
         [SKIPPED] Not an iSCSI device. Skipping test

@@ -106,20 +106,14 @@ bool backend_sdcard_teensy41::write(const uint64_t block_nr, const uint32_t n_bl
 	size_t n_bytes_to_write = n_blocks * iscsi_block_size;
 	bs.bytes_written += n_bytes_to_write;
 
-	bool rc = false;
-	for(int i=0; i<5; i++) {  // 5 is arbitrarily chosen
-		wait_for_card();
-		arm_dcache_flush(data, n_bytes_to_write);
-		size_t bytes_written = file.write(data, n_bytes_to_write);
-		rc = bytes_written == n_bytes_to_write;
-		if (rc)
-			break;
-		Serial.printf("Wrote %zu bytes instead of %zu\r\n", bytes_written, n_bytes_to_write);
-		delay((i + 1) * 100); // 100ms is arbitrarily chosen
-		Serial.printf("Retrying write of %" PRIu32 " blocks starting at block number % " PRIu64 "\r\n", n_blocks, block_nr);
-	}
-	if (!rc)
+	wait_for_card();
+	arm_dcache_flush(data, n_bytes_to_write);
+	size_t bytes_written = file.write(data, n_bytes_to_write);
+	bool rc = bytes_written == n_bytes_to_write;
+	if (!rc) {
 		DOLOG(logging::ll_error, "backend_sdcard_teensy41::write", "-", "Cannot write: %d", file.getError());
+		Serial.printf("Wrote %zu bytes instead of %zu\r\n", bytes_written, n_bytes_to_write);
+	}
 
 	write_led(led_write, LOW);
 
@@ -168,21 +162,15 @@ bool backend_sdcard_teensy41::read(const uint64_t block_nr, const uint32_t n_blo
 	size_t n_bytes_to_read = n_blocks * iscsi_block_size;
 	bs.bytes_read += n_bytes_to_read;
 
-	bool rc = false;
-	for(int i=0; i<5; i++) {  // 5 is arbitrarily chosen
-		arm_dcache_flush_delete(data, n_bytes_to_read);
-		size_t bytes_read = file.read(data, n_bytes_to_read);
-		arm_dcache_delete(data, n_bytes_to_read);
-		rc = bytes_read == n_bytes_to_read;
-		if (rc)
-			break;
+	arm_dcache_flush_delete(data, n_bytes_to_read);
+	size_t bytes_read = file.read(data, n_bytes_to_read);
+	arm_dcache_delete(data, n_bytes_to_read);
+	bool rc = bytes_read == n_bytes_to_read;
+	if (!rc) {
+		DOLOG(logging::ll_error, "backend_sdcard_teensy41::read", "-", "Cannot read: %d", file.getError());
 		DOLOG(logging::ll_error, "backend_sdcard_teensy41::read", "-", "Read %zu bytes instead of %zu", bytes_read, n_bytes_to_read);
-		delay((i + 1) * 100); // 100ms is arbitrarily chosen
-		DOLOG(logging::ll_error, "backend_sdcard_teensy41::read", "-", "Retrying read of %" PRIu32 " blocks starting at block number % " PRIu64, n_blocks, block_nr);
 	}
 	auto end = get_micros();
-	if (!rc)
-		DOLOG(logging::ll_error, "backend_sdcard_teensy41::read", "-", "Cannot read: %d", file.getError());
 	write_led(led_read, LOW);
 	bs.io_wait   += end-start;
 	bs.n_reads++;
