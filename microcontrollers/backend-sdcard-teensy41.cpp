@@ -9,10 +9,11 @@
 
 extern void write_led(const int gpio, const int state);
 
-backend_sdcard_teensy41::backend_sdcard_teensy41(const int led_read, const int led_write):
+backend_sdcard_teensy41::backend_sdcard_teensy41(const int led_read, const int led_write, const std::string & disk_name):
 	backend("SD-card"),
 	led_read(led_read),
-	led_write(led_write)
+	led_write(led_write),
+	disk_name(disk_name)
 {
 }
 
@@ -36,10 +37,10 @@ bool backend_sdcard_teensy41::begin()
 
 	SD.sdfs.ls(LS_DATE | LS_SIZE);
 
-	file = SD.sdfs.open(FILENAME, O_RDWR);
+	file = SD.sdfs.open(disk_name.c_str(), O_RDWR);
 	if (!file)
 	{
-		DOLOG(logging::ll_error, "backend_sdcard_teensy41::begin", "-", "Cannot access " FILENAME " on SD-card");
+		DOLOG(logging::ll_error, "backend_sdcard_teensy41::begin", "-", "Cannot access \"%s\" on SD-card", disk_name.c_str());
 		write_led(led_read,  LOW);
 		write_led(led_write, LOW);
 		return false;

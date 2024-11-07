@@ -17,7 +17,7 @@
 
 extern void write_led(const int gpio, const int state);
 
-backend_sdcard::backend_sdcard(const int led_read, const int led_write, const int pin_SD_MISO, const int pin_SD_MOSI, const int pin_SD_SCLK, const int pin_SD_CS, const std::optional<int> spi_speed):
+backend_sdcard::backend_sdcard(const int led_read, const int led_write, const int pin_SD_MISO, const int pin_SD_MOSI, const int pin_SD_SCLK, const int pin_SD_CS, const std::optional<int> spi_speed, const std::string & disk_name):
 	backend("SD-card"),
 	led_read(led_read),
 	led_write(led_write),
@@ -25,7 +25,8 @@ backend_sdcard::backend_sdcard(const int led_read, const int led_write, const in
 	pin_SD_MOSI(pin_SD_MOSI),
 	pin_SD_SCLK(pin_SD_SCLK),
 	pin_SD_CS(pin_SD_CS),
-	spi_speed(spi_speed)
+	spi_speed(spi_speed),
+	disk_name(disk_name)
 {
 #if defined(RP2040W)
 	mutex_init(&serial_access_lock);
@@ -101,9 +102,9 @@ bool backend_sdcard::reinit(const bool close_first)
 	sd.ls(LS_DATE | LS_SIZE);
 
 retry:
-	if (file.open(FILENAME, O_RDWR) == false)
+	if (file.open(disk_name.c_str(), O_RDWR) == false)
 	{
-		DOLOG(logging::ll_error, "backend_sdcard::reinit", "-", "Cannot access " FILENAME " on SD-card");
+		DOLOG(logging::ll_error, "backend_sdcard::reinit", "-", "Cannot access \"%s\" on SD-card", disk_name.c_str());
 		write_led(led_read,  LOW);
 		write_led(led_write, LOW);
 		return false;

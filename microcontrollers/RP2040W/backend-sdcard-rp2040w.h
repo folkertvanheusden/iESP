@@ -12,9 +12,10 @@ private:
 	size_t        sector_size { 0  };
 	const int     led_read    { -1 };
 	const int     led_write   { -1 };
+	const std::string disk_name;
 
 public:
-	backend_sdcard_rp2040w(const int led_read, const int led_write);
+	backend_sdcard_rp2040w(const int led_read, const int led_write, const std::string & disk_naame);
 	virtual ~backend_sdcard_rp2040w();
 
 	bool begin() override;

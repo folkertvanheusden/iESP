@@ -74,7 +74,7 @@ void setup()
 		init_my_getrandom();
 
 		Serial.println(F("Init SD card"));
-		bs = new backend_sdcard_rp2040w(led_green, led_yellow);
+		bs = new backend_sdcard_rp2040w(led_green, led_yellow, FILENAME);
 		bs->begin();
 
 		Serial.println(F("Create SCSI instance"));

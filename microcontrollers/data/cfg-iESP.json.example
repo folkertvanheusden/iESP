@@ -16,5 +16,6 @@
 	"SD-MOSI": 23,
 	"SD-SCLK": 18,
 	"SD-CS": 5,
-	"spi-speed": 16
+	"spi-speed": 16,
+	"disk-name": "test.dat"
 }

@@ -11,12 +11,13 @@ private:
 	uint64_t  card_size   { 0  };
 	const int led_read    { -1 };
 	const int led_write   { -1 };
+	const std::string disk_name;
 
 	// wait until it is no longer busy with something and available for writes
 	void wait_for_card();
 
 public:
-	backend_sdcard_teensy41(const int led_read, const int led_write);
+	backend_sdcard_teensy41(const int led_read, const int led_write, const std::string & disk_name);
 	virtual ~backend_sdcard_teensy41();
 
 	bool begin() override;

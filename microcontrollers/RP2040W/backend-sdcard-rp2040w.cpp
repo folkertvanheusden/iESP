@@ -11,10 +11,11 @@
 
 extern void write_led(const int gpio, const int state);
 
-backend_sdcard_rp2040w::backend_sdcard_rp2040w(const int led_read, const int led_write):
+backend_sdcard_rp2040w::backend_sdcard_rp2040w(const int led_read, const int led_write, const std::string & disk_name):
 	backend("SD-card"),
 	led_read(led_read),
-	led_write(led_write)
+	led_write(led_write),
+	disk_name(disk_name)
 {
 }
 
@@ -63,10 +64,10 @@ bool backend_sdcard_rp2040w::begin()
 	Serial.println(F(" - mount"));
 	card_p->mount();
 
-	FRESULT frc = file.open(FILENAME, FA_OPEN_APPEND | FA_WRITE | FA_READ);
+	FRESULT frc = file.open(disk_name.c_str(), FA_OPEN_APPEND | FA_WRITE | FA_READ);
 	if (frc != FR_OK)
 	{
-		DOLOG(logging::ll_error, "backend_sdcard_rp2040w::begin", "-", "Cannot access " FILENAME " on SD-card");
+		DOLOG(logging::ll_error, "backend_sdcard_rp2040w::begin", "-", "Cannot access \"%s\" on SD-card", disk_name.c_str());
 		write_led(led_read,  LOW);
 		write_led(led_write, LOW);
 		return false;

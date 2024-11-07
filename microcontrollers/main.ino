@@ -68,6 +68,7 @@ backend  *bs         { nullptr };
 scsi     *scsi_dev   { nullptr };
 backend_stats_t bstats { };
 std::atomic_bool stop { false  };
+std::string disk_name { "test.dat" };
 
 #if defined(WT_ETH01)
 int led_green  = -1;
@@ -282,6 +283,9 @@ bool load_configuration() {
 
 	if (cfg.containsKey("spi-speed"))
 		spi_speed = cfg["spi-speed"].as<int>();
+
+	if (cfg.containsKey("disk-name"))
+		disk_name = cfg["disk-name"].as<int>();
 
 	data_file.close();
 
@@ -640,10 +644,10 @@ void setup() {
 
 	draw_status(11);
 #if defined(TEENSY4_1)
-	bs = new backend_sdcard_teensy41(led_green, led_yellow);
+	bs = new backend_sdcard_teensy41(led_green, led_yellow, disk_name);
 #else
   Serial.printf("LEDgreen: %d, LEDyellow: %d, MISO: %d, MOSI: %d, SCLK: %d, CS: %d\r\n", led_green, led_yellow, pin_SD_MISO, pin_SD_MOSI, pin_SD_SCLK, pin_SD_CS);
-	bs = new backend_sdcard(led_green, led_yellow, pin_SD_MISO, pin_SD_MOSI, pin_SD_SCLK, pin_SD_CS, spi_speed);
+	bs = new backend_sdcard(led_green, led_yellow, pin_SD_MISO, pin_SD_MOSI, pin_SD_SCLK, pin_SD_CS, spi_speed, disk_name);
 #endif
 
 	draw_status(13);

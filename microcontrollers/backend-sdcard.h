@@ -22,6 +22,7 @@ private:
 	const int    pin_SD_SCLK { -1 };
 	const int    pin_SD_CS   { -1 };
 	const std::optional<int> spi_speed;
+	const std::string disk_name;
 
 #if defined(RP2040W)
 	mutex_t    serial_access_lock;
@@ -35,7 +36,7 @@ private:
 	void wait_for_card();
 
 public:
-	backend_sdcard(const int led_read, const int led_write, const int pin_SD_MISO, const int pin_SD_MOSI, const int pin_SD_SCLK, const int pin_SD_CS, const std::optional<int> spi_speed);
+	backend_sdcard(const int led_read, const int led_write, const int pin_SD_MISO, const int pin_SD_MOSI, const int pin_SD_SCLK, const int pin_SD_CS, const std::optional<int> spi_speed, const std::string & disk_name);
 	virtual ~backend_sdcard();
 
 	bool begin() override;
