@@ -4,6 +4,7 @@
 #include <optional>
 
 #include "com.h"
+#include "gen.h"
 #include "iscsi.h"
 
 
@@ -19,9 +20,11 @@ private:
 	uint32_t          block_size    { 0       };
 
 	struct {
-		uint64_t  bytes_rx      { 0       };
-		uint64_t  bytes_tx      { 0       };
-		uint32_t  pdu_count     { 0       };
+		uint64_t   bytes_rx     { 0       };
+		uint64_t   bytes_tx     { 0       };
+		uint32_t   pdu_count    { 0       };
+		unsigned   error_count  { 0       };
+		io_stats_t is;
 	} statistics;
 
 	uint32_t          max_seg_len   { MAX_DATA_SEGMENT_SIZE };
@@ -50,15 +53,19 @@ public:
 	void     set_max_seg_len(const uint32_t v) { max_seg_len = v; }
 	uint32_t get_max_seg_len() const { return max_seg_len; }
 
-	void     add_bytes_rx(const uint64_t n) { statistics.bytes_rx += n;    }
-	uint64_t get_bytes_rx() const           { return statistics.bytes_rx;  }
-	void     reset_bytes_rx()               { statistics.bytes_rx = 0;     }
-	void     add_bytes_tx(const uint64_t n) { statistics.bytes_tx += n;    }
-	uint64_t get_bytes_tx() const           { return statistics.bytes_tx;  }
-	void     reset_bytes_tx()               { statistics.bytes_tx = 0;     }
-	void     inc_pdu_count()                { statistics.pdu_count++;      }
-	uint32_t get_pdu_count() const          { return statistics.pdu_count; }
-	void     reset_pdu_count()              { statistics.pdu_count = 0;    }
+	void     add_bytes_rx(const uint64_t n) { statistics.bytes_rx += n;      }
+	uint64_t get_bytes_rx() const           { return statistics.bytes_rx;    }
+	void     reset_bytes_rx()               { statistics.bytes_rx = 0;       }
+	void     add_bytes_tx(const uint64_t n) { statistics.bytes_tx += n;      }
+	uint64_t get_bytes_tx() const           { return statistics.bytes_tx;    }
+	void     reset_bytes_tx()               { statistics.bytes_tx = 0;       }
+	void     inc_pdu_count()                { statistics.pdu_count++;        }
+	uint32_t get_pdu_count() const          { return statistics.pdu_count;   }
+	void     reset_pdu_count()              { statistics.pdu_count = 0;      }
+	io_stats_t *get_io_stats()              { return &statistics.is;         }
+	void     reset_io_stats()               { statistics.is.reset();         }
+	void     inc_error_count()              { statistics.error_count++;      }
+	unsigned get_error_count() const        { return statistics.error_count; }
 
 	uint32_t get_inc_datasn(const uint32_t itt);
 

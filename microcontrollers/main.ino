@@ -123,7 +123,6 @@ WiFiUDP ntp_udp;
 NTP ntp(ntp_udp);
 
 uint32_t hundredsofasecondcounter = 0;
-io_stats_t ios { };
 iscsi_stats_t is { };
 #if !defined(TEENSY4_1)
 uint64_t core0_idle = 0;
@@ -394,9 +393,6 @@ void loopw(void *)
 
 			ram_free_kb = get_free_heap_space() / 1024;  // in kB
 
-			ios.io_wait = ios.io_wait_cur / 10000;  // uS to 1/100th
-			ios.io_wait_cur = 0;
-
 			cu_count = 0;
 		}
 	}
@@ -647,7 +643,7 @@ void setup() {
 #endif
 
 	draw_status(13);
-	init_snmp(&snmp_, &snmp_data_, &ios, &is, get_diskspace, bs, &cpu_usage, &ram_free_kb, &stop, 161);
+	init_snmp(&snmp_, &snmp_data_, &is, get_diskspace, bs, &cpu_usage, &ram_free_kb, &stop, 161);
 
 	draw_status(14);
 	if (bs->begin() == false) {
@@ -657,7 +653,7 @@ void setup() {
 	}
 
 	draw_status(16);
-	scsi_dev = new scsi(bs, trim_level, &ios);
+	scsi_dev = new scsi(bs, trim_level);
 
 #if !defined(TEENSY4_1)
 	draw_status(20);

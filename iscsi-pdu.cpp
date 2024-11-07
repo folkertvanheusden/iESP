@@ -439,7 +439,7 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(scsi *const s
 	DOLOG(logging::ll_debug, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "working on ITT %08x for LUN %" PRIu64, get_Itasktag(), lun);
 
 	uint64_t iscsi_expected = get_ExpDatLen();
-	auto     scsi_reply     = sd->send(lun, get_CDB(), 16, data);
+	auto     scsi_reply     = sd->send(ses->get_io_stats(), lun, get_CDB(), 16, data);
 	if (scsi_reply.has_value() == false) {
 		DOLOG(logging::ll_warning, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "scsi::send returned nothing");
 		return { };

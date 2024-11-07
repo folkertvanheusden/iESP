@@ -7,7 +7,7 @@
 #include "snmp/snmp.h"
 
 
-void init_snmp(snmp **const snmp_, snmp_data **const snmp_data_, io_stats_t *const ios, iscsi_stats_t *const is, std::function<int(void *)> get_percentage_diskspace, void *const gpd_context, int *const cpu_usage, int *const ram_free_kb, std::atomic_bool *const stop, const int port)
+void init_snmp(snmp **const snmp_, snmp_data **const snmp_data_, iscsi_stats_t *const is, std::function<int(void *)> get_percentage_diskspace, void *const gpd_context, int *const cpu_usage, int *const ram_free_kb, std::atomic_bool *const stop, const int port)
 {
 	*snmp_data_ = new snmp_data();
 	(*snmp_data_)->register_oid("1.3.6.1.2.1.1.1.0",            "iESP"  );
@@ -26,7 +26,6 @@ void init_snmp(snmp **const snmp_, snmp_data **const snmp_data_, io_stats_t *con
 	(*snmp_data_)->register_oid("1.3.6.1.2.1.142.1.10.2.1.1",   new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter32, &is->iscsiSsnCmdPDUs));
 	(*snmp_data_)->register_oid("1.3.6.1.2.1.142.1.10.2.1.3",   new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &is->iscsiSsnTxDataOctets));
 	(*snmp_data_)->register_oid("1.3.6.1.2.1.142.1.10.2.1.4",   new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &is->iscsiSsnRxDataOctets));
-	(*snmp_data_)->register_oid("1.3.6.1.4.1.2021.11.54",       new snmp_data_type_stats_uint32_t(&ios->io_wait));
 	(*snmp_data_)->register_oid("1.3.6.1.4.1.2021.13.15.1.1.2", "iESP"  );
 	(*snmp_data_)->register_oid("1.3.6.1.4.1.2021.100.1",       snmp_integer::snmp_integer_type::si_integer, 1);
 #if defined(ARDUINO)
@@ -34,10 +33,6 @@ void init_snmp(snmp **const snmp_, snmp_data **const snmp_data_, io_stats_t *con
 #endif
 	(*snmp_data_)->register_oid("1.3.6.1.4.1.2021.100.3",       __DATE__);
 
-	(*snmp_data_)->register_oid("1.3.6.1.4.1.2021.13.15.1.1.3", new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &ios->bytes_read   ));
-	(*snmp_data_)->register_oid("1.3.6.1.4.1.2021.13.15.1.1.4", new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &ios->bytes_written));
-	(*snmp_data_)->register_oid("1.3.6.1.4.1.2021.13.15.1.1.5", new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &ios->n_reads      ));
-	(*snmp_data_)->register_oid("1.3.6.1.4.1.2021.13.15.1.1.6", new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &ios->n_writes     ));
 	(*snmp_data_)->register_oid("1.3.6.1.4.1.2021.4.11.0",      new snmp_data_type_stats_int(ram_free_kb));
 	(*snmp_data_)->register_oid("1.3.6.1.4.1.2021.9.1.9.1",     new snmp_data_type_stats_int_callback(get_percentage_diskspace, gpd_context));
 	(*snmp_data_)->register_oid("1.3.6.1.4.1.2021.11.9.0",      new snmp_data_type_stats_int(cpu_usage));

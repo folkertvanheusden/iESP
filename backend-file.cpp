@@ -54,7 +54,6 @@ uint64_t backend_file::get_block_size() const
 
 bool backend_file::sync()
 {
-	n_syncs++;
 	ts_last_acces = get_micros();
 #if defined(__MINGW32__)
 	if (_commit(fd) == 0)
@@ -91,7 +90,6 @@ bool backend_file::write(const uint64_t block_nr, const uint32_t n_blocks, const
 	if (rc == -1)
 		DOLOG(logging::ll_error, "backend_file::write", identifier, "ERROR writing: %s", strerror(errno));
 	ts_last_acces = get_micros();
-	bytes_written += n_bytes;
 	return rc == ssize_t(n_bytes);
 }
 
@@ -117,7 +115,6 @@ bool backend_file::trim(const uint64_t block_nr, const uint32_t n_blocks)
 #endif
 	if (rc == -1)
 		DOLOG(logging::ll_error, "backend_file::trim", identifier, "unmapping: %s", strerror(errno));
-	n_trims += n_blocks;
 	ts_last_acces = get_micros();
 	return rc == 0;
 }
@@ -145,7 +142,6 @@ bool backend_file::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_
 	else if (rc != ssize_t(n_bytes))
 		DOLOG(logging::ll_error, "backend_file::read", identifier, "short read, requested: %zu, received: %zd", n_bytes, rc);
 	ts_last_acces = get_micros();
-	bytes_read += n_bytes;
 	return rc == ssize_t(n_bytes);
 }
 
@@ -183,7 +179,6 @@ backend::cmpwrite_result_t backend_file::cmpwrite(const uint64_t block_nr, const
 			result = cmpwrite_result_t::CWR_READ_ERROR;
 			break;
 		}
-		bytes_read += block_size;
 
 		// compare
 		if (memcmp(buffer, &data_compare[i * block_size], block_size) != 0) {
@@ -210,8 +205,6 @@ backend::cmpwrite_result_t backend_file::cmpwrite(const uint64_t block_nr, const
 			result = cmpwrite_result_t::CWR_WRITE_ERROR;
 		}
 		else {
-			bytes_written += block_size;
-
 			ts_last_acces = get_micros();
 		}
 	}

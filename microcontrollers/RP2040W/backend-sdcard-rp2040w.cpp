@@ -91,12 +91,8 @@ backend_sdcard_rp2040w::~backend_sdcard_rp2040w()
 bool backend_sdcard_rp2040w::sync()
 {
 	write_led(led_write, HIGH);
-
-	n_syncs++;
-
 	if (file.sync() != FR_OK)
 		DOLOG(logging::ll_error, "backend_sdcard_rp2040w::sync", "-", "Cannot sync data to SD-card");
-
 	write_led(led_write, LOW);
 
 	ts_last_acces = get_micros();
@@ -129,7 +125,6 @@ bool backend_sdcard_rp2040w::write(const uint64_t block_nr, const uint32_t n_blo
 	}
 
 	size_t n_bytes_to_write = n_blocks * iscsi_block_size;
-	bytes_written += n_bytes_to_write;
 
 	bool rc = false;
 	for(int i=0; i<5; i++) {  // 5 is arbitrarily chosen
@@ -165,7 +160,6 @@ bool backend_sdcard_rp2040w::trim(const uint64_t block_nr, const uint32_t n_bloc
 	}
 	delete [] data;
 	ts_last_acces = get_micros();
-	n_trims++;
 	return rc;
 }
 
@@ -184,7 +178,6 @@ bool backend_sdcard_rp2040w::read(const uint64_t block_nr, const uint32_t n_bloc
 	}
 
 	size_t n_bytes_to_read = n_blocks * iscsi_block_size;
-	bytes_read += n_bytes_to_read;
 
 	bool rc = false;
 	for(int i=0; i<5; i++) {  // 5 is arbitrarily chosen
@@ -232,7 +225,6 @@ backend::cmpwrite_result_t backend_sdcard_rp2040w::cmpwrite(const uint64_t block
 			DOLOG(logging::ll_error, "backend_sdcard_rp2040w::cmpwrite", "-", "Cannot read: %d", file.error());
 			break;
 		}
-		bytes_read += block_size;
 
 		// compare
 		if (memcmp(buffer, &data_compare[i * block_size], block_size) != 0) {
@@ -254,8 +246,6 @@ backend::cmpwrite_result_t backend_sdcard_rp2040w::cmpwrite(const uint64_t block
 			DOLOG(logging::ll_error, "backend_sdcard_rp2040w::cmpwrite", "-", "Cannot write: %d", file.error());
 			break;
 		}
-
-		bytes_written += block_size;
 
 		ts_last_acces = get_micros();
 	}
