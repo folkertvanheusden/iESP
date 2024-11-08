@@ -37,12 +37,12 @@ bool backend_sdcard::begin()
 {
 	for(int i=0; i<3; i++) {
 		if (reinit(i)) {
-			Serial.printf("Card serial: %s\r\n", get_serial().c_str());
+			DOLOG(logging::ll_info, "backend_sdcard::begin", "-", "Card serial: %s", get_serial().c_str());
 			return true;
 		}
 	}
 
-	Serial.println(F("SD-card init failed"));
+	DOLOG(logging::ll_info, "backend_sdcard::begin", "-", "SD-card init failed");
 
 	return false;
 }
@@ -56,7 +56,7 @@ bool backend_sdcard::reinit(const bool close_first)
 	if (close_first) {
 		file.close();
 		sd.end();
-		Serial.println(F("Re-init SD-card backend..."));
+		DOLOG(logging::ll_info, "backend_sdcard::reinit", "-", "SD-card re-init");
 	}
 
 #if defined(RP2040W)
@@ -77,21 +77,21 @@ bool backend_sdcard::reinit(const bool close_first)
 	if (spi_speed.has_value()) {
 		ok = sd.begin(SdSpiConfig(pin_SD_CS, SHARED_SPI, SD_SCK_MHZ(spi_speed.value())));
 		if (ok)
-			Serial.printf("Accessing SD card at %d MHz\r\n", spi_speed.value());
+			DOLOG(logging::ll_info, "backend_sdcard::reinit", "-", "Accessing SD card at %d MHz", spi_speed.value());
 	}
 	else {
 		for(int sp=start_speed; sp>=end_speed; sp -= steps) {
-			Serial.printf("Trying %d MHz...\r\n", sp);
+			DOLOG(logging::ll_debug, "backend_sdcard::reinit", "-", "Trying %d MHz...", sp);
 			if (sd.begin(SdSpiConfig(pin_SD_CS, SHARED_SPI, SD_SCK_MHZ(sp)))) {
 				ok = true;
-				Serial.printf("Accessing SD card at %d MHz\r\n", sp);
+				DOLOG(logging::ll_info, "backend_sdcard::reinit", "-", "Accessing SD card at %d MHz", sp);
 				break;
 			}
 		}
 	}
 
 	if (ok == false) {
-		Serial.printf("SD-card mount failed (assuming CS is on pin %d)\r\n", pin_SD_CS);
+		DOLOG(logging::ll_warning, "backend_sdcard::reinit", "-", "SD-card mount failed (assuming CS is on pin %d)", pin_SD_CS);
 		sd.initErrorPrint(&Serial);
 		write_led(led_read,  LOW);
 		write_led(led_write, LOW);
@@ -112,7 +112,7 @@ retry:
 
 	// virtual sizes
 	card_size   = file.fileSize();
-	Serial.printf("Virtual disk size: %" PRIu64 "MB\r\n", uint64_t(card_size / 1024 / 1024));
+	DOLOG(logging::ll_info, "backend_sdcard::reinit", "-", "Virtual disk size: %" PRIu64 "MB", uint64_t(card_size / 1024 / 1024));
 
 	write_led(led_read,  LOW);
 	write_led(led_write, LOW);
@@ -195,7 +195,7 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 	bool   rc            = bytes_written == n_bytes_to_write;
 	auto   end           = get_micros();
 	if (!rc)
-		Serial.printf("Wrote %zu bytes instead of %zu\r\n", bytes_written, n_bytes_to_write);
+		DOLOG(logging::ll_warning, "backend_sdcard::write", "-", "Wrote %zu bytes instead of %zu", bytes_written, n_bytes_to_write);
 
 #if defined(RP2040W)
 	mutex_exit(&serial_access_lock);
@@ -261,7 +261,7 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 	bool   rc         = bytes_read == n_bytes_to_read;
 	auto   end        = get_micros();
 	if (!rc)
-		Serial.printf("Read %zu bytes instead of %zu\r\n", bytes_read, n_bytes_to_read);
+		DOLOG(logging::ll_warning, "backend_sdcard::write", "-", "Read %zu bytes instead of %zu", bytes_read, n_bytes_to_read);
 
 #if defined(RP2040W)
 	mutex_exit(&serial_access_lock);
