@@ -204,13 +204,14 @@ void fail_flash() {
 #ifdef LED_BUILTIN
 		digitalWrite(LED_BUILTIN, HIGH);
 #endif
-		write_led(led_red, HIGH);
-		delay(200);
+		write_led(led_red, get_millis() & 256);
+		ArduinoOTA.handle();
+		delay(1);
 #ifdef LED_BUILTIN
 		digitalWrite(LED_BUILTIN, LOW);
 #endif
-		write_led(led_red, LOW);
-		delay(200);
+		write_led(led_red, !(get_millis() & 256));
+		delay(1);
 	}
 }
 
