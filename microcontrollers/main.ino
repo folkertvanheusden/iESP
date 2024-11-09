@@ -620,9 +620,11 @@ void setup() {
 	draw_status(20);
 	auto reset_reason = esp_reset_reason();
 	if (reset_reason != ESP_RST_POWERON)
-		DOLOG(logging::ll_error, "setup", "-", "Reset reason: %s (%d), software version %s", reset_name(reset_reason), reset_reason, version_str);
+		DOLOG(logging::ll_error, "setup", "-", "Reset reason: %s (%d), software version %s, name: %s", reset_name(reset_reason), reset_reason, version_str, name);
 	else
-		DOLOG(logging::ll_info, "setup", "-", "System (re-)started, software version %s", version_str);
+		DOLOG(logging::ll_info, "setup", "-", "System (re-)started, software version %s, name: %s", version_str, name);
+#else
+		DOLOG(logging::ll_info, "setup", "-", "System started, software version %s, name: %s", version_str, name);
 #endif
 
 	draw_status(28);
