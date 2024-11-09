@@ -126,15 +126,10 @@ NTP ntp(ntp_udp);
 
 uint32_t hundredsofasecondcounter = 0;
 iscsi_stats_t is { };
-#if !defined(TEENSY4_1)
-uint64_t core0_idle = 0;
-uint64_t core1_idle = 0;
-uint64_t max_idle_ticks = 1855000;
-#endif
-int cpu_usage = 0;
-int ram_free_kb = 0;
-int eth_wait_seconds = 10;
-int update_df_interval = 0;
+int cpu_usage            = 0;
+int ram_free_kb          = 0;
+int eth_wait_seconds     = 10;
+int update_df_interval   = 0;
 int percentage_diskspace = 0;
 
 #if !defined(WT_ETH01)
@@ -166,18 +161,6 @@ int get_diskspace(void *const context)
 
 	return bf->get_free_space_percentage();
 }
-
-#if !defined(TEENSY4_1)
-bool idle_task_0() {
-	core0_idle++;
-	return false;
-}
-
-bool idle_task_1() {
-	core1_idle++;
-	return false;
-}
-#endif
 
 void write_led(const int gpio, const int state) {
 #if 0
@@ -353,6 +336,16 @@ void heap_caps_alloc_failed_hook(size_t requested_size, uint32_t caps, const cha
 	write_led(led_red, LOW);
 }
 
+uint32_t idle_cnt = 0;
+void idle_task(void *)
+{
+  for(;;) {
+    int64_t start = esp_timer_get_time();
+    vTaskDelay(0);
+    idle_cnt += esp_timer_get_time() - start;
+  }
+}
+
 void loopw(void *)
 {
 	Serial.println(F("Thread started"));
@@ -388,14 +381,9 @@ void loopw(void *)
 		vTaskDelay(100 / portTICK_PERIOD_MS);
 
 		if (++cu_count >= 10) {
-			uint64_t core0_tick_temp = core0_idle;
-			uint64_t core1_tick_temp = core1_idle;
-			core0_idle = core1_idle = 0;
-
-			max_idle_ticks = std::max(core0_tick_temp, max_idle_ticks);
-			max_idle_ticks = std::max(core1_tick_temp, max_idle_ticks);
-
-			cpu_usage = ((100 - core0_tick_temp * 100 / max_idle_ticks) + (100 - core1_tick_temp * 100 / max_idle_ticks)) / 2;
+      uint32_t cpu_usage_temp = idle_cnt;
+      idle_cnt = 0;
+      cpu_usage = 100 - (99.9 / 90. * cpu_usage_temp / 1000) / 10;
 
 			ram_free_kb = get_free_heap_space() / 1024;  // in kB
 
@@ -405,40 +393,6 @@ void loopw(void *)
 			cu_count = 0;
 		}
 	}
-}
-#endif
-
-#if 0
-void do_ls(fs::FS &fs, const String & name)
-{
-	Serial.print(F("Directory: "));
-	Serial.println(name);
-
-	File dir = fs.open(name);
-	if (!dir) {
-		Serial.println(F("Can't open"));
-		write_led(led_red, LOW);
-		return;
-	}
-
-	File file = dir.openNextFile();
-	while(file) {
-		if (file.isDirectory()) {
-			Serial.print("Dir: ");
-			Serial.println(file.name());
-			do_ls(fs, name + "/" + file.name());
-		}
-		else {
-			Serial.print("File: ");
-			Serial.print(file.name());
-			Serial.print(", size: ");
-			Serial.println(file.size());
-		}
-
-		file = dir.openNextFile();
-	}
-
-	dir.close();
 }
 #endif
 
@@ -630,13 +584,8 @@ void setup() {
 	draw_status(8);
 	ntp.begin();
 
-	draw_status(10);
-#if !defined(TEENSY4_1)
-	esp_register_freertos_idle_hook_for_cpu(idle_task_0, 0);
-	esp_register_freertos_idle_hook_for_cpu(idle_task_1, 1);
-#endif
- 
 #if defined(ESP32)
+	draw_status(10);
 	esp_pthread_cfg_t cfg = esp_pthread_get_default_config();
 	Serial.printf("Original pthread stack size: %d\r\n", cfg.stack_size);
 	cfg.stack_size = 8192;
@@ -650,6 +599,9 @@ void setup() {
   Serial.printf("LEDgreen: %d, LEDyellow: %d, MISO: %d, MOSI: %d, SCLK: %d, CS: %d\r\n", led_green, led_yellow, pin_SD_MISO, pin_SD_MOSI, pin_SD_SCLK, pin_SD_CS);
 	bs = new backend_sdcard(led_green, led_yellow, pin_SD_MISO, pin_SD_MOSI, pin_SD_SCLK, pin_SD_CS, spi_speed, disk_name);
 #endif
+
+	draw_status(12);
+  xTaskCreate(idle_task, "idle_task", 2048, nullptr, 0, nullptr);
 
 	draw_status(13);
 	init_snmp(&snmp_, &snmp_data_, &is, get_diskspace, bs, &bstats, &cpu_usage, &ram_free_kb, &stop, 161);
