@@ -379,9 +379,9 @@ void loopw(void *)
 		ArduinoOTA.handle();
 		hundredsofasecondcounter = now / 10;
 
-		vTaskDelay(100 / portTICK_PERIOD_MS);
+		vTaskDelay(25 / portTICK_PERIOD_MS);
 
-		if (++cu_count >= 10) {
+		if (++cu_count >= 40) {
       uint32_t cpu_usage_temp = idle_cnt;
       idle_cnt = 0;
       cpu_usage = 100 - (99.9 / 90. * cpu_usage_temp / 1000) / 10;
