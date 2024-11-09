@@ -17,3 +17,10 @@
 ----------
 
 - https://stackoverflow.com/questions/60486774/how-to-generate-html-reports-of-coverage-information-using-gcov
+
+versie updaten:
+> CMakeLists.txt
+> microcontrollers/platformio.ini
+> microcontrollers/RP2040W/platformio.ini
+> debian/changelog
+> iesp.spec
