@@ -681,7 +681,7 @@ void server::handler()
 						"send: %.2f kB/s, recv: %.2f kB/s, "
 						"written: %.2f kB/s, read: %.2f kB/s, "
 						"syncs: %.2f/s, unmapped: %.2f kB/s, "
-						"io-wait: %.2f%% "
+						"io-wait: %.2f%%, "
 						"load: %.2f%%, errors: %u, mem: %u",
 						is->get_n_iops() / dtook,
 						ses->get_bytes_tx() / dkB, ses->get_bytes_rx() / dkB,

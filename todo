@@ -24,3 +24,4 @@ versie updaten:
 > microcontrollers/RP2040W/platformio.ini
 > debian/changelog
 > iesp.spec
+> git tag
