@@ -189,7 +189,9 @@ void fail_flash() {
 		digitalWrite(LED_BUILTIN, state);
 #endif
 		write_led(led_red, state);
+#if !defined(TEENSY4_1) && !defined(RP2040W)
 		ArduinoOTA.handle();
+#endif
 		delay(1);
 #ifdef LED_BUILTIN
 		digitalWrite(LED_BUILTIN, state);
@@ -364,6 +366,10 @@ void loopw(void *)
 #endif
 			draw_status_ts = now;
 		}
+
+#ifdef LED_BUILTIN
+		digitalWrite(LED_BUILTIN, s->is_active() && cu_count >= 20);
+#endif
 
 		if (now - last_diskfree_update >= update_df_interval * 1000 && update_df_interval != 0) {
 			auto disk_act_pars = bs->get_idle_state();
@@ -601,8 +607,10 @@ void setup() {
 	bs = new backend_sdcard(led_green, led_yellow, pin_SD_MISO, pin_SD_MOSI, pin_SD_SCLK, pin_SD_CS, spi_speed, disk_name);
 #endif
 
+#if !defined(TEENSY4_1)
 	draw_status(12);
   xTaskCreate(idle_task, "idle_task", 2048, nullptr, 0, nullptr);
+#endif
 
 	draw_status(13);
 	init_snmp(&snmp_, &snmp_data_, &is, get_diskspace, bs, &bstats, &cpu_usage, &ram_free_kb, &stop, 161);

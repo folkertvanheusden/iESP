@@ -1,5 +1,10 @@
 #include <cstdint>
 #include <utility>
+#if !defined(TEENSY4_1) && !defined(RP2040W)
+#include <atomic>
+#include <mutex>
+#include <thread>
+#endif
 
 #include "com.h"
 #include "scsi.h"
@@ -29,6 +34,12 @@ private:
 #if !defined(ARDUINO) && !defined(NDEBUG)
 	std::atomic_uint64_t cmd_use_count[64] { };
 #endif
+#if !defined(TEENSY4_1) && !defined(RP2040W)
+	std::mutex     threads_lock;
+	std::vector<std::pair<std::thread *, std::atomic_bool *> > threads;
+#else
+	bool           active           { false   };
+#endif
 
 	std::tuple<iscsi_pdu_bhs *, iscsi_fail_reason, uint64_t>
 		          receive_pdu  (com_client *const cc, session **const s);
@@ -39,6 +50,6 @@ public:
 	virtual ~server();
 
 	bool begin();
-
+	bool is_active();
 	void handler();
 };

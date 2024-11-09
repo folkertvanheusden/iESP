@@ -529,10 +529,19 @@ iscsi_fail_reason server::push_response(com_client *const cc, session *const ses
 	return ifr;
 }
 
+bool server::is_active()
+{
+#if !defined(TEENSY4_1) && !defined(RP2040W)
+	bool active = false;
+	std::unique_lock<std::mutex> lck(threads_lock);
+	for(auto &e: threads)
+		active |= !e.second;
+#endif
+	return active;
+}
+
 void server::handler()
 {
-	std::vector<std::pair<std::thread *, std::atomic_bool *> > threads;
-
 	while(!stop) {
 		com_client *cc = c->accept();
 		if (cc == nullptr) {
@@ -541,6 +550,7 @@ void server::handler()
 		}
 
 #if !defined(TEENSY4_1) && !defined(RP2040W)
+		threads_lock.lock();
 		for(size_t i=0; i<threads.size();) {
 			if (*threads.at(i).second) {
 				DOLOG(logging::ll_debug, "server::handler", "-", "thread cleaned up");
@@ -553,10 +563,13 @@ void server::handler()
 				i++;
 			}
 		}
+		threads_lock.unlock();
 
 		std::atomic_bool *flag = new std::atomic_bool(false);
 
 		std::thread *th = new std::thread([=, this]() {
+#else
+		active = true;
 #endif
 			std::string endpoint = cc->get_endpoint_name();
 
@@ -574,9 +587,6 @@ void server::handler()
 			auto           block_size   = s->get_block_size();
 
 			do {
-#if defined(LED_BUILTIN) && defined(ARDUINO)
-				digitalWrite(LED_BUILTIN, LOW);
-#endif
 				auto incoming = receive_pdu(cc, &ses);
 				iscsi_pdu_bhs *pdu = std::get<0>(incoming);
 
@@ -695,10 +705,6 @@ void server::handler()
 					ses->reset_io_stats();
 					busy = 0;
 				}
-
-#if defined(LED_BUILTIN) && defined(ARDUINO)
-				digitalWrite(LED_BUILTIN, HIGH);
-#endif
 			}
 			while(ok);
 #if defined(ESP32)
@@ -720,7 +726,11 @@ void server::handler()
 			*flag = true;
 		});
 
+		threads_lock.lock();
 		threads.push_back({ th, flag });
+		threads_lock.unlock();
+#else
+		active = false;
 #endif
 
 #if defined(ESP32)
@@ -729,6 +739,7 @@ void server::handler()
 	}
 
 #if !defined(TEENSY4_1) && !defined(RP2040W)
+	threads_lock.lock();
 	for(auto &e: threads) {
 		if (e.second) {
 			e.first->join();
@@ -736,5 +747,6 @@ void server::handler()
 			delete e.second;
 		}
 	}
+	threads_lock.unlock();
 #endif
 }
