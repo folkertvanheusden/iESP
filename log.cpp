@@ -38,10 +38,11 @@ std::string name { "?" };
 extern NTP ntp;
 #endif
 
+constexpr int err_log_buf_len = 256;
 #if defined(RP2040W)
-char err_log_buf[192];
+char err_log_buf[err_log_buf_len];
 #else
-thread_local char err_log_buf[192];
+thread_local char err_log_buf[err_log_buf_len];
 #endif
 
 // TODO: into headerfile
