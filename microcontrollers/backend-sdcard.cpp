@@ -195,7 +195,7 @@ bool backend_sdcard::write(const uint64_t block_nr, const uint32_t n_blocks, con
 	bool   rc            = bytes_written == n_bytes_to_write;
 	auto   end           = get_micros();
 	if (!rc)
-		DOLOG(logging::ll_warning, "backend_sdcard::write", "-", "Wrote %zu bytes instead of %zu", bytes_written, n_bytes_to_write);
+		DOLOG(logging::ll_warning, "backend_sdcard::write", "-", "Wrote %" PRIu64 " bytes instead of %" PRIu64, uint64_t(bytes_written), uint64_t(n_bytes_to_write));
 
 #if defined(RP2040W)
 	mutex_exit(&serial_access_lock);
@@ -261,7 +261,7 @@ bool backend_sdcard::read(const uint64_t block_nr, const uint32_t n_blocks, uint
 	bool   rc         = bytes_read == n_bytes_to_read;
 	auto   end        = get_micros();
 	if (!rc)
-		DOLOG(logging::ll_warning, "backend_sdcard::write", "-", "Read %zu bytes instead of %zu", bytes_read, n_bytes_to_read);
+		DOLOG(logging::ll_warning, "backend_sdcard::write", "-", "Read %" PRIu64 " bytes instead of %" PRIu64, uint64_t(bytes_read), uint64_t(n_bytes_to_read));
 
 #if defined(RP2040W)
 	mutex_exit(&serial_access_lock);
