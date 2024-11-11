@@ -214,7 +214,6 @@ bool backend_sdcard::trim(const uint64_t block_nr, const uint32_t n_blocks)
 {
 	bool     rc    = true;
 	uint8_t *data  = new uint8_t[get_block_size()]();
-	auto     start = get_micros();
 	for(uint32_t i=0; i<n_blocks; i++) {
 		if (write(block_nr + i, 1, data) == false) {
 			DOLOG(logging::ll_error, "backend_sdcard::trim", "-", "Cannot trim");
@@ -222,11 +221,8 @@ bool backend_sdcard::trim(const uint64_t block_nr, const uint32_t n_blocks)
 			break;
 		}
 	}
-	auto end = get_micros();
 	delete [] data;
-	bs.n_trims++;
-	bs.io_wait   += end-start;
-	ts_last_acces = end;
+	// stats are updated in write()
 	return rc;
 }
 
