@@ -69,6 +69,7 @@ scsi     *scsi_dev   { nullptr };
 backend_stats_t bstats { };
 std::atomic_bool stop { false  };
 std::string disk_name { "test.dat" };
+server   *s          { nullptr };
 
 #if defined(WT_ETH01)
 int led_green  = -1;
@@ -368,7 +369,8 @@ void loopw(void *)
 		}
 
 #ifdef LED_BUILTIN
-		digitalWrite(LED_BUILTIN, s->is_active() && cu_count >= 20);
+    if (s)
+      digitalWrite(LED_BUILTIN, s->is_active() && cu_count >= 20);
 #endif
 
 		if (now - last_diskfree_update >= update_df_interval * 1000 && update_df_interval != 0) {
@@ -744,11 +746,11 @@ void loop()
 		}
 
 		draw_status(220);
-		server s(scsi_dev, &c, &is, "test", false);
+		s = new server(scsi_dev, &c, &is, "test", false);
 		Serial.printf("Free heap space: %u\r\n", get_free_heap_space());
 		Serial.println(F("Go!"));
 		draw_status(500);
-		s.handler();
+		s->handler();
 		draw_status(900);
 	}
 
