@@ -10,7 +10,6 @@
 #include <cstdio>
 #if !defined(TEENSY4_1)
 #include <esp_debug_helpers.h>
-#include <esp_freertos_hooks.h>
 #include <esp_heap_caps.h>
 #include <esp_wifi.h>
 #include <ESPmDNS.h>
@@ -354,11 +353,11 @@ void loopw(void *)
 {
 	Serial.println(F("Thread started"));
 
-	int           cu_count             = 0;
-	unsigned long last_diskfree_update = 0;
-	unsigned long prev_disk_act        = 0;
+	int cu_count = 0;
 
 	for(;;) {
+    yield();
+
 		auto now = millis();
 		if (now - draw_status_ts > 5000) {
 #if !defined(WT_ETH01)
@@ -370,18 +369,8 @@ void loopw(void *)
 
 #ifdef LED_BUILTIN
     if (s)
-      digitalWrite(LED_BUILTIN, s->is_active() && cu_count >= 20);
+      digitalWrite(LED_BUILTIN, cu_count >= 20 && s->is_active());
 #endif
-
-		if (now - last_diskfree_update >= update_df_interval * 1000 && update_df_interval != 0) {
-			auto disk_act_pars = bs->get_idle_state();
-
-			if (disk_act_pars.first > prev_disk_act && now - disk_act_pars.first >= disk_act_pars.second) {
-				percentage_diskspace = bs->get_free_space_percentage();
-				last_diskfree_update = now;
-				prev_disk_act        = micros();
-			}
-		}
 
 		ntp.update();
 		ArduinoOTA.handle();
