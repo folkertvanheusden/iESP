@@ -535,7 +535,7 @@ bool server::is_active()
 	bool active = false;
 	std::unique_lock<std::mutex> lck(threads_lock);
 	for(auto &e: threads)
-		active |= !e.second;
+		active |= !*e.second;
 #endif
 	return active;
 }

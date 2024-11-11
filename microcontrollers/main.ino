@@ -184,7 +184,7 @@ void fail_flash() {
 	write_led(led_yellow, LOW);
 
 	for(;;) {
-    bool state = get_millis() & 256;
+    bool state = get_millis() & 1024;
 #ifdef LED_BUILTIN
 		digitalWrite(LED_BUILTIN, state);
 #endif
@@ -369,7 +369,7 @@ void loopw(void *)
 
 #ifdef LED_BUILTIN
     if (s)
-      digitalWrite(LED_BUILTIN, cu_count >= 20 && s->is_active());
+      digitalWrite(LED_BUILTIN, ((cu_count / 10) & 1) && s->is_active());
 #endif
 
 		ntp.update();
