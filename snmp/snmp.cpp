@@ -378,18 +378,32 @@ void snmp::poll()
 #else
 void snmp::thread()
 {
-	pollfd fds[] { { fd, POLLIN, 0 } };
+#if (!defined(ARDUINO) || defined(ESP32)) && !defined(__MINGW32__)
+        pollfd fds[] { { fd, POLLIN, 0 } };
+#endif
 
 	while(!*stop_flag) {
-		sockaddr_in clientaddr {                   };
-		socklen_t   len        { sizeof clientaddr };
+#if !defined(ARDUINO) || defined(ESP32)
+                sockaddr_in clientaddr   {   };
+                socklen_t   len          { sizeof clientaddr };
 
-		if (poll(fds, 1, 100) == 0)
-			continue;
+#if !defined(__MINGW32__)
+                if (poll(fds, 1, 100) == 0)
+                        continue;
+#endif
 
-		int rc = recvfrom(fd, buffer, SNMP_RECV_BUFFER_SIZE, 0, reinterpret_cast<sockaddr *>(&clientaddr), &len);
-		if (rc == -1)
-			break;
+                int rc = recvfrom(fd, reinterpret_cast<char *>(buffer), SNMP_RECV_BUFFER_SIZE, 0, reinterpret_cast<sockaddr *>(&clientaddr), &len);
+                if (rc == -1)
+                        break;
+#else
+                int rc = handle->parsePacket();
+                if (rc == 0) {
+                        delay(1);
+                        continue;
+                }
+
+                handle->read(buffer, rc);
+#endif
 
 		if (rc > 0) {
 			oid_req_t or_;
