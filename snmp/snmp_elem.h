@@ -1,9 +1,11 @@
-// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2025 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #pragma once
-#include <stdint.h>
+
+#include <cstdint>
 #include <string>
 #include <utility>
 #include <vector>
+
 
 class snmp_elem
 {
@@ -16,7 +18,7 @@ public:
 
 	virtual uint8_t get_size() const { return len; }
 
-	virtual std::pair<uint8_t *, uint8_t> get_payload() const;
+	virtual std::pair<uint8_t *, uint8_t> get_payload() const = 0;
 };
 
 //---

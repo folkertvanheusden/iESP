@@ -1,4 +1,5 @@
 #include <atomic>
+#include <functional>
 
 #include "backend.h"
 #include "snmp/snmp.h"

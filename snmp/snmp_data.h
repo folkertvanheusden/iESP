@@ -1,9 +1,11 @@
+// (C) 2022-2025 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #pragma once
 
-#include <functional>
 #if !defined(TEENSY4_1)  // does not do threading
+#include <atomic>
 #include <mutex>
 #endif
+#include <functional>
 #include <optional>
 #include <stdint.h>
 #include <vector>
@@ -42,18 +44,18 @@ private:
 public:
 	snmp_data_type_static(const std::string & content);
 	snmp_data_type_static(const snmp_integer::snmp_integer_type type, const int content);
-	~snmp_data_type_static();
+	virtual ~snmp_data_type_static();
 
 	snmp_elem * get_data() override;
 };
 
 class snmp_data_type_stats : public snmp_data_type
 {
-protected:
-	const snmp_integer::snmp_integer_type type;
-
 private:
 	uint64_t *const counter;
+
+protected:
+	const snmp_integer::snmp_integer_type type;
 
 public:
 	snmp_data_type_stats(const snmp_integer::snmp_integer_type type, uint64_t *const counter);
@@ -61,6 +63,23 @@ public:
 
 	snmp_elem * get_data() override;
 };
+
+#if !defined(TEENSY4_1)
+class snmp_data_type_stats_atomic : public snmp_data_type
+{
+private:
+	std::atomic_uint64_t *const counter;
+
+protected:
+	const snmp_integer::snmp_integer_type type;
+
+public:
+	snmp_data_type_stats_atomic(const snmp_integer::snmp_integer_type type, std::atomic_uint64_t *const counter);
+	virtual ~snmp_data_type_stats_atomic();
+
+	snmp_elem * get_data() override;
+};
+#endif
 
 class snmp_data_type_stats_int: public snmp_data_type
 {
@@ -77,16 +96,37 @@ public:
 class snmp_data_type_stats_int_callback: public snmp_data_type
 {
 private:
-	std::function<int(void *)> cb;
-	void *const context;
+        std::function<int(void *)> cb;
+        void *const context;
 
 public:
-	snmp_data_type_stats_int_callback(std::function<int(void *)> & function, void *const context);
-	virtual ~snmp_data_type_stats_int_callback();
+        snmp_data_type_stats_int_callback(std::function<int(void *)> & function, void *const context);
+        virtual ~snmp_data_type_stats_int_callback();
+
+        snmp_elem * get_data() override;
+};
+
+class snmp_data_type_stats_atomic_int: public snmp_data_type
+{
+private:
+#if defined(TEENSY4_1)
+	int *const counter;
+#else
+	std::atomic_int *const counter;
+#endif
+
+public:
+#if defined(TEENSY4_1)
+	snmp_data_type_stats_atomic_int(int *const counter);
+#else
+	snmp_data_type_stats_atomic_int(std::atomic_int *const counter);
+#endif
+	virtual ~snmp_data_type_stats_atomic_int();
 
 	snmp_elem * get_data() override;
 };
 
+#if !defined(TEENSY4_1)
 class snmp_data_type_stats_uint32_t: public snmp_data_type
 {
 private:
@@ -99,6 +139,19 @@ public:
 	snmp_elem * get_data() override;
 };
 
+class snmp_data_type_stats_atomic_uint32_t: public snmp_data_type
+{
+private:
+	std::atomic_uint32_t *const counter;
+
+public:
+	snmp_data_type_stats_atomic_uint32_t(std::atomic_uint32_t *const counter);
+	virtual ~snmp_data_type_stats_atomic_uint32_t();
+
+	snmp_elem * get_data() override;
+};
+#endif
+
 class snmp_data_type_running_since : public snmp_data_type
 {
 private:
@@ -106,7 +159,7 @@ private:
 
 public:
 	snmp_data_type_running_since();
-	~snmp_data_type_running_since();
+	virtual ~snmp_data_type_running_since();
 
 	snmp_elem * get_data() override;
 };
@@ -120,7 +173,7 @@ public:
 	snmp_data_type_oid(const std::string & oid) : oid(oid) {
 	}
 
-	~snmp_data_type_oid() {
+	virtual ~snmp_data_type_oid() {
 	}
 
 	snmp_elem * get_data() override { return new snmp_oid(oid); }

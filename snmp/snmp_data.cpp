@@ -1,3 +1,4 @@
+// (C) 2022-2025 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
@@ -24,6 +25,8 @@ snmp_data_type::snmp_data_type()
 
 snmp_data_type::~snmp_data_type()
 {
+	for(auto & entry: data)
+		delete entry;
 }
 
 std::vector<snmp_data_type *> * snmp_data_type::get_children()
@@ -82,8 +85,8 @@ snmp_elem * snmp_data_type_static::get_data()
 }
 
 snmp_data_type_stats::snmp_data_type_stats(const snmp_integer::snmp_integer_type type, uint64_t *const counter) :
-	type(type),
-	counter(counter)
+	counter(counter),
+	type(type)
 {
 }
 
@@ -94,6 +97,42 @@ snmp_data_type_stats::~snmp_data_type_stats()
 snmp_elem * snmp_data_type_stats::get_data()
 {
 	return new snmp_integer(type, *counter);
+}
+
+#if !defined(TEENSY4_1)
+snmp_data_type_stats_atomic::snmp_data_type_stats_atomic(const snmp_integer::snmp_integer_type type, std::atomic_uint64_t *const counter) :
+	counter(counter),
+	type(type)
+{
+}
+
+snmp_data_type_stats_atomic::~snmp_data_type_stats_atomic()
+{
+}
+
+snmp_elem * snmp_data_type_stats_atomic::get_data()
+{
+	return new snmp_integer(type, *counter);
+}
+#endif
+
+#if defined(TEENSY4_1)
+snmp_data_type_stats_atomic_int::snmp_data_type_stats_atomic_int(int *const counter) : counter(counter)
+{
+}
+#else
+snmp_data_type_stats_atomic_int::snmp_data_type_stats_atomic_int(std::atomic_int *const counter) : counter(counter)
+{
+}
+#endif
+
+snmp_data_type_stats_atomic_int::~snmp_data_type_stats_atomic_int()
+{
+}
+
+snmp_elem * snmp_data_type_stats_atomic_int::get_data()
+{
+	return new snmp_integer(snmp_integer::snmp_integer_type::si_integer, *counter);
 }
 
 snmp_data_type_stats_int::snmp_data_type_stats_int(int *const counter) : counter(counter)
@@ -110,8 +149,8 @@ snmp_elem * snmp_data_type_stats_int::get_data()
 }
 
 snmp_data_type_stats_int_callback::snmp_data_type_stats_int_callback(std::function<int(void *)> & function, void *const context):
-	cb(function),
-	context(context)
+        cb(function),
+        context(context)
 {
 }
 
@@ -121,7 +160,21 @@ snmp_data_type_stats_int_callback::~snmp_data_type_stats_int_callback()
 
 snmp_elem * snmp_data_type_stats_int_callback::get_data()
 {
-	return new snmp_integer(snmp_integer::snmp_integer_type::si_integer, cb(context));
+        return new snmp_integer(snmp_integer::snmp_integer_type::si_integer, cb(context));
+}
+
+#if !defined(TEENSY4_1)
+snmp_data_type_stats_atomic_uint32_t::snmp_data_type_stats_atomic_uint32_t(std::atomic_uint32_t *const counter) : counter(counter)
+{
+}
+
+snmp_data_type_stats_atomic_uint32_t::~snmp_data_type_stats_atomic_uint32_t()
+{
+}
+
+snmp_elem * snmp_data_type_stats_atomic_uint32_t::get_data()
+{
+	return new snmp_integer(snmp_integer::snmp_integer_type::si_integer, *counter);
 }
 
 snmp_data_type_stats_uint32_t::snmp_data_type_stats_uint32_t(uint32_t *const counter) : counter(counter)
@@ -136,6 +189,7 @@ snmp_elem * snmp_data_type_stats_uint32_t::get_data()
 {
 	return new snmp_integer(snmp_integer::snmp_integer_type::si_integer, *counter);
 }
+#endif
 
 snmp_data_type_running_since::snmp_data_type_running_since():
 	running_since((get_micros() - ::running_since) / 10000)
@@ -160,6 +214,9 @@ snmp_data::snmp_data()
 snmp_data::~snmp_data()
 {
 	// delete tree 'data'
+
+	for(auto & entry: data)
+		delete entry;
 }
 
 void snmp_data::register_oid(const std::string & oid, snmp_data_type *const e)
@@ -169,7 +226,6 @@ void snmp_data::register_oid(const std::string & oid, snmp_data_type *const e)
 	std::vector<snmp_data_type *> *p_lut = &data;
 
 	std::vector<std::string>       parts = split(oid, ".");
-
 	std::string                    cur_oid;
 
 #if !defined(TEENSY4_1)
@@ -264,7 +320,7 @@ std::string snmp_data::find_next_oid(const std::string & oid)
 
 	std::string cur_oid;
 
-	std::vector<std::pair<snmp_data_type *, size_t> > branch;
+	std::vector<std::pair<snmp_data_type *, ssize_t> > branch;
 
 	for(size_t i=0; i<parts.size(); i++) {
 		if (cur_oid.empty() == false)
@@ -273,6 +329,7 @@ std::string snmp_data::find_next_oid(const std::string & oid)
 		cur_oid += parts.at(i);
 
 		ssize_t idx = find_oid_in_vector(p_lut, cur_oid);
+
 		if (idx == -1)
 			break;
 
@@ -298,7 +355,7 @@ std::string snmp_data::find_next_oid(const std::string & oid)
 	// go to a sibbling
 	while(branch.empty() == false) {
 		snmp_data_type *element = branch.back().first;
-		size_t          index   = branch.back().second;
+		ssize_t         index   = branch.back().second;
 
 		if (element == nullptr) {  // top node
 			assert(branch.size() == 1);
@@ -307,7 +364,7 @@ std::string snmp_data::find_next_oid(const std::string & oid)
 
 		branch.pop_back();
 
-		if (index + 1 < element->get_children()->size()) {
+		if (index + 1 < ssize_t(element->get_children()->size())) {
 			ssize_t nr = index + 1;
 
 			do {

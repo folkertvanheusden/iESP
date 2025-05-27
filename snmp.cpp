@@ -1,4 +1,6 @@
 #include <atomic>
+#include <functional>
+
 #include "backend.h"
 #include "scsi.h"
 #include "server.h"
@@ -27,7 +29,9 @@ void init_snmp(snmp **const snmp_, snmp_data **const snmp_data_, iscsi_stats_t *
 	(*snmp_data_)->register_oid("1.3.6.1.2.1.142.1.10.2.1.1",   new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter32, &is->iscsiSsnCmdPDUs));
 	(*snmp_data_)->register_oid("1.3.6.1.2.1.142.1.10.2.1.3",   new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &is->iscsiSsnTxDataOctets));
 	(*snmp_data_)->register_oid("1.3.6.1.2.1.142.1.10.2.1.4",   new snmp_data_type_stats(snmp_integer::snmp_integer_type::si_counter64, &is->iscsiSsnRxDataOctets));
+#if !defined(TEENSY4_1)
 	(*snmp_data_)->register_oid("1.3.6.1.4.1.2021.11.54",       new snmp_data_type_stats_uint32_t(&bs->io_wait_ticks));
+#endif
 	(*snmp_data_)->register_oid("1.3.6.1.4.1.2021.13.15.1.1.2", "iESP"  );
 	(*snmp_data_)->register_oid("1.3.6.1.4.1.2021.100.1",       snmp_integer::snmp_integer_type::si_integer, 1);
 #if defined(ARDUINO)
@@ -43,9 +47,7 @@ void init_snmp(snmp **const snmp_, snmp_data **const snmp_data_, iscsi_stats_t *
 	(*snmp_data_)->register_oid("1.3.6.1.4.1.2021.9.1.9.1",     new snmp_data_type_stats_int_callback(get_percentage_diskspace, gpd_context));
 	(*snmp_data_)->register_oid("1.3.6.1.4.1.2021.11.9.0",      new snmp_data_type_stats_int(cpu_usage));
 
-
 	// TODO bs-> bla  in snmp
-
 
 	*snmp_ = new snmp(*snmp_data_, stop, port);
 }

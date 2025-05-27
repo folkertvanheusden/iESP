@@ -1,6 +1,6 @@
-// (C) 2022-2024 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2022-2025 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <cstdint>
-#include <cstring>
+#include <stdexcept>
 #include <thread>
 #include <unistd.h>
 #if defined(ESP32)
@@ -23,16 +23,30 @@ namespace qn = qindesign::network;
 #include <netinet/in.h>
 #endif
 
-#include "../log.h"
-#include "../utils.h"
+#include "block.h"
 #include "snmp.h"
 #include "snmp_elem.h"
+#include "../utils.h"
 
 
-snmp::snmp(snmp_data *const sd, std::atomic_bool *const stop, const int port): sd(sd), stop(stop)
+snmp::snmp(snmp_data *const sd, std::atomic_bool *const stop_flag, const bool verbose, const int port): sd(sd), stop_flag(stop_flag), verbose(verbose), port(port)
+{
+}
+
+snmp::~snmp()
+{
+	stop();
+}
+
+bool snmp::begin()
 {
 #if !defined(ARDUINO) || defined(ESP32)
+	if (fd != -1)
+		return false;
+
 	fd = socket(AF_INET, SOCK_DGRAM, 0);
+	if (fd == -1)
+		return false;
 
 	sockaddr_in servaddr { };
 	servaddr.sin_family      = AF_INET; // IPv4
@@ -40,74 +54,72 @@ snmp::snmp(snmp_data *const sd, std::atomic_bool *const stop, const int port): s
 	servaddr.sin_port        = htons(port);
 
 	if (bind(fd, reinterpret_cast<const struct sockaddr *>(&servaddr), sizeof servaddr) == -1)
-		DOLOG(logging::ll_error, "snmp::snmp", "-", "Failed to bind to SNMP UDP port %d", port);
+		return false;
 #else
-	handle = new qn::EthernetUDP();
-	handle->begin(161);
+        handle = new qn::EthernetUDP();
+        handle->begin(161);
 #endif
+
 	buffer = new uint8_t[SNMP_RECV_BUFFER_SIZE]();
 
 #if !defined(TEENSY4_1)
+	*stop_flag = false;
 	th = new std::thread(&snmp::thread, this);
 #endif
+
+	return true;
 }
 
-snmp::~snmp()
+void snmp::stop()
 {
-#if !defined(ARDUINO) || defined(ESP32)
-	close(fd);
-#endif
-#if defined(TEENSY4_1)
-	delete handle;
-#endif
+#if !defined(TEENSY4_1)
+	if (fd != -1) {
+		close(fd);
+		fd = -1;
+	}
 
-	th->join();
-	delete th;
+	if (th) {
+		*stop_flag = true;
+		th->join();
+		delete th;
+		th = nullptr;
+	}
+#endif
 
 	delete [] buffer;
+	buffer = nullptr;
 }
 
-uint64_t snmp::get_INTEGER(const uint8_t *p, const size_t length)
+uint64_t snmp::get_INTEGER(block *const b)
 {
 	uint64_t v = 0;
-
-	if (length > 8)
-		DOLOG(logging::ll_error, "SNMP::get_INTEGER", "-", "truncated (%zu bytes)", length);
-
-	for(size_t i=0; i<length; i++) {
+	while(b->is_empty() == false) {
 		v <<= 8;
-		v |= *p++;
+		v |= b->get_byte();
 	}
 
 	return v;
 }
 
-bool snmp::get_type_length(const uint8_t *p, const size_t len, uint8_t *const type, uint8_t *const length)
+void snmp::get_type_length(block *const b, uint8_t *const type, uint8_t *const length)
 {
-	if (len < 2) {
-		DOLOG(logging::ll_error, "snmp::get_type_length", "-", "length < 2");
-		return false;
-	}
-
-	*type = *p++;
-
-	*length = *p++;
-
-	return true;
+	*type   = b->get_byte();
+	*length = b->get_byte();
 }
 
-bool snmp::get_OID(const uint8_t *p, const size_t length, std::string *const oid_out)
+bool snmp::get_OID(block *const b, std::string *const oid_out)
 {
 	oid_out->clear();
 
-	uint32_t v = 0;
-
-	for(size_t i=0; i<length; i++) {
-		if (p[i] < 128) {
+	bool     first = true;
+	uint32_t v     = 0;
+	while(b->is_empty() == false) {
+		uint8_t cur_byte = b->get_byte();
+		if (cur_byte < 128) {
 			v <<= 7;
-			v |= p[i];
+			v |= cur_byte;
 
-			if (i == 0 && v == 43)
+			if (first == true && v == 43)
 				*oid_out += "1.3";
 			else
 				*oid_out += myformat(".%d", v);
@@ -116,149 +128,121 @@ bool snmp::get_OID(const uint8_t *p, const size_t length, std::string *const oid
 		}
 		else {
 			v <<= 7;
-			v |= p[i] & 127;
+			v |= cur_byte & 127;
 		}
+
+		first = false;
 	}
 
 	if (v) {
-		DOLOG(logging::ll_error, "snmp::get_OID", "-", "object identifier did not properly terminate");
+		if (verbose)
+			printf("SNMP: object identifier did not properly terminate\n");
 		return false;
 	}
 
 	return true;
 }
 
-bool snmp::process_PDU(const uint8_t *p, const size_t len, oid_req_t *const oids_req, const bool is_getnext)
+bool snmp::process_PDU(block *const b, oid_req_t *const oids_req, const bool is_getnext)
 {
 	uint8_t pdu_type = 0, pdu_length = 0;
 
 	// ID
-	if (!get_type_length(p, len, &pdu_type, &pdu_length))
-		return false;
-
+	get_type_length(b, &pdu_type, &pdu_length);
 	if (pdu_type != 0x02) { // expecting an integer here)
-		DOLOG(logging::ll_error, "SNMP::process_PDU", "-", "ID-type is not integer");
+		if (verbose)
+			printf("SNMP::process_PDU: ID-type is not integer\n");
 		return false;
 	}
-
-	p += 2;
-
-	oids_req->req_id = get_INTEGER(p, pdu_length);
-	p += pdu_length;
+	block id_bytes(b->get_bytes(pdu_length));
+	oids_req->req_id = get_INTEGER(&id_bytes);
 
 	// error
-	if (!get_type_length(p, len, &pdu_type, &pdu_length))
-		return false;
-
+	get_type_length(b, &pdu_type, &pdu_length);
 	if (pdu_type != 0x02) { // expecting an integer here)
-		DOLOG(logging::ll_error, "SNMP::process_PDU", "-", "error-type is not integer");
+		if (verbose)
+			printf("SNMP::process_PDU: error-type is not integer\n");
 		return false;
 	}
-
-	p += 2;
-
-	uint64_t error = get_INTEGER(p, pdu_length);
-	(void)error;
-	p += pdu_length;
+	b->skip_bytes(pdu_length);
 
 	// error index
-	if (!get_type_length(p, len, &pdu_type, &pdu_length))
-		return false;
-
+	get_type_length(b, &pdu_type, &pdu_length);
 	if (pdu_type != 0x02) { // expecting an integer here)
-		DOLOG(logging::ll_error, "SNMP::process_PDU", "-", "error-index is not integer");
+		if (verbose)
+			printf("SNMP::process_PDU: error-index is not integer\n");
 		return false;
 	}
-
-	p += 2;
-
-	uint64_t error_index = get_INTEGER(p, pdu_length);
-	(void)error_index;
-	p += pdu_length;
+	b->skip_bytes(pdu_length);
 
 	// varbind list sequence
-	uint8_t type_vb_list = *p++;
+	uint8_t type_vb_list = b->get_byte();
 	if (type_vb_list != 0x30) {
-		DOLOG(logging::ll_error, "SNMP::process_PDU", "-", "expecting varbind list sequence, got %02x", type_vb_list);
+		if (verbose)
+			printf("SNMP::process_PDU: expecting varbind list sequence, got %02x\n", type_vb_list);
 		return false;
 	}
-	uint8_t len_vb_list = *p++;
+	uint8_t len_vb_list = b->get_byte();
 
-	const uint8_t *pnt = p;
+	if (len_vb_list) {
+		block temp(b->get_bytes(len_vb_list));
 
-	while(pnt < &p[len_vb_list]) {
-		uint8_t seq_type = *pnt++;
-		uint8_t seq_length = *pnt++;
+		while(temp.is_empty() == false) {
+			uint8_t seq_type   = temp.get_byte();
+			uint8_t seq_length = temp.get_byte();
 
-		if (&pnt[seq_length] > &p[len_vb_list]) {
-			DOLOG(logging::ll_error, "SNMP::process_PDU", "-", "length field out of bounds (PDU)");
-			return false;
-		}
+			block seq_data(temp.get_bytes(seq_length));
 
-		if (seq_type == 0x30) {  // sequence
-			process_BER(pnt, seq_length, oids_req, is_getnext, 0);
-			pnt += seq_length;
-		}
-		else {
-			DOLOG(logging::ll_error, "SNMP::process_PDU", "-", "unexpected/invalid type %02x", seq_type);
-			return false;
+			if (seq_type == 0x30)  // sequence
+				process_BER(&seq_data, oids_req, is_getnext, 0);
+			else {
+				if (verbose)
+					printf("SNMP: unexpected/invalid type %02x\n", seq_type);
+				return false;
+			}
 		}
 	}
 
 	return true;
 }
 
-bool snmp::process_BER(const uint8_t *p, const size_t len, oid_req_t *const oids_req, const bool is_getnext, const int is_top)
+bool snmp::process_BER(block *const b, oid_req_t *const oids_req, const bool is_getnext, const int is_top)
 {
-	if (len < 2) {
-		DOLOG(logging::ll_error, "SNMP::process_BER", "-", "BER too small");
-		return false;
-	}
-
-	const uint8_t *pnt   = p;
 	bool first_integer   = true;
 	bool first_octet_str = true;
 
-	while(pnt < &p[len]) {
-		uint8_t type   = *pnt++;
-		uint8_t length = *pnt++;
+	while(b->is_empty() == false) {
+		uint8_t type   = b->get_byte();
+		uint8_t length = b->get_byte();
 
-		if (&pnt[length] > &p[len]) {
-			DOLOG(logging::ll_error, "SNMP::process_BER", "-", "length field out of bounds (BER)");
-			return false;
-		}
+		block temp(b->get_bytes(length));
 
 		if (type == 0x02) {  // integer
 			if (is_top && first_integer)
-				oids_req->version = get_INTEGER(pnt, length);
+				oids_req->version = get_INTEGER(&temp);
 
 			first_integer = false;
-
-			pnt += length;
 		}
 		else if (type == 0x04) {  // octet string
 			if (is_top && first_octet_str)
-				oids_req->community = std::string(reinterpret_cast<const char *>(pnt), length);
+				oids_req->community = std::string(reinterpret_cast<const char *>(temp.get_data()), length);
 
 			first_octet_str = false;
-
-			pnt += length;
 		}
 		else if (type == 0x05) {  // null
 			// ignore for now
-			pnt += length;
 		}
 		else if (type == 0x06) {  // object identifier
 			std::string oid_out;
 
-			if (!get_OID(pnt, length, &oid_out))
+			if (!get_OID(&temp, &oid_out))
 				return false;
 
 			if (is_getnext) {
 				std::string oid_next = sd->find_next_oid(oid_out);
 
 				if (oid_next.empty()) {
-					oids_req->err = 2;
+					oids_req->err     = 2;
 					oids_req->err_idx = 1;
 				}
 				else {
@@ -268,32 +252,26 @@ bool snmp::process_BER(const uint8_t *p, const size_t len, oid_req_t *const oids
 			else {
 				oids_req->oids.push_back(oid_out);
 			}
-
-			pnt += length;
 		}
 		else if (type == 0x30) {  // sequence
-			if (!process_BER(pnt, length, oids_req, is_getnext, is_top - 1))
+			if (!process_BER(&temp, oids_req, is_getnext, is_top - 1))
 				return false;
-
-			pnt += length;
 		}
 		else if (type == 0xa0) {  // GetRequest PDU
-			if (!process_PDU(pnt, length, oids_req, is_getnext))
+			if (!process_PDU(&temp, oids_req, is_getnext))
 				return false;
-			pnt += length;
 		}
 		else if (type == 0xa1) {  // GetNextRequest PDU
-			if (!process_PDU(pnt, length, oids_req, true))
+			if (!process_PDU(&temp, oids_req, true))
 				return false;
-			pnt += length;
 		}
 		else if (type == 0xa3) {  // SetRequest PDU
-			if (!process_PDU(pnt, length, oids_req, is_getnext))
+			if (!process_PDU(&temp, oids_req, is_getnext))
 				return false;
-			pnt += length;
 		}
 		else {
-			DOLOG(logging::ll_error, "SNMP::process_BER", "-", "invalid type %02x", type);
+			if (verbose)
+				printf("SNMP: invalid type %02x\n", type);
 			return false;
 		}
 	}
@@ -332,7 +310,8 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 
 		varbind->add(new snmp_oid(e));
 
-		DOLOG(logging::ll_debug, "SNMP:process_BER", "-", "requested: %s", e.c_str());
+		if (verbose)
+			printf("SNMP requested: %s\n", e.c_str());
 
 		std::optional<snmp_elem *> rc = sd->find_by_oid(e);
 
@@ -351,7 +330,8 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 				varbind->add(new snmp_null());
 		}
 		else {
-			DOLOG(logging::ll_info, "SNMP::process_BER", "-", "requested %s not found, returning null", e.c_str());
+			if (verbose)
+				printf("SNMP: requested %s not found, returning null\n", e.c_str());
 
 			// FIXME snmp_null?
 			varbind->add(new snmp_null());
@@ -359,7 +339,7 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 	}
 
 	auto rc = se->get_payload();
-	*packet_out = rc.first;
+	*packet_out  = rc.first;
 	*output_size = rc.second;
 
 	delete se;
@@ -368,79 +348,77 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 #if defined(TEENSY4_1)
 void snmp::poll()
 {
-	int rc = handle->parsePacket();
-	if (rc == 0)
-		return;
+       int rc = handle->parsePacket();
+       if (rc == 0)
+               return;
 
-	if (rc > 0) {
-		oid_req_t or_;
+       if (rc > 0) {
+               oid_req_t or_;
 
-		handle->read(buffer, rc);
+               handle->read(buffer, rc);
 
-		if (!process_BER(buffer, rc, &or_, false, 2))
-			return;
+	       block b(buffer, rc, false);
+	       if (!process_BER(&b, &or_, false, 2)) {
+		       if (verbose)
+			       printf("Processing packet failed\n");
+		       return;
+	       }
 
-		uint8_t *packet_out  = nullptr;
-		size_t   output_size = 0;
-		gen_reply(or_, &packet_out, &output_size);
-		if (output_size) {
-			handle->beginPacket(handle->remoteIP(), handle->remotePort());
-			handle->write(packet_out, output_size);
-			handle->endPacket();
-		}
-		free(packet_out);
-	}
+               uint8_t *packet_out  = nullptr;
+               size_t   output_size = 0;
+               gen_reply(or_, &packet_out, &output_size);
+               if (output_size) {
+                       handle->beginPacket(handle->remoteIP(), handle->remotePort());
+                       handle->write(packet_out, output_size);
+                       handle->endPacket();
+               }
+               free(packet_out);
+       }
 }
 #else
 void snmp::thread()
 {
-#if (!defined(ARDUINO) || defined(ESP32)) && !defined(__MINGW32__)
 	pollfd fds[] { { fd, POLLIN, 0 } };
-#endif
 
-	while(!*stop) {
-#if !defined(ARDUINO) || defined(ESP32)
-		sockaddr_in clientaddr   {   };
-		socklen_t   len          { sizeof clientaddr };
+	while(!*stop_flag) {
+		sockaddr_in clientaddr {                   };
+		socklen_t   len        { sizeof clientaddr };
 
-#if !defined(__MINGW32__)
 		if (poll(fds, 1, 100) == 0)
 			continue;
-#endif
 
-		int rc = recvfrom(fd, reinterpret_cast<char *>(buffer), SNMP_RECV_BUFFER_SIZE, 0, reinterpret_cast<sockaddr *>(&clientaddr), &len);
+		int rc = recvfrom(fd, buffer, SNMP_RECV_BUFFER_SIZE, 0, reinterpret_cast<sockaddr *>(&clientaddr), &len);
 		if (rc == -1)
 			break;
-#else
-		int rc = handle->parsePacket();
-		if (rc == 0) {
-			delay(1);
-			continue;
-		}
-
-		handle->read(buffer, rc);
-#endif
 
 		if (rc > 0) {
 			oid_req_t or_;
 
-			if (!process_BER(buffer, rc, &or_, false, 2))
-				return;
+			block b(buffer, rc, false);
+			try {
+				if (!process_BER(&b, &or_, false, 2))
+					continue;
+			}
+			catch(const std::runtime_error & re) {
+				if (verbose)
+					printf("Processing packet failed: %s\n", re.what());
+				continue;
+			}
 
 			uint8_t *packet_out  = nullptr;
 			size_t   output_size = 0;
 			gen_reply(or_, &packet_out, &output_size);
 			if (output_size) {
 #if !defined(ARDUINO) || defined(ESP32)
-				if (sendto(fd, reinterpret_cast<char *>(packet_out), output_size, 0, reinterpret_cast<sockaddr *>(&clientaddr), len) == -1)
-					DOLOG(logging::ll_debug, "snmp::thread", "-", "failed to transmit SNMP reply packet: %s", strerror(errno));
+				(void)sendto(fd, packet_out, output_size, 0, reinterpret_cast<sockaddr *>(&clientaddr), len);
 #else
 				handle->beginPacket(handle->remoteIP(), handle->remotePort());
 				handle->write(packet_out, output_size);
 				handle->endPacket();
 #endif
 			}
-			free(packet_out);
+
+			delete [] packet_out;
 		}
 	}
 }

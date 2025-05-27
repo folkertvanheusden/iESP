@@ -30,6 +30,7 @@ add_executable(
 	session.cpp
 	snmp.cpp
 	utils.cpp
+	snmp/block.cpp
 	snmp/snmp.cpp
 	snmp/snmp_data.cpp
 	snmp/snmp_elem.cpp
