@@ -47,7 +47,7 @@ private:
 	std::thread      *th              { nullptr };
 	std::atomic_bool *const stop_flag { nullptr };
 	const bool        verbose         { false   };
-	const int         port            { 161     };
+	const int         port            { -1      };
 
 #ifdef UNITTEST
 	FRIEND_TEST(Snmp, test);
@@ -66,7 +66,7 @@ private:
 	void     thread          ();
 
 public:
-	snmp(snmp_data *const sd, std::atomic_bool *const stop, const bool verbose, const int port = 161);
+	snmp(snmp_data *const sd, std::atomic_bool *const stop, const bool verbose, const int port);
 	snmp(const snmp &) = delete;
 	virtual ~snmp();
 

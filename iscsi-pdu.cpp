@@ -424,7 +424,7 @@ std::optional<iscsi_response_set> iscsi_pdu_scsi_cmd::get_response(scsi *const s
 	auto *pdu_scsi_response = new iscsi_pdu_scsi_response(ses) /* 0x21 */;
 	if (pdu_scsi_response->set(*this, { }, { }, { }) == false) {
 		DOLOG(logging::ll_info, "iscsi_pdu_scsi_cmd::get_response", ses->get_endpoint_name(), "iscsi_pdu_scsi_response::set returned error");
-
+		delete pdu_scsi_response;
 		return { };
 	}
 

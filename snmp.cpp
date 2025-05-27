@@ -2,6 +2,7 @@
 #include <functional>
 
 #include "backend.h"
+#include "log.h"
 #include "scsi.h"
 #include "server.h"
 #if defined(ARDUINO)
@@ -49,5 +50,7 @@ void init_snmp(snmp **const snmp_, snmp_data **const snmp_data_, iscsi_stats_t *
 
 	// TODO bs-> bla  in snmp
 
-	*snmp_ = new snmp(*snmp_data_, stop, port);
+	*snmp_ = new snmp(*snmp_data_, stop, 1, port);
+	if ((*snmp_)->begin() == false)
+		DOLOG(logging::ll_error, "snmp", "-", "failed to initialize SNMP server");
 }

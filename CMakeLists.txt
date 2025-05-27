@@ -6,7 +6,7 @@ add_compile_options(-Wall -pedantic -D_FILE_OFFSET_BITS=64)  # -D_GLIBCXX_DEBUG 
 #add_compile_options(--coverage -O0 -fno-inline)
 #add_compile_options(-fno-inline)
 
-SET(VERSION "2.2")
+SET(VERSION "2.3")
 
 add_definitions(-DVERSION=\"${VERSION}\")
 

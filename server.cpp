@@ -636,10 +636,15 @@ void server::handler()
 					}
 
 					if (reject.has_value() == false) {
-						reject = generate_reject_pdu(*pdu, reason);
-						if (reject.has_value() == false) {
-							DOLOG(logging::ll_error, "server::handler", endpoint, "cannot generate reject PDU");
-							continue;
+						if (pdu) {
+							reject = generate_reject_pdu(*pdu, reason);
+							if (reject.has_value() == false) {
+								DOLOG(logging::ll_error, "server::handler", endpoint, "cannot generate reject PDU");
+								continue;
+							}
+						}
+						else {
+							DOLOG(logging::ll_info, "server::handler", ses->get_endpoint_name(), "Unhandled error situation with no PDU to respond to");
 						}
 					}
 

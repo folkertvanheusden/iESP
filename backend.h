@@ -31,7 +31,7 @@ class backend
 {
 protected:
 	const std::string identifier;
-	backend_stats_t   bs;
+	backend_stats_t   bs            {   };
 	uint64_t          ts_last_acces { 0 };
 
 #if !(defined(ARDUINO) || defined(TEENSY4_1) || defined(RP2040W))

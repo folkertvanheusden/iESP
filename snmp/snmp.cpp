@@ -57,7 +57,7 @@ bool snmp::begin()
 		return false;
 #else
         handle = new qn::EthernetUDP();
-        handle->begin(161);
+        handle->begin(port);
 #endif
 
 	buffer = new uint8_t[SNMP_RECV_BUFFER_SIZE]();
