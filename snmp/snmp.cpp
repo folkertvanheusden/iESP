@@ -424,7 +424,7 @@ void snmp::thread()
 			gen_reply(or_, &packet_out, &output_size);
 			if (output_size) {
 #if !defined(ARDUINO) || defined(ESP32)
-				(void)sendto(fd, packet_out, output_size, 0, reinterpret_cast<sockaddr *>(&clientaddr), len);
+				(void)sendto(fd, reinterpret_cast<char *>(packet_out), output_size, 0, reinterpret_cast<sockaddr *>(&clientaddr), len);
 #else
 				handle->beginPacket(handle->remoteIP(), handle->remotePort());
 				handle->write(packet_out, output_size);
