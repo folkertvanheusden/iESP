@@ -42,7 +42,7 @@ struct scsi_response
 	}
 };
 
-typedef enum { cs_6, cs_10, cs_16 } cdb_size_t;
+typedef enum { cs_6, cs_10, cs_12, cs_16 } cdb_size_t;
 
 void get_lba_len(const uint8_t *const CDB, const cdb_size_t s, uint64_t *const lba, uint32_t *const transfer_length);
 
@@ -111,6 +111,8 @@ public:
 		o_get_lba_status   = 0x9e,
 		o_report_luns      = 0xa0,
 		o_rep_sup_oper     = 0xa3,
+		o_read_12          = 0xa8,
+		o_write_12         = 0xaa,
 	};
 
 	enum scsi_lock_status {

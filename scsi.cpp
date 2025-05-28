@@ -41,6 +41,8 @@ const std::map<scsi::scsi_opcode, scsi_opcode_details> scsi_a3_data {
 	{ scsi::scsi_opcode::o_write_verify_10,	{ { 0xff, 0xf2, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 }, 10, "write verify 10" } },
 	{ scsi::scsi_opcode::o_sync_cache_10,	{ { 0xff, 0x06, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 }, 10, "sync cache 10"   } },
 	{ scsi::scsi_opcode::o_unmap,           { { 0xff, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0x07 }, 10, "unmap"           } },
+	{ scsi::scsi_opcode::o_read_12,		{ { 0xff, 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 }, 12, "read 12"  } },
+	{ scsi::scsi_opcode::o_write_12,	{ { 0xff, 0xfa, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 }, 12, "write 12" } },
 	{ scsi::scsi_opcode::o_read_16,		{ { 0xff, 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 }, 16, "read 16" } },
 	{ scsi::scsi_opcode::o_compare_and_write, { { 0xff, 0xfa, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x07 }, 16, "compare and write" } },
 	{ scsi::scsi_opcode::o_write_16,	{ { 0x8a, 0xfa, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x07 }, 16, "write 16" } },
@@ -371,6 +373,10 @@ void get_lba_len(const uint8_t *const CDB, const cdb_size_t s, uint64_t *const l
 		*lba             = get_uint32_t(&CDB[2]);
 		*transfer_length =  (CDB[7] << 8) | CDB[8];
 	}
+	else if (s == cs_12) {
+		*lba             = get_uint32_t(&CDB[2]);
+		*transfer_length = get_uint32_t(&CDB[6]);
+	}
 	else if (s == cs_16) {
 		*lba             = get_uint64_t(&CDB[2]);
 		*transfer_length = get_uint32_t(&CDB[10]);
@@ -401,9 +407,16 @@ scsi_response scsi::write_verify(io_stats_t *const is, const std::string & ident
 		get_lba_len(CDB, cs_10, &lba, &transfer_length);
 		name = opcode == o_write_verify_10 ? "verify-10" : "10";
 	}
+	else if (opcode == o_write_12) {
+		get_lba_len(CDB, cs_12, &lba, &transfer_length);
+		name = "12";
+	}
 	else if (opcode == o_write_16) {
 		get_lba_len(CDB, cs_16, &lba, &transfer_length);
 		name = "16";
+	}
+	else {
+		DOLOG(logging::ll_error, "scsi::write_", identifier, "Unknown write mode");
 	}
 
 	bool fua = CDB[1] & 8;
@@ -514,13 +527,20 @@ scsi_response scsi::read_(const std::string & identifier, const uint64_t lun, co
 		get_lba_len(CDB, cs_16, &lba, &transfer_length);
 		DOLOG(logging::ll_debug, "scsi::read_", identifier, "READ_16, LBA %" PRIu64 ", %u sectors", lba, transfer_length);
 	}
+	else if (opcode == o_read_12) {
+		get_lba_len(CDB, cs_12, &lba, &transfer_length);
+		DOLOG(logging::ll_debug, "scsi::read_", identifier, "READ_12, LBA %" PRIu64 ", %u sectors", lba, transfer_length);
+	}
 	else if (opcode == o_read_10) {
 		get_lba_len(CDB, cs_10, &lba, &transfer_length);
 		DOLOG(logging::ll_debug, "scsi::read_", identifier, "READ_10, LBA %" PRIu64 ", %u sectors", lba, transfer_length);
 	}
-	else {
+	else if (opcode == o_read_6) {
 		get_lba_len(CDB, cs_6, &lba, &transfer_length);
 		DOLOG(logging::ll_debug, "scsi::read_", identifier, "READ_6, LBA %" PRIu64 ", %u sectors", lba, transfer_length);
+	}
+	else {
+		DOLOG(logging::ll_error, "scsi::read_", identifier, "Unknown read mode");
 	}
 
 	auto backend_block_size = b->get_block_size();
@@ -928,9 +948,9 @@ std::optional<scsi_response> scsi::send(io_stats_t *const is, const uint64_t lun
 		response = read_capacity_10(lun_identifier, lun, CDB, size, data);
 	else if (opcode == o_get_lba_status)
 		response = get_lba_status(lun_identifier, lun, CDB, size, data);
-	else if (opcode == o_write_6 || opcode == o_write_10 || opcode == o_write_verify_10 || opcode == o_write_16)
+	else if (opcode == o_write_6 || opcode == o_write_10 || opcode == o_write_verify_10 || opcode == o_write_12 || opcode == o_write_16)
 		response = write_verify(is, lun_identifier, lun, CDB, size, data, opcode);
-	else if (opcode == o_read_16 || opcode == o_read_10 || opcode == o_read_6)  // 0x88, 0x28, 0x08
+	else if (opcode == o_read_16 || opcode == o_read_12 || opcode == o_read_10 || opcode == o_read_6)  // 0x88, 0xa8, 0x28, 0x08
 		response = read_(lun_identifier, lun, CDB, size, data, opcode);
 	else if (opcode == o_sync_cache_10)  // 0x35
 		response = sync_cache(is, lun_identifier, lun, CDB, size, data);
