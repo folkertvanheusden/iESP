@@ -13,6 +13,7 @@
 #include <QNEthernet.h>
 namespace qn = qindesign::network;
 #else
+#include <AsyncUDP.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
 #endif
@@ -26,10 +27,12 @@ namespace qn = qindesign::network;
 
 #if defined(ARDUINO)
 std::optional<std::string> syslog_host;
+bool syslog_is_broadcast { false };
 #if defined(TEENSY4_1)
 qn::EthernetUDP UDP_socket;
 #else
 WiFiUDP UDP_socket;
+AsyncUDP AUDP_socket;
 #endif
 #endif
 std::string name { "?" };
@@ -112,17 +115,22 @@ namespace logging {
 			write_led(led_red, HIGH);
 
 		if (syslog_host.has_value() && is_network_up()) {
-			IPAddress ip;
-			static bool failed = false;
-			if (!ip.fromString(syslog_host.value().c_str()) && failed == false) {
-				failed = true;
-				Serial.printf("Problem converting \"%s\" to an internal representation\r\n", syslog_host.value().c_str());
+			if (syslog_is_broadcast) {
+				AUDP_socket.broadcastTo(err_log_buf, 514);
 			}
+			else {
+				IPAddress ip;
+				static bool failed = false;
+				if (!ip.fromString(syslog_host.value().c_str()) && failed == false) {
+					failed = true;
+					Serial.printf("Problem converting \"%s\" to an internal representation\r\n", syslog_host.value().c_str());
+				}
 
-			if (!failed) {
-				UDP_socket.beginPacket(ip, 514);
-				UDP_socket.printf(err_log_buf);
-				UDP_socket.endPacket();
+				if (!failed) {
+					UDP_socket.beginPacket(ip, 514);
+					UDP_socket.printf(err_log_buf);
+					UDP_socket.endPacket();
+				}
 			}
 		}
 		else {

@@ -235,6 +235,9 @@ bool load_configuration() {
 	else
 		Serial.printf("Syslog host: %s\r\n", syslog_host.value().c_str());
 
+	if (cfg.containsKey("syslog-is-broadcast"))
+		syslog_is_broadcast = cfg["syslog-is-broadcast"].as<bool>();
+
 	if (cfg.containsKey("trim-level"))
 		trim_level = cfg["trim-level"].as<int>();
 

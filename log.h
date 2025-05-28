@@ -37,5 +37,6 @@ namespace logging {
 #include <optional>
 #include <string>
 extern std::optional<std::string> syslog_host;
+extern bool syslog_is_broadcast;
 void init_logger(const std::string & name);
 #endif
