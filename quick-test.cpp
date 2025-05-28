@@ -227,10 +227,12 @@ void main_tests()
                 exit(10);
         }
 
+#if 0  // Not available in Ubuntu 24.04
 	if (iscsi_set_data_digest(iscsi, ISCSI_DATA_DIGEST_CRC32C_NONE)) {
 		printf("ISCSI_DATA_DIGEST_CRC32C_NONE failed: %s\n", iscsi_get_error(iscsi));
                 exit(10);
         }
+#endif
 
 	if (iscsi_login_sync(iscsi)) {
 		printf("iscsi_login failed: %s\n", iscsi_get_error(iscsi));
