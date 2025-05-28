@@ -1,6 +1,6 @@
 what it is
 ----------
-iESP is an iSCSI target that was originally designed for the ESP32 and Teensy 4.1 microcontroller. This allows you to boot your VMWare cluster from an SD-card :-)
+iESP is an iSCSI target that was originally designed for the ESP32, RP2040W and Teensy 4.1 microcontroller. This allows you to boot your VMWare cluster from an SD-card :-)
 Since then it was ported to Linux, \*BSD (tested on FreeBSD) and Microsoft Windows.
 
 
@@ -124,4 +124,4 @@ build status
 license
 -------
 It is licensed under the MIT license.
-Written by Folkert van Heusden <mail@vanheusden.com> in 2023/2024.
+Written by Folkert van Heusden <mail@vanheusden.com> in 2023-2025.
