@@ -985,7 +985,7 @@ std::optional<std::vector<uint8_t> > scsi::validate_request(const uint64_t lba, 
 {
 	auto size_in_blocks = get_size_in_blocks();
 
-	if (lba > size_in_blocks - n_blocks) {
+	if (lba > size_in_blocks - n_blocks || size_in_blocks < n_blocks) {
 		DOLOG(logging::ll_debug, "scsi::validate_request", "-", "lba %" PRIu64 " + n_blocks %u > size_in_blocks %" PRIu64, lba, n_blocks, size_in_blocks);
 		return error_out_of_range();
 	}
