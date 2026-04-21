@@ -208,7 +208,7 @@ int main(int argc, char *argv[])
 		b = new backend_nbd(dev.substr(0, colon), std::stoi(dev.substr(colon + 1)));
 	}
 
-	if (b->begin() == false) {
+	if (b == nullptr || b->begin() == false) {
 		fprintf(stderr, "Failed to initialize storage backend\n");
 		return 1;
 	}
