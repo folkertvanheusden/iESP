@@ -140,6 +140,8 @@ bool iscsi_pdu_bhs::set_ahs_segment(std::pair<const uint8_t *, size_t> ahs_in)
 
 			ahs_list.push_back(instance);
 		}
+
+		offset += ahs_length;
 	}
 
 	return offset == ahs_in.second;
