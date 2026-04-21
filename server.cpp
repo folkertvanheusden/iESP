@@ -201,10 +201,12 @@ std::tuple<iscsi_pdu_bhs *, iscsi_fail_reason, uint64_t> server::receive_pdu(com
 			uint8_t temp[32];
 			size_t temp_len = data_length;
 			while(temp_len) {
-				if (cc->recv(temp, std::min(temp_len, sizeof temp)) == false) {
+				size_t to_get = std::min(temp_len, sizeof temp);
+				if (cc->recv(temp, to_get) == false) {
 					pdu_error = IFR_CONNECTION;
 					break;
 				}
+				temp_len -= to_get;
 			}
 		}
 		else if (data_length) {
