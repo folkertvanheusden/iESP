@@ -83,7 +83,7 @@ bool backend_file::write(const uint64_t block_nr, const uint32_t n_blocks, const
 	auto   start      = get_micros();
 #if defined(__MINGW32__)
 	std::unique_lock<std::mutex> lck(io_lock);
-	int rc = lseek(fd, offset, SEEK_SET);
+	off_t rc = lseek(fd, offset, SEEK_SET);
 	if (rc != -1)
 		rc = ::write(fd, data, n_bytes);
 #else
