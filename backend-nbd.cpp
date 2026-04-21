@@ -212,9 +212,9 @@ bool backend_nbd::invoke_nbd(const uint32_t command, const uint64_t offset, cons
 			else if (error == NBD_ENOMEM)
 				error_str = "NBD_ENOMEM";
 			else if (error == NBD_ENOSPC)
-				error_str = "NBD_EINVAL";
-			else if (error == NBD_EINVAL)
 				error_str = "NBD_ENOSPC";
+			else if (error == NBD_EINVAL)
+				error_str = "NBD_EINVAL";
 			else if (error == NBD_EOVERFLOW)
 				error_str = "NBD_EOVERFLOW";
 			else if (error == NBD_ENOTSUP)
