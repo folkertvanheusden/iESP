@@ -119,7 +119,7 @@ scsi_response scsi::inquiry(const std::string & identifier, const uint64_t lun, 
 	DOLOG(logging::ll_debug, "scsi::inquiry", identifier, "INQUIRY");
 	if (CDB[1] & 1) {
 		DOLOG(logging::ll_debug, "scsi::inquiry", identifier, "INQUIRY: EVPD");
-		DOLOG(logging::ll_debug, "scsi::inquirinquiry", identifier, "INQUIRY: PageCode: %02xh", CDB[2]);
+		DOLOG(logging::ll_debug, "scsi::inquiry", identifier, "INQUIRY: PageCode: %02xh", CDB[2]);
 	}
 	if (CDB[1] & 2)
 		DOLOG(logging::ll_debug, "scsi::inquiry", identifier, "INQUIRY: CmdDt");
