@@ -61,7 +61,6 @@ bool com_sockets::begin()
 	if (setsockopt(listen_fd, IPPROTO_TCP, TCP_FASTOPEN, &q_size, sizeof q_size)) {
 #endif
 		DOLOG(logging::ll_error, "com_sockets::begin", get_local_address(), "failed to set \"TCP fast open\": %s", strerror(errno));
-		return false;
 	}
 #endif
 
