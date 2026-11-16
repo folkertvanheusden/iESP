@@ -116,7 +116,9 @@ namespace logging {
 
 		if (syslog_host.has_value() && is_network_up()) {
 			if (syslog_is_broadcast) {
+#if !defined(TEENSY4_1)
 				AUDP_socket.broadcastTo(err_log_buf, 514);
+#endif
 			}
 			else {
 				IPAddress ip;

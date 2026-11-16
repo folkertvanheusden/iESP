@@ -107,8 +107,10 @@ size_t get_TLV_length(block *const b)
 	if (first < 128)
 		return first;
 	first &= 127;
+#if !defined(TEENSY4_1)
 	if (first > sizeof(size_t))
 		throw std::runtime_error("length too long");
+#endif
 	size_t length = 0;
 	for(int i=0; i<first; i++) {
 		length <<= 8;
