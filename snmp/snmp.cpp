@@ -285,8 +285,10 @@ bool snmp::process_BER(block *const b, oid_req_t *const oids_req, const bool is_
 				return false;
 		}
 		else if (type == 0xa3) {  // SetRequest PDU
+#if !defined(TEENSY4_1)
 			if (verbose)
 				printf("SNMP: SetRequest not implemented yet\n");
+#endif
 			return false;  // not supported yet
 		}
 		else {
