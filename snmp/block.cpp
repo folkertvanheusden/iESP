@@ -105,7 +105,7 @@ block *block::substr(const size_t offset) const
 
 block *block::substr(const size_t offset, const size_t n) const
 {
-	if (offset + n >= get_size())
+	if (offset > get_size() || n > get_size() - offset)
 		return nullptr;
 	return new block(get_data() + offset, n);
 }
@@ -131,7 +131,7 @@ uint8_t block::get_byte()
 void block::get_bytes(const size_t len, uint8_t *const to)
 {
 #if !defined(TEENSY4_1)
-	if (offset + len > get_size())
+	if (len > get_bytes_left())
 		throw std::range_error("block::get_bytes");
 #endif
 
@@ -142,7 +142,7 @@ void block::get_bytes(const size_t len, uint8_t *const to)
 block block::get_bytes(const size_t len)
 {
 #if !defined(TEENSY4_1)
-	if (offset + len > get_size())
+	if (len > get_bytes_left())
 		throw std::range_error("block::get_bytes");
 #endif
 
@@ -160,7 +160,7 @@ size_t block::get_bytes_left() const
 void block::skip_bytes(const size_t len)
 {
 #if !defined(TEENSY4_1)
-	if (offset + len > get_size())
+	if (len > get_bytes_left())
 		throw std::range_error("block::skip_bytes");
 #endif
 

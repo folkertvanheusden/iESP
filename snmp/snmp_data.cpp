@@ -347,6 +347,9 @@ std::string snmp_data::find_next_oid(const std::string & oid)
 		p_lut = parent->get_children();
 	}
 
+	if (!parent)
+		return "";
+
 	if (parent->get_oid() != oid)
 		return parent->get_oid();
 
@@ -399,7 +402,8 @@ void snmp_data::dump_tree()
 {
 	fprintf(stderr, "digraph test {\n");
 
-	walk_tree(*data.at(0));
+	if (data.empty() == false)
+		walk_tree(*data.at(0));
 
 	fprintf(stderr, "}\n");
 }

@@ -56,7 +56,7 @@ private:
 	bool     process_BER     (block *const b, oid_req_t *const oids_req, const bool is_getnext, const int is_top);
 	uint64_t get_INTEGER     (block *const b);
 	bool     get_OID         (block *const b, std::string *const oid_out);
-	void     get_type_length (block *const b, uint8_t *const type, uint8_t *const len);
+	void     get_type_length (block *const b, uint8_t *const type, size_t *const len);
 	bool     process_PDU     (block *const b, oid_req_t *const oids_req, const bool is_getnext);
 
 	void     add_oid         (uint8_t **const packet_out, size_t *const output_size, const std::string & oid);
