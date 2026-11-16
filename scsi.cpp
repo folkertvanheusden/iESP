@@ -669,8 +669,11 @@ scsi_response scsi::compare_and_write(io_stats_t *const is, const std::string & 
 
 	auto block_size         = b->get_block_size();
 	auto expected_data_size = block_size * block_count * 2;
-	if (expected_data_size != data.second)
+	if (expected_data_size != data.second) {
 		DOLOG(logging::ll_warning, "scsi::compare_and_write", identifier, "COMPARE AND WRITE: data count mismatch (%zu versus %zu)", size_t(expected_data_size), data.second);
+		response.sense_data = error_compare_and_write_count();
+		return response;
+	}
 
 	response.amount_of_data_expected = expected_data_size;
 
