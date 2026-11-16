@@ -36,6 +36,10 @@ public:
 class com_arduino : public com
 {
 private:
+#if !defined(TEENSY4_1)
+	static constexpr unsigned long WIFI_CONNECT_TIMEOUT_MS { 15000 };  // begin() gives up after this
+	static constexpr unsigned long WIFI_LOST_REBOOT_MS     { 10000 };  // reboot if WiFi stays down while idle
+#endif
 	const int   port   { 3260    };
 	const std::function<void()> idle_poll;
 #if defined(TEENSY4_1)
