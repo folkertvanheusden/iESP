@@ -110,18 +110,7 @@ For test-blockdevice.py:
 * for a microcontroller: make sure block-count (-m) multiplied by block size (-b) is 8192 bytes or less as that's the limit in there
 
 
-build status
-------------
-![POSIX CI](https://github.com/folkertvanheusden/iESP/actions/workflows/posix.yaml/badge.svg)
-![Windows CI](https://github.com/folkertvanheusden/iESP/actions/workflows/windows.yaml/badge.svg)
-![Microcontrollers CI](https://github.com/folkertvanheusden/iESP/actions/workflows/platformio.yaml/badge.svg)
-![MacOS X CI](https://github.com/folkertvanheusden/iESP/actions/workflows/macos.yaml/badge.svg)
-
-![Coverity](https://scan.coverity.com/projects/29725/badge.svg)
-[![Codacy Badge](https://app.codacy.com/project/badge/Grade/4ac7abe4ee944411ac6c9cdc80eaf991)](https://app.codacy.com/gh/folkertvanheusden/iESP/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
-
-
 license
 -------
 It is licensed under the MIT license.
-Written by Folkert van Heusden <mail@vanheusden.com> in 2023-2025.
+Written by Folkert van Heusden <mail@vanheusden.com> in 2023-2026.
