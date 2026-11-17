@@ -112,21 +112,47 @@ com_client *com_arduino::accept()
 
 	auto wc = server->accept();
 
-	return new com_client_arduino(wc, idle_poll);
+	return new com_client_arduino(wc, idle_poll, server);
 #endif
 }
 
 #if defined(TEENSY4_1)
-com_client_arduino::com_client_arduino(qn::EthernetClient & wc, std::function<void()> idle_poll): com_client(nullptr), wc(wc), idle_poll(idle_poll)
+com_client_arduino::com_client_arduino(qn::EthernetClient & wc, std::function<void()> idle_poll): com_client(nullptr), wc(wc), idle_poll(idle_poll), t_start(millis())
 {
 	wc.setNoDelay(true);
 }
 #else
-com_client_arduino::com_client_arduino(WiFiClient & wc, std::function<void()> idle_poll): com_client(nullptr), wc(wc), idle_poll(idle_poll)
+com_client_arduino::com_client_arduino(WiFiClient & wc, std::function<void()> idle_poll, WiFiServer *const srv): com_client(nullptr), wc(wc), idle_poll(idle_poll), t_start(millis()), srv(srv)
 {
 	wc.setNoDelay(true);
 }
+
+void com_client_arduino::reject_pending() const
+{
+	if (srv && srv->hasClient()) {
+		auto other = srv->accept();
+		Serial.println(F("Busy with another session: closing new connection"));
+		other.stop();
+	}
+}
 #endif
+
+bool com_client_arduino::timed_out(const unsigned long t_last_data) const
+{
+	const unsigned long now = millis();
+
+	if (now - t_last_data >= IDLE_TIMEOUT_MS) {
+		Serial.println(F("Session idle timeout: closing"));
+		return true;
+	}
+
+	if (now - t_start >= MAX_SESSION_MS) {
+		Serial.println(F("Session maximum duration reached: closing"));
+		return true;
+	}
+
+	return false;
+}
 
 com_client_arduino::~com_client_arduino()
 {
@@ -135,8 +161,9 @@ com_client_arduino::~com_client_arduino()
 
 bool com_client_arduino::send(const uint8_t *const from, const size_t n)
 {
-	const uint8_t *p    = from;
-	size_t         todo = n;
+	const uint8_t *p      = from;
+	size_t         todo   = n;
+	unsigned long  t_last = millis();
 
 	while(todo > 0 && wc) {
 #if !defined(TEENSY4_1)
@@ -148,8 +175,12 @@ bool com_client_arduino::send(const uint8_t *const from, const size_t n)
 			break;
 
 		if (cur_n > 0) {
-			p    += cur_n;
-			todo -= cur_n;
+			p     += cur_n;
+			todo  -= cur_n;
+			t_last = millis();
+		}
+		else if (timed_out(t_last)) {
+			break;
 		}
 	}
 
@@ -161,8 +192,9 @@ bool com_client_arduino::send(const uint8_t *const from, const size_t n)
 
 bool com_client_arduino::recv(uint8_t *const to, const size_t n)
 {
-	uint8_t *p    = to;
-	size_t   todo = n;
+	uint8_t      *p      = to;
+	size_t        todo   = n;
+	unsigned long t_last = millis();
 
 	while(todo > 0 && wc) {
 #if !defined(TEENSY4_1)
@@ -174,9 +206,18 @@ bool com_client_arduino::recv(uint8_t *const to, const size_t n)
 			break;
 
 		if (cur_n > 0) {
-			p    += cur_n;
-			todo -= cur_n;
+			p     += cur_n;
+			todo  -= cur_n;
+			t_last = millis();
 		}
+		else if (timed_out(t_last)) {
+			break;
+		}
+#if !defined(TEENSY4_1)
+		else {
+			reject_pending();
+		}
+#endif
 
 		idle_poll();
 	}

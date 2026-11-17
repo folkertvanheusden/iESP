@@ -17,12 +17,25 @@ private:
 	mutable WiFiClient wc;
 #endif
 	const std::function<void()> idle_poll;
+	// The microcontroller serves one session at a time (no threads), so a stuck or vanished
+	// initiator must never hold it: end the session after IDLE_TIMEOUT_MS without any data
+	// (initiators send NOP-Outs every few seconds) or MAX_SESSION_MS in total.
+	static constexpr unsigned long IDLE_TIMEOUT_MS { 20000 };
+	static constexpr unsigned long MAX_SESSION_MS  { 60000 };
+	const unsigned long t_start;
+	bool timed_out(const unsigned long t_last_data) const;
+#if !defined(TEENSY4_1)
+	// While this session is active, any other initiator that connects is closed at once (it gets
+	// a quick failure and retries) instead of hanging in login until this session ends.
+	WiFiServer *const srv;
+	void reject_pending() const;
+#endif
 
 public:
 #if defined(TEENSY4_1)
 	com_client_arduino(qn::EthernetClient & wc, std::function<void()> idle_poll);
 #else
-	com_client_arduino(WiFiClient & wc, std::function<void()> idle_poll);
+	com_client_arduino(WiFiClient & wc, std::function<void()> idle_poll, WiFiServer *const srv);
 #endif
 	virtual ~com_client_arduino();
 
