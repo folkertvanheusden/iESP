@@ -42,10 +42,17 @@ bool com_arduino::begin()
 #endif
  
 	Serial.println(F("Wait for connection:"));
+	const unsigned long connect_start = millis();
 	for(;;) {
 		auto rc = WiFi.status();
 		if (rc == WL_CONNECTED)
 			break;
+
+		if (millis() - connect_start >= WIFI_CONNECT_TIMEOUT_MS) {
+			Serial.println(F(""));
+			Serial.println(F("WiFi connection timed out"));
+			return false;
+		}
 
 		delay(500);
 		Serial.print(' ');
@@ -105,8 +112,26 @@ com_client *com_arduino::accept()
 		idle_poll();
 	}
 #else
+	// The WiFi stack does not always recover by itself after the access point goes away
+	// (e.g. a router reboot); reboot to reconnect cleanly if WiFi stays down while idle.
+	unsigned long wifi_down_since = 0;
+
 	while(!server->hasClient()) {
 		watchdog_update();
+
+		if (WiFi.status() != WL_CONNECTED) {
+			if (wifi_down_since == 0)
+				wifi_down_since = millis() | 1;
+			else if (millis() - wifi_down_since >= WIFI_LOST_REBOOT_MS) {
+				Serial.println(F("WiFi lost: rebooting to reconnect"));
+				delay(100);
+				rp2040.reboot();
+			}
+		}
+		else {
+			wifi_down_since = 0;
+		}
+
 		delay(10);
 	}
 
