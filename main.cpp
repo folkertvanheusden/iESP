@@ -189,6 +189,10 @@ int main(int argc, char *argv[])
 				fprintf(stderr, "Environment variable PASSWORD not set\n");
 				return 1;
 			}
+			if (pw[0] == 0x00) {
+				fprintf(stderr, "Empty PASSWORD environment variable set\n");
+				return 1;
+			}
 			auth = { optarg, pw };
 		}
 		else {
