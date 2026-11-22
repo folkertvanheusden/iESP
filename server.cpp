@@ -27,12 +27,13 @@
 
 extern std::atomic_bool stop;
 
-server::server(scsi *const s, com *const c, iscsi_stats_t *is, const std::string & target_name, const bool digest_chk):
+server::server(scsi *const s, com *const c, iscsi_stats_t *is, const std::string & target_name, const bool digest_chk, const std::optional<std::pair<std::string, std::string> > & auth_in):
 	s(s),
 	c(c),
 	is(is),
 	target_name(target_name),
-	digest_chk(digest_chk)
+	digest_chk(digest_chk),
+	auth(auth_in)
 {
 }
 
@@ -50,7 +51,7 @@ server::~server()
 #endif
 }
 
-std::tuple<iscsi_pdu_bhs *, iscsi_fail_reason, uint64_t> server::receive_pdu(com_client *const cc, session **const ses)
+std::tuple<iscsi_pdu_bhs *, iscsi_fail_reason, uint64_t> server::receive_pdu(com_client *const cc, session **const ses, const std::optional<std::pair<std::string, std::string> > with_chap)
 {
 	if (*ses == nullptr) {
 		*ses = new session(cc, target_name, digest_chk);
@@ -92,9 +93,15 @@ std::tuple<iscsi_pdu_bhs *, iscsi_fail_reason, uint64_t> server::receive_pdu(com
 	cmd_use_count[opcode]++;
 #endif
 
+	if ((*ses)->get_handshake_state() == discovery &&
+		opcode != iscsi_pdu_bhs::iscsi_bhs_opcode::o_login_req && opcode != iscsi_pdu_bhs::iscsi_bhs_opcode::o_text_req) {
+		DOLOG(logging::ll_debug, "server::receive_pdu", cc->get_endpoint_name(), "invalid PDU in discovery mode (opcode: %02x)", opcode);
+		return { nullptr, IFR_MISC, 0 };
+	}
+
 	switch(opcode) {
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_login_req:
-			pdu_obj = new iscsi_pdu_login_request(*ses);
+			pdu_obj = new iscsi_pdu_login_request(*ses, with_chap);
 			has_digest = false;
 			break;
 		case iscsi_pdu_bhs::iscsi_bhs_opcode::o_scsi_cmd:
@@ -382,7 +389,7 @@ iscsi_fail_reason server::push_response(com_client *const cc, session *const ses
 
 	if (response_set.has_value() == false) {
 		DOLOG(logging::ll_debug, "server::push_response", cc->get_endpoint_name(), "no response from PDU");
-		return IFR_OK;
+		return IFR_MISC;
 	}
 
 	for(auto & pdu_out: response_set.value().responses) {
@@ -589,7 +596,7 @@ void server::handler()
 			auto           block_size   = s->get_block_size();
 
 			do {
-				auto incoming = receive_pdu(cc, &ses);
+				auto incoming = receive_pdu(cc, &ses, auth);
 				iscsi_pdu_bhs *pdu = std::get<0>(incoming);
 
 				is->iscsiSsnCmdPDUs++;
@@ -650,15 +657,17 @@ void server::handler()
 						}
 					}
 
-					bool rc = cc->send(reject.value().data, reject.value().n);
-					delete [] reject.value().data;
-					if (rc == false) {
-						DOLOG(logging::ll_error, "server::handler", endpoint, "cannot transmit reject PDU");
-						ok = false;
-					}
-					else {
-						is->iscsiSsnTxDataOctets += reject.value().n;
-						DOLOG(logging::ll_debug, "server::handler", endpoint, "transmitted reject PDU");
+					if (reject.has_value()) {
+						bool rc = cc->send(reject.value().data, reject.value().n);
+						delete [] reject.value().data;
+						if (rc == false) {
+							DOLOG(logging::ll_error, "server::handler", endpoint, "cannot transmit reject PDU");
+							ok = false;
+						}
+						else {
+							is->iscsiSsnTxDataOctets += reject.value().n;
+							DOLOG(logging::ll_debug, "server::handler", endpoint, "transmitted reject PDU");
+						}
 					}
 				}
 
@@ -674,6 +683,11 @@ void server::handler()
 						ok = false;
 						DOLOG(logging::ll_info, "server::handler", endpoint, "disconnecting because of too many consecutive errors");
 					}
+				}
+
+				if (ses->get_handshake_state() == auth_failed) {
+					DOLOG(logging::ll_debug, "server::handler", endpoint, "auth failed");
+					ok = false;
 				}
 
 				if (ifr == IFR_CONNECTION) {

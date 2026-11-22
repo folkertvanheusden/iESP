@@ -35,6 +35,7 @@ void encode_lun(uint8_t *const target, const uint64_t lun_nr);
 uint8_t * duplicate_new(const void *const in, const size_t n);
 
 std::string to_hex(const uint8_t *const in, const size_t n);
+uint8_t * from_hex(const std::string & what);
 
 // Apple has NTOHL/etc macros that confuse the build
 uint32_t my_NTOHL(const uint32_t x);
@@ -49,3 +50,5 @@ void socket_set_nodelay(const int fd);
 extern uint64_t running_since;
 
 void my_yield();
+
+void calc_md5(const uint8_t *const data, const size_t n, uint8_t *const target);

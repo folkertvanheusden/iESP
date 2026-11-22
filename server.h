@@ -40,13 +40,14 @@ private:
 #else
 	bool           active           { false   };
 #endif
+	const std::optional<std::pair<std::string, std::string> > auth;
 
 	std::tuple<iscsi_pdu_bhs *, iscsi_fail_reason, uint64_t>
-		          receive_pdu  (com_client *const cc, session **const s);
+		          receive_pdu  (com_client *const cc, session **const s, const std::optional<std::pair<std::string, std::string> > with_chap);
 	iscsi_fail_reason push_response(com_client *const cc, session *const s, iscsi_pdu_bhs *const pdu);
 
 public:
-	server(scsi *const s, com *const c, iscsi_stats_t *is, const std::string & target_name, const bool digest_chk);
+	server(scsi *const s, com *const c, iscsi_stats_t *is, const std::string & target_name, const bool digest_chk, const std::optional<std::pair<std::string, std::string> > & auth);
 	virtual ~server();
 
 	bool begin();

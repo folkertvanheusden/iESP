@@ -10,6 +10,8 @@
 
 class iscsi_pdu_scsi_cmd;
 
+typedef enum { discovery, select_auth_type, reply_with_chap_r, verify_password, auth_success, auth_failed } handshake_state_t;
+
 class session
 {
 private:
@@ -36,6 +38,10 @@ private:
 
 	std::map<uint32_t, r2t_session *> r2t_sessions; // r2t sessions
 
+	handshake_state_t          handshake_state { select_auth_type };
+	std::optional<uint8_t>     chap_I;
+	std::optional<std::string> chap_C;
+
 public:
 	session(com_client *const connected_to, const std::string & target_name, const bool allow_digest);
 	virtual ~session();
@@ -43,6 +49,11 @@ public:
 	std::string get_target_name  () const { return target_name;                       }
 	std::string get_local_address() const { return connected_to->get_local_address(); }
 	std::string get_endpoint_name() const { return connected_to->get_endpoint_name(); }
+
+	handshake_state_t get_handshake_state() const                       { return handshake_state;      }
+	void         set_handshake_state(const handshake_state_t new_state) { handshake_state = new_state; }
+	uint8_t      get_chap_I();
+	std::string  get_chap_C();
 
 	void     set_header_digest(const bool v) { header_digest = v; }
 	void     set_data_digest  (const bool v) { data_digest   = v; }

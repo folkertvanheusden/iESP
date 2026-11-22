@@ -68,3 +68,23 @@ void session::remove_r2t_session(const uint32_t ttt)
 		r2t_sessions.erase(it);
 	}
 }
+
+uint8_t session::get_chap_I()
+{
+	if (chap_I.has_value() == false) {
+		uint32_t temp = 0;
+		my_getrandom(&temp);  // what to do if this fails?
+		chap_I = temp;
+	}
+	return chap_I.value();
+}
+
+std::string session::get_chap_C()
+{
+	if (chap_C.has_value() == false) {
+		uint8_t random[16] {};
+		my_getrandom(random, sizeof random);  // TODO can fail
+		chap_C = "0x" + to_hex(random, sizeof random);
+	}
+	return chap_C.value();
+}

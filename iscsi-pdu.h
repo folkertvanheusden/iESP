@@ -148,6 +148,9 @@ std::optional<blob_t> generate_reject_pdu(const iscsi_pdu_bhs & about, const std
 
 class iscsi_pdu_login_request : public iscsi_pdu_bhs  // login request 0x03
 {
+private:
+	const std::optional<std::pair<std::string, std::string> > with_chap;
+
 public:
 	struct __login_req__ {
 		uint8_t  b1;
@@ -183,7 +186,7 @@ public:
 	std::optional<std::string> initiator;
 
 public:
-	iscsi_pdu_login_request(session *const ses);
+	iscsi_pdu_login_request(session *const ses, const std::optional<std::pair<std::string, std::string> > with_chap);
 	virtual ~iscsi_pdu_login_request() { }
 
 	std::vector<blob_t> get() const override;
@@ -207,6 +210,9 @@ public:
 
 class iscsi_pdu_login_reply : public iscsi_pdu_bhs
 {
+private:
+	const std::optional<std::pair<std::string, std::string> > with_chap;
+
 public:
 	struct __login_reply__ {
 		uint8_t  b1;
@@ -245,7 +251,7 @@ public:
 	std::pair<uint8_t *, size_t> login_reply_reply_data { nullptr, 0 };
 
 public:
-	iscsi_pdu_login_reply(session *const ses);
+	iscsi_pdu_login_reply(session *const ses, const std::optional<std::pair<std::string, std::string> > with_chap_in);
 	virtual ~iscsi_pdu_login_reply();
 
 	bool set(const iscsi_pdu_login_request & reply_to);

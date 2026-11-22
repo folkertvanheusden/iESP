@@ -227,22 +227,32 @@ blob_t iscsi_pdu_ahs::get()
 
 /*--------------------------------------------------------------------------*/
 
-iscsi_pdu_login_request::iscsi_pdu_login_request(session *const ses): iscsi_pdu_bhs(ses)
+iscsi_pdu_login_request::iscsi_pdu_login_request(session *const ses, const std::optional<std::pair<std::string, std::string> > with_chap_in): iscsi_pdu_bhs(ses), with_chap(with_chap_in)
 {
 	assert(sizeof(*login_req) == 48);
 
 	*login_req = { };
 }
 
-bool has_CRC32C(const std::string & value)
+bool has_key(const std::string & value, const std::string & key)
 {
 	auto parts = split(value, ",");
 	for(const auto & part: parts) {
-		if (part == "CRC32C")
+		if (part == key)
 			return true;
 	}
 
 	return false;
+}
+
+bool has_CRC32C(const std::string & value)
+{
+	return has_key(value, "CRC32C");
+}
+
+bool has_CHAP(const std::string & value)
+{
+	return has_key(value, "CHAP");
 }
 
 bool iscsi_pdu_login_request::set_data(const std::pair<const uint8_t *, size_t> & data_in)
@@ -252,14 +262,20 @@ bool iscsi_pdu_login_request::set_data(const std::pair<const uint8_t *, size_t> 
 		return false;
 	}
 
-	auto        kvs_in      = data_to_text_array(data.first, data.second);
-	uint32_t    max_burst   = ~0;
-	uint32_t    max_seg_len = ses->get_max_seg_len();
+	auto        handshake_state = ses->get_handshake_state();
+	auto        kvs_in          = data_to_text_array(data.first, data.second);
+	uint32_t    max_burst       = ~0;
+	uint32_t    max_seg_len     = ses->get_max_seg_len();
+	std::string CHAP_N;
+	std::string CHAP_R;
 	for(const auto & kv: kvs_in) {
 		DOLOG(logging::ll_debug, "iscsi_pdu_login_request::set_data", ses->get_endpoint_name(), "kv %s", kv.c_str());
 
 		auto parts = split(kv, "=");
 		if (parts.size() < 2)
+			continue;
+
+		if (parts[1] == "Irrelevant")
 			continue;
 
 		if (parts[0] == "MaxBurstLength")
@@ -274,6 +290,68 @@ bool iscsi_pdu_login_request::set_data(const std::pair<const uint8_t *, size_t> 
 			ses->set_header_digest(has_CRC32C(parts[1]));
 		else if (parts[0] == "DataDigest")
 			ses->set_data_digest(has_CRC32C(parts[1]));
+		else if (parts[0] == "CHAP_N")
+			CHAP_N = parts[1];
+		else if (parts[0] == "CHAP_R")
+			CHAP_R = parts[1];
+		else if (parts[0] == "SessionType") {
+			if (parts[1] == "Discovery")
+				ses->set_handshake_state(discovery);
+		}
+		else if (parts[0] == "AuthMethod") {
+			if (handshake_state == select_auth_type) {
+				bool has_chap { has_CHAP(parts[1]) };
+				if (with_chap.has_value() && has_chap == false) {
+					DOLOG(logging::ll_warning, "iscsi_pdu_login_request::set_data", ses->get_endpoint_name(), "No AuthMethod with CHAP");
+					return false;
+				}
+			}
+		}
+	}
+
+	if (handshake_state == verify_password) {
+		if (CHAP_N != with_chap.value().first) {
+			ses->set_handshake_state(auth_failed);
+			DOLOG(logging::ll_warning, "iscsi_pdu_login_request::set_data", ses->get_endpoint_name(), "password mismatch");
+			return false;
+		}
+
+		if (CHAP_R.size() != 34 || CHAP_R.substr(0, 2) != "0x") {
+			ses->set_handshake_state(auth_failed);
+			DOLOG(logging::ll_warning, "iscsi_pdu_login_request::set_data", ses->get_endpoint_name(), "CHAP_R is garbage");
+			return false;
+		}
+
+		auto hextoval { [](int c) { return c > '9' ? c - 'a' + 10: (c - '0'); } };
+
+		uint8_t *input = from_hex(CHAP_R.substr(2));
+
+		std::string CHAP_C { ses->get_chap_C().substr(2) };
+		size_t   chap_c_len { CHAP_C.size() / 2 };
+		uint8_t *chap_c_bin { from_hex(ses->get_chap_C().substr(2)) };
+
+		size_t compare_input_length = 1 + with_chap.value().second.size() + chap_c_len;
+		uint8_t *compare_input = new uint8_t[compare_input_length]();
+		compare_input[0] = ses->get_chap_I();
+		memcpy(&compare_input[1], with_chap.value().second.c_str(), with_chap.value().second.size());
+		memcpy(&compare_input[1 + with_chap.value().second.size()], chap_c_bin, chap_c_len);
+		uint8_t md5_digest_to_compare[16] { 0xff };  // initialized with 0xff so not to be equal to input in any case
+		calc_md5(compare_input, compare_input_length, md5_digest_to_compare);
+		bool compare_result { memcmp(input, md5_digest_to_compare, 16) == 0 };
+		delete [] compare_input;
+		delete [] chap_c_bin;
+		delete [] input;
+
+		if (compare_result == true) {  // if CHAP_R is correct
+			ses->set_handshake_state(auth_success);
+			DOLOG(logging::ll_debug, "iscsi_pdu_login_request::set_data", ses->get_endpoint_name(), "authentication succeeded");
+			return true;
+		}
+
+		DOLOG(logging::ll_debug, "iscsi_pdu_login_request::set_data", ses->get_endpoint_name(), "authentication failed");
+
+		ses->set_handshake_state(auth_failed);
+		return false;
 	}
 
 	ses->set_max_seg_len(max_seg_len);
@@ -294,7 +372,7 @@ std::vector<blob_t> iscsi_pdu_login_request::get() const
 std::optional<iscsi_response_set> iscsi_pdu_login_request::get_response(scsi *const sd)
 {
 	iscsi_response_set response;
-	auto reply_pdu = new iscsi_pdu_login_reply(ses);
+	auto reply_pdu = new iscsi_pdu_login_reply(ses, with_chap);
 	if (reply_pdu->set(*this) == false) {
 		delete reply_pdu;
 		return { };
@@ -306,7 +384,7 @@ std::optional<iscsi_response_set> iscsi_pdu_login_request::get_response(scsi *co
 
 /*--------------------------------------------------------------------------*/
 
-iscsi_pdu_login_reply::iscsi_pdu_login_reply(session *const ses): iscsi_pdu_bhs(ses)
+iscsi_pdu_login_reply::iscsi_pdu_login_reply(session *const ses, const std::optional<std::pair<std::string, std::string> > with_chap_in): iscsi_pdu_bhs(ses), with_chap(with_chap_in)
 {
 	assert(sizeof(*login_reply) == 48);
 }
@@ -318,16 +396,15 @@ iscsi_pdu_login_reply::~iscsi_pdu_login_reply()
 
 bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 {
-	bool discovery = reply_to.get_NSG() == 1;
-
-	if (discovery) {
+	if (ses->get_handshake_state() == discovery) {
 		DOLOG(logging::ll_debug, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "discovery mode, CSG %d, NSG %d", reply_to.get_CSG(), reply_to.get_NSG());
 
 		const std::vector<std::string> kvs {
 			"TargetPortalGroupTag=1",
-			"AuthMethod=None",
 			"ErrorRecoveryLevel=0",
 		};
+
+		DOLOG(logging::ll_debug, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "handshake finished");
 		for(const auto & kv : kvs)
 			DOLOG(logging::ll_debug, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "send KV \"%s\"", kv.c_str());
 		auto temp = text_array_to_data(kvs);
@@ -337,16 +414,48 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 	else {
 		DOLOG(logging::ll_debug, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "login mode, CSG %d, NSG %d", reply_to.get_CSG(), reply_to.get_NSG());
 
-		const std::vector<std::string> kvs {
-			ses->get_header_digest() ? "HeaderDigest=CRC32C" : "HeaderDigest=None",
-			ses->get_data_digest  () ? "DataDigest=CRC32C"   : "DataDigest=None",
-			"DefaultTime2Wait=2",
-			"DefaultTime2Retain=20",
-			"InitialR2T=Yes",
-			myformat("FirstBurstLength=%d", MAX_DATA_SEGMENT_SIZE),
-			myformat("MaxBurstLength=%d", MAX_DATA_SEGMENT_SIZE),
-			myformat("MaxRecvDataSegmentLength=%d", MAX_DATA_SEGMENT_SIZE),
-		};
+		bool add_headers { false };
+		std::vector<std::string> kvs;
+		if (with_chap.has_value()) {
+			auto handshake_state = ses->get_handshake_state();
+
+			if (handshake_state == select_auth_type) {
+				DOLOG(logging::ll_debug, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "return CHAP request");
+				kvs.push_back("AuthMethod=CHAP");
+				ses->set_handshake_state(reply_with_chap_r);
+			}
+			else if (handshake_state == reply_with_chap_r) {
+				kvs.push_back("CHAP_A=5");  // MD5
+				kvs.push_back(myformat("CHAP_I=%d", ses->get_chap_I()));
+				kvs.push_back("CHAP_C=" + ses->get_chap_C());
+				ses->set_handshake_state(verify_password);
+			}
+			else if (handshake_state == auth_success) {
+				add_headers = true;
+			}
+			else if (handshake_state == auth_failed) {
+				return false;
+			}
+			else {
+				DOLOG(logging::ll_error, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "Unexpected state %d", handshake_state);
+				return false;
+			}
+		}
+		else {
+			kvs.push_back("AuthMethod=none");
+			ses->set_handshake_state(auth_success);  // finished handshake
+			add_headers = true;
+		}
+		if (add_headers) {
+			kvs.push_back(ses->get_header_digest() ? "HeaderDigest=CRC32C" : "HeaderDigest=None");
+			kvs.push_back(ses->get_data_digest  () ? "DataDigest=CRC32C"   : "DataDigest=None");
+			kvs.push_back("DefaultTime2Wait=2");
+			kvs.push_back("DefaultTime2Retain=20");
+			kvs.push_back("InitialR2T=Yes");
+			kvs.push_back(myformat("FirstBurstLength=%d", MAX_DATA_SEGMENT_SIZE));
+			kvs.push_back(myformat("MaxBurstLength=%d", MAX_DATA_SEGMENT_SIZE));
+			kvs.push_back(myformat("MaxRecvDataSegmentLength=%d", MAX_DATA_SEGMENT_SIZE));
+		}
 		for(const auto & kv : kvs)
 			DOLOG(logging::ll_debug, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "send KV \"%s\"", kv.c_str());
 		auto temp = text_array_to_data(kvs);
@@ -359,10 +468,11 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 	set_bits(&login_reply->b1, 6, 1, false);  // filler 0
 	set_bits(&login_reply->b1, 0, 6, o_login_resp);  // opcode
 
-	set_bits(&login_reply->b2, 7, 1, true);  // T
+	bool sg_flag = with_chap.has_value() == false || ses->get_handshake_state() == auth_success || ses->get_handshake_state() == discovery;
+	set_bits(&login_reply->b2, 7, 1, sg_flag);  // T
 	set_bits(&login_reply->b2, 6, 1, false);  // C
-	set_bits(&login_reply->b2, 2, 2, reply_to.get_CSG());  // CSG
-	set_bits(&login_reply->b2, 0, 2, reply_to.get_NSG());  // NSG
+	set_bits(&login_reply->b2, 2, 2, sg_flag ? reply_to.get_CSG() : 0);  // CSG
+	set_bits(&login_reply->b2, 0, 2, sg_flag ? reply_to.get_NSG() : 0);  // NSG
 
 	login_reply->versionmax = reply_to.get_versionmin();
 	login_reply->versionact = reply_to.get_versionmin();

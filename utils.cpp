@@ -27,6 +27,7 @@
 #endif
 
 #include "log.h"
+#include "md5.h"
 #include "utils.h"
 
 
@@ -92,16 +93,12 @@ std::vector<std::string> split(std::string in, const std::string & splitter)
 
 std::string to_hex(const uint8_t *const in, const size_t n)
 {
-	std::string out;
-	out.resize(n * 3);
+	std::string out(n * 2, '_');
 
 	for(size_t i=0, o = 0; i<n; i++) {
 		uint8_t v = in[i];
 		uint8_t nh = v >> 4;
 		uint8_t nl = v & 15;
-
-		if (i)
-			out.at(o++) = ' ';
 
 		if (nh > 9)
 			out.at(o++) = 'a' + nh - 10;
@@ -114,6 +111,16 @@ std::string to_hex(const uint8_t *const in, const size_t n)
 			out.at(o++) = '0' + nl;
 	}
 
+	return out;
+}
+
+uint8_t * from_hex(const std::string & what)
+{
+	auto hextoval { [](int c) { return c > '9' ? c - 'a' + 10: (c - '0'); } };
+	size_t len = what.size();
+	uint8_t *out = new uint8_t[len / 2]();
+	for(size_t i=0; i<len / 2; i++)
+		out[i] = (hextoval(what[i * 2 + 0]) << 4) + hextoval(what[i * 2 + 1]);
 	return out;
 }
 
@@ -328,4 +335,12 @@ void my_yield()
 #else
 	yield();
 #endif
+}
+
+void calc_md5(const uint8_t *const data, const size_t n, uint8_t *const target)
+{
+	md5_state_t ms{ };
+	md5_init(&ms);
+	md5_append(&ms, data, int(n));
+	md5_finish(&ms, target);
 }

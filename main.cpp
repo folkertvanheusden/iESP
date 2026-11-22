@@ -97,6 +97,7 @@ void help()
 	printf("-l x    set log file\n");
 	printf("-D      disable digest\n");
 	printf("-S x    enable SNMP agent on port x, usually 161\n");
+	printf("-U x    set username, retrieve password via environment variable PASSWORD (for CHAP authentication)\n");
 	printf("-P x    write PID-file\n");
 #if !defined(__MINGW32__)
 	printf("-f      become daemon process\n");
@@ -137,8 +138,9 @@ int main(int argc, char *argv[])
 	const char    *logfile    = "/tmp/iesp.log";
 	logging::log_level_t ll_screen = logging::ll_error;
 	logging::log_level_t ll_file   = logging::ll_error;
+	std::optional<std::pair<std::string, std::string> > auth;
 	int o = -1;
-	while((o = getopt(argc, argv, "P:fS:Db:d:i:p:T:t:L:l:h")) != -1) {
+	while((o = getopt(argc, argv, "P:fS:Db:d:i:p:T:t:L:l:U:h")) != -1) {
 		if (o == 'P')
 			pid_file = optarg;  // used for scripting
 		else if (o == 'f')
@@ -181,6 +183,14 @@ int main(int argc, char *argv[])
 		}
 		else if (o == 'l')
 			logfile = optarg;
+		else if (o == 'U') {
+			const char *pw = getenv("PASSWORD");
+			if (!pw) {
+				fprintf(stderr, "Environment variable PASSWORD not set\n");
+				return 1;
+			}
+			auth = { optarg, pw };
+		}
 		else {
 			help();
 			return o != 'h';
@@ -239,7 +249,7 @@ int main(int argc, char *argv[])
 	if (use_snmp)
 		init_snmp(&snmp_, &snmp_data_, &is, get_diskspace, b, &bs, &cpu_usage, &ram_free_kb, &stop, snmp_port);
 
-	server s(&sd, &c, &is, target_name, digest_chk);
+	server s(&sd, &c, &is, target_name, digest_chk, auth);
 
 	std::thread *mth = new std::thread(maintenance_thread, b, &bs, &stop, &cpu_usage, &ram_free_kb);
 
