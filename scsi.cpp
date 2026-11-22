@@ -146,7 +146,7 @@ scsi_response scsi::inquiry(const std::string & identifier, const uint64_t lun, 
 			response.io.what.data.first[7] = 0;
 			memcpy(&response.io.what.data.first[8],  "vnHeusdn", 8);
 			memcpy(&response.io.what.data.first[16], "iESP", 4);
-			memcpy(&response.io.what.data.first[32], VERSION, 3);
+			memcpy(&response.io.what.data.first[32], IESP_VERSION, 3);
 			memset(&response.io.what.data.first[36], '0', 8);
 			memcpy(&response.io.what.data.first[36], serial.c_str(), std::min(serial.size(), size_t(8)));
 			// https://www.t10.org/lists/stds-num.htm

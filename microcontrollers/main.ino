@@ -1,4 +1,4 @@
-// (C) 2023-2024 by Folkert van Heusden
+// (C) 2023-2026 by Folkert van Heusden
 // Released under MIT license
 
 #include <atomic>
@@ -82,6 +82,10 @@ int led_red    = -1;
 int led_green  = 7;
 int led_yellow = 6;
 int led_red    = 5;
+#elif defined(OLIMEX)
+int led_green  = 33;
+int led_yellow = 16;
+int led_red    = 32;
 #else
 int led_green  = -1;
 int led_yellow = -1;
@@ -279,7 +283,7 @@ bool load_configuration() {
 
 	data_file.close();
 
-#if !defined(TEENSY4_1)
+#if !defined(TEENSY4_1) && !defined(OLIMEX)
 	auto n = wifi_targets.size();
 	Serial.printf("Loaded configuration parameters for %zu WiFi access points\r\n", n);
 	if (n == 0) {
@@ -466,7 +470,7 @@ void setup() {
 	}
 #endif
 
-#if !defined(TEENSY4_1) && !defined(WT_ETH01)
+#if !defined(TEENSY4_1) && !defined(WT_ETH01) && !defined(OLIMEX)
 	TM = new TM1637();
 	TM->begin(21, 22, 4);  // TEENSY4.1: pins
 	TM->setBrightness(1);
@@ -486,7 +490,7 @@ void setup() {
 
 	draw_status(2);
 
-	Serial.println(F("iESP, (C) 2023-2024 by Folkert van Heusden <mail@vanheusden.com>"));
+	Serial.println(F("iESP, (C) 2023-2026 by Folkert van Heusden <mail@vanheusden.com>"));
 	Serial.println(F("Compiled on " __DATE__ " " __TIME__));
 	Serial.print(F("GIT hash: "));
 	Serial.println(version_str);
@@ -571,6 +575,9 @@ void setup() {
 		Serial.print(qn::Ethernet.localIP());
 		Serial.println(F(")"));
 	}
+#elif defined(OLIMEX)
+  if (ETH.begin(ETH_PHY_LAN8720, 0, 23, 18, 12, ETH_CLOCK_GPIO17_OUT) == false)
+		Serial.println(F("Failed to init ETH"));
 #elif defined(WEMOS32)
 //
 #else
@@ -596,6 +603,8 @@ void setup() {
 	draw_status(11);
 #if defined(TEENSY4_1)
 	bs = new backend_sdcard_teensy41(led_green, led_yellow, disk_name);
+#elif defined(OLIMEX)
+	bs = new backend_sdcard(led_green, led_yellow, -1, -1, -1, -1, spi_speed, disk_name);
 #else
   Serial.printf("LEDgreen: %d, LEDyellow: %d, MISO: %d, MOSI: %d, SCLK: %d, CS: %d\r\n", led_green, led_yellow, pin_SD_MISO, pin_SD_MOSI, pin_SD_SCLK, pin_SD_CS);
 	bs = new backend_sdcard(led_green, led_yellow, pin_SD_MISO, pin_SD_MOSI, pin_SD_SCLK, pin_SD_CS, spi_speed, disk_name);
@@ -738,7 +747,11 @@ void loop()
 		}
 
 		draw_status(220);
-		s = new server(scsi_dev, &c, &is, "test", false);
+#if defined(ISCSI_CHAP_AUTH_USER)
+		s = new server(scsi_dev, &c, &is, "test", false, { ISCSI_CHAP_AUTH_USER, ISCSI_CHAP_AUTH_PASSWORD });
+#else
+		s = new server(scsi_dev, &c, &is, "test", false, { });
+#endif
 		Serial.printf("Free heap space: %u\r\n", get_free_heap_space());
 		Serial.println(F("Go!"));
 		draw_status(500);

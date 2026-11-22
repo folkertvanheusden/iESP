@@ -76,7 +76,7 @@ void WiFiEvent(WiFiEvent_t event)
 			msg += "WIFI_REASON_ASSOC_FAIL"; break;
 		case WIFI_REASON_HANDSHAKE_TIMEOUT:
 			msg += "WIFI_REASON_HANDSHAKE_TIMEOUT"; break;
-#if !defined(WEMOS32)
+#if !defined(WEMOS32) && !defined(OLIMEX)
 		case ARDUINO_EVENT_ETH_START:
 			msg += "ETH Started";
 			//set eth hostname here
@@ -137,9 +137,6 @@ bool setup_wifi()
 
 	draw_status(20);
 	enable_wifi_debug();
-
-	draw_status(21);
-	WiFi.onEvent(WiFiEvent);
 
 	connect_status_t cs = CS_IDLE;
 	draw_status(22);

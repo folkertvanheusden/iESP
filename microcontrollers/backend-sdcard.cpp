@@ -59,7 +59,7 @@ bool backend_sdcard::reinit(const bool close_first)
 		DOLOG(logging::ll_info, "backend_sdcard::reinit", "-", "SD-card re-init");
 	}
 
-#if defined(RP2040W)
+#if defined(RP2040W) || defined(OLIMEX)
 	SPI.begin();
 	bool ok = true;
 #else
