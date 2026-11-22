@@ -1,4 +1,4 @@
-// (C) 2022-2025 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2022-2026 by folkert van heusden <mail@vanheusden.com>, released under MIT license
 #include <cstdint>
 #include <stdexcept>
 #include <thread>
