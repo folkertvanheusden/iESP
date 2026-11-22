@@ -113,4 +113,4 @@ For test-blockdevice.py:
 license
 -------
 It is licensed under the MIT license.
-Written by Folkert van Heusden <mail@vanheusden.com> in 2023-2026.
+Written by Folkert van Heusden <folkert@vanheusden.com> in 2023-2026.

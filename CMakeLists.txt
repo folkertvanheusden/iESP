@@ -2,9 +2,9 @@ cmake_minimum_required(VERSION 3.9)
 project(iesp)
 
 add_compile_options(-Wall -pedantic -D_FILE_OFFSET_BITS=64)  # -D_GLIBCXX_DEBUG -Wextra -fanalyzer
-add_compile_options(-fsanitize=address,undefined)
+#add_compile_options(-fsanitize=address,undefined)
 #add_compile_options(--coverage -O0 -fno-inline)
-add_compile_options(-fno-inline)
+#add_compile_options(-fno-inline)
 
 SET(VERSION "2.3")
 
@@ -54,7 +54,7 @@ pkg_check_modules(LIBISCSI REQUIRED libiscsi)
 target_link_libraries(quick-test ${LIBISCSI_LIBRARIES})
 target_include_directories(quick-test PUBLIC ${LIBISCSI_INCLUDE_DIRS})
 target_compile_options(quick-test PUBLIC ${LIBISCSI_CFLAGS_OTHER})
-target_link_libraries(quick-test -fsanitize=address,undefined)
+#target_link_libraries(quick-test -fsanitize=address,undefined)
 
 endif ((NOT IS_WINDOWS) AND (NOT IS_MAC))
 
