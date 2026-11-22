@@ -40,9 +40,11 @@ void write_led(const int gpio, const int state) {
 void setup()
 {
 	Serial.begin(115200);
-	while(!Serial)
-		delay(100);
-	Serial.setDebugOutput(true);
+	// Wait briefly for a USB serial console, but don't block when running headless.
+	const unsigned long serial_wait_start = millis();
+	while(!Serial && millis() - serial_wait_start < 3000)
+		delay(10);
+	Serial.setDebugOutput(bool(Serial));
 
 	Serial.println(F("iESP (for RP2040W), (C) 2023-2024 by Folkert van Heusden <mail@vanheusden.com>"));
 	Serial.println(F("Compiled on " __DATE__ " " __TIME__));
@@ -68,8 +70,11 @@ void setup()
 	try {
 		c = new com_arduino(3260, idle_poll);
 		wifi_connected = c->begin();
-		if (wifi_connected == false)
-			Serial.println(F("Failed to initialize com-layer"));
+		if (wifi_connected == false) {
+			Serial.println(F("Failed to initialize com-layer: rebooting to retry"));
+			delay(1000);
+			rp2040.reboot();
+		}
 
 		init_my_getrandom();
 
