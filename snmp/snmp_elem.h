@@ -1,4 +1,4 @@
-// (C) 2020-2025 by folkert van heusden <mail@vanheusden.com>, released under MIT license
+// (C) 2020-2026 by folkert van heusden <mail@vanheusden.com>, released under MIT license
 #pragma once
 
 #include <cstdint>
