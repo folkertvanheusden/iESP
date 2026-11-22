@@ -93,9 +93,11 @@ std::tuple<iscsi_pdu_bhs *, iscsi_fail_reason, uint64_t> server::receive_pdu(com
 	cmd_use_count[opcode]++;
 #endif
 
-	if ((*ses)->get_handshake_state() == discovery &&
-		opcode != iscsi_pdu_bhs::iscsi_bhs_opcode::o_login_req && opcode != iscsi_pdu_bhs::iscsi_bhs_opcode::o_text_req) {
-		DOLOG(logging::ll_debug, "server::receive_pdu", cc->get_endpoint_name(), "invalid PDU in discovery mode (opcode: %02x)", opcode);
+	auto handshake_state { (*ses)->get_handshake_state() };
+	bool limited_pdus { opcode == iscsi_pdu_bhs::iscsi_bhs_opcode::o_login_req || opcode == iscsi_pdu_bhs::iscsi_bhs_opcode::o_text_req };
+	if (handshake_state != operational && limited_pdus == false)
+	{
+		DOLOG(logging::ll_debug, "server::receive_pdu", cc->get_endpoint_name(), "invalid PDU when not in operational mode (opcode: %02x)", opcode);
 		return { nullptr, IFR_MISC, 0 };
 	}
 
@@ -228,7 +230,11 @@ std::tuple<iscsi_pdu_bhs *, iscsi_fail_reason, uint64_t> server::receive_pdu(com
 				DOLOG(logging::ll_info, "server::receive_pdu", cc->get_endpoint_name(), "data receive error");
 			}
 			else {
-				pdu_obj->set_data({ data_temp, data_length });
+				if (pdu_obj->set_data({ data_temp, data_length }) == false) {
+					ok = false;
+					DOLOG(logging::ll_info, "server::receive_pdu", cc->get_endpoint_name(), "set_data returned error");
+					pdu_error = IFR_MISC;
+				}
 			}
 			std::pair<uint32_t, uint32_t> incoming_crc32c { };
 			if (digest_chk)
