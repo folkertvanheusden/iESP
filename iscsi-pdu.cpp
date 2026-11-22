@@ -396,6 +396,8 @@ iscsi_pdu_login_reply::~iscsi_pdu_login_reply()
 
 bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 {
+	int NSG = 0;
+
 	if (ses->get_handshake_state() == discovery) {
 		DOLOG(logging::ll_debug, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "discovery mode, CSG %d, NSG %d", reply_to.get_CSG(), reply_to.get_NSG());
 
@@ -414,6 +416,8 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 	else {
 		DOLOG(logging::ll_debug, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "login mode, CSG %d, NSG %d", reply_to.get_CSG(), reply_to.get_NSG());
 
+		NSG = 0;
+
 		bool add_headers { false };
 		std::vector<std::string> kvs;
 		if (with_chap.has_value()) {
@@ -431,10 +435,15 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 				ses->set_handshake_state(verify_password);
 			}
 			else if (handshake_state == auth_success) {
-				add_headers = true;
+				NSG = 1;
+				ses->set_handshake_state(operational);
 			}
 			else if (handshake_state == auth_failed) {
 				return false;
+			}
+			else if (handshake_state == operational) {
+				add_headers = true;
+				NSG = 3;
 			}
 			else {
 				DOLOG(logging::ll_error, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "Unexpected state %d", handshake_state);
@@ -468,11 +477,11 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 	set_bits(&login_reply->b1, 6, 1, false);  // filler 0
 	set_bits(&login_reply->b1, 0, 6, o_login_resp);  // opcode
 
-	bool sg_flag = with_chap.has_value() == false || ses->get_handshake_state() == auth_success || ses->get_handshake_state() == discovery;
+	bool sg_flag = with_chap.has_value() == false || ses->get_handshake_state() == operational || ses->get_handshake_state() == discovery;
 	set_bits(&login_reply->b2, 7, 1, sg_flag);  // T
 	set_bits(&login_reply->b2, 6, 1, false);  // C
 	set_bits(&login_reply->b2, 2, 2, sg_flag ? reply_to.get_CSG() : 0);  // CSG
-	set_bits(&login_reply->b2, 0, 2, sg_flag ? reply_to.get_NSG() : 0);  // NSG
+	set_bits(&login_reply->b2, 0, 2, NSG);  // NSG
 
 	login_reply->versionmax = reply_to.get_versionmin();
 	login_reply->versionact = reply_to.get_versionmin();

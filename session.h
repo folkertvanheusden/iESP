@@ -10,7 +10,7 @@
 
 class iscsi_pdu_scsi_cmd;
 
-typedef enum { discovery, select_auth_type, reply_with_chap_r, verify_password, auth_success, auth_failed } handshake_state_t;
+typedef enum { discovery, select_auth_type, reply_with_chap_r, verify_password, auth_success, auth_failed, operational } handshake_state_t;
 
 class session
 {
