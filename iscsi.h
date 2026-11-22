@@ -10,7 +10,7 @@
 #if defined(ARDUINO)
 #define MAX_DATA_SEGMENT_SIZE 8192  // 8 kB, less fails with at least the libiscsi test-set
 #else
-#define MAX_DATA_SEGMENT_SIZE (256 * 1024 * 1024)  // 256 MB
+#define MAX_DATA_SEGMENT_SIZE (16 * 1024 * 1024)  // 16 MB
 #endif
 
 enum residual { iSR_OVERFLOW, iSR_UNDERFLOW, iSR_OK };  // iSR: iS(CSI) Residual
