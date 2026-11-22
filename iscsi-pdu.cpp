@@ -451,9 +451,15 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 			}
 		}
 		else {
-			kvs.push_back("AuthMethod=none");
-			ses->set_handshake_state(auth_success);  // finished handshake
-			add_headers = true;
+			if (ses->get_handshake_state() == select_auth_type) {
+				ses->set_handshake_state(operational);  // finished handshake
+				kvs.push_back("AuthMethod=none");
+				NSG = 1;
+			}
+			else {
+				add_headers = true;
+				NSG = 3;
+			}
 		}
 		if (add_headers) {
 			kvs.push_back(ses->get_header_digest() ? "HeaderDigest=CRC32C" : "HeaderDigest=None");
