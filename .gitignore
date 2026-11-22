@@ -6,3 +6,5 @@ microcontrollers/version.cpp
 microcontrollers/RP2040W/.pio/
 microcontrollers/RP2040W/version.cpp
 test.dat
+microcontrollers/RP2040W/key-data.h
+microcontrollers/RP2040W/key.bin

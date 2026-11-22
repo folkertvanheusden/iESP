@@ -1,0 +1,7 @@
+// Contents of the read-only LUN for the virtual flash backend (-DIESP_BACKEND_VIRTUAL_FLASH).
+// Copy to key-data.h (git-ignored) and replace with your own data, e.g.:
+//   head -c 512 /dev/urandom > key.bin
+//   xxd -i -n disk_img key.bin > key-data.h
+// The length must be a non-zero multiple of 512 bytes.
+unsigned char disk_img[512] = { 0 };
+unsigned int disk_img_len = 512;

@@ -8,17 +8,29 @@
 #include <WiFi.h>
 #include <hardware/watchdog.h>
 
+// Build options (set in platformio.ini build_flags):
+//   -DIESP_BACKEND_VIRTUAL_FLASH   serve a read-only LUN compiled into the firmware (key-data.h)
+//                                  instead of an image file on the SD card
+//   -DIESP_TARGET_NAME=\"name\"      iSCSI target name (default "test")
+#if defined(IESP_BACKEND_VIRTUAL_FLASH)
+#include "backend-virtual-flash.h"
+#else
 #include "backend-sdcard-rp2040w.h"
+#endif
 #include "com-arduino.h"
 #include "random.h"
 #include "server.h"
 #include "version.h"
 #include "wifi.h"
 
+#if !defined(IESP_TARGET_NAME)
+#define IESP_TARGET_NAME "test"
+#endif
+
 
 std::atomic_bool        stop { false   };
 com                    *c    { nullptr };
-backend_sdcard_rp2040w *bs   { nullptr };
+backend                *bs   { nullptr };
 scsi                   *sd   { nullptr };
 server                 *s    { nullptr };
 iscsi_stats_t           is;
@@ -78,15 +90,21 @@ void setup()
 
 		init_my_getrandom();
 
+#if defined(IESP_BACKEND_VIRTUAL_FLASH)
+		Serial.println(F("Init virtual flash (read-only)"));
+		bs = new backend_virtual_flash(led_green);
+#else
 		Serial.println(F("Init SD card"));
 		bs = new backend_sdcard_rp2040w(led_green, led_yellow, FILENAME);
+#endif
 		bs->begin();
 
 		Serial.println(F("Create SCSI instance"));
 		sd = new scsi(bs, 1);
 
-		Serial.println(F("Instantiate iSCSI server"));
-		s = new server(sd, c, &is, "test", false);
+		Serial.print(F("Instantiate iSCSI server, target name: "));
+		Serial.println(F(IESP_TARGET_NAME));
+		s = new server(sd, c, &is, IESP_TARGET_NAME, false);
 
 		Serial.print(F("Free memory after full init: "));
 		Serial.println(rp2040.getFreeHeap());

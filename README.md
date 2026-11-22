@@ -29,6 +29,7 @@ For the Raspberry Pi Pico (RP2040W):
 * * Manually copy the .pio/build/BUILD_FOR_RP2040W/firmware.uf2 file onto the Pico
 * * Optionally connect a green LED to GPIO 17 and a yellow LED to GPIO 18
 * * Connect the following pins of your SD card reader to: MISO to GPIO 8, MOSI to GPIO 11, SCK to GPIO 10 and SS/CS to GPIO 12
+* * Without an SD card: `pio run -e BUILD_FOR_RP2040W_VFLASH` serves a small read-only LUN compiled into the firmware (e.g. a network key device for LUKS). Put the data in `key-data.h` (see `key-data.h.example`; length a multiple of 512 bytes). The target name is set with `-DIESP_TARGET_NAME=\"name\"` (default "test")
 
 For Linux/FreeBSD/Apple:
 * mkdir build
