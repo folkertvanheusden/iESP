@@ -42,10 +42,10 @@ extern NTP ntp;
 #endif
 
 constexpr int err_log_buf_len = 256;
-#if defined(RP2040W) || defined(TEENSY4_1)
-char err_log_buf[err_log_buf_len];
-#else
+#if defined(__FreeBSD__) || defined(__MINGW32__) || defined(linux) || defined(__APPLE__)
 thread_local char err_log_buf[err_log_buf_len];
+#else
+char err_log_buf[err_log_buf_len];
 #endif
 
 // TODO: into headerfile
@@ -80,7 +80,7 @@ namespace logging {
 #if defined(ARDUINO)
 void initlogger()
 {
-#if defined(ESP32)
+#if defined(ESP32) || defined(TEENSY4_1)
 	if (UDP_socket.begin(514) == 0)
 		Serial.println(F("UDP_socket.begin(514) failed"));
 #endif
@@ -110,6 +110,7 @@ namespace logging {
 		va_start(ap, fmt);
 		(void)vsnprintf(&err_log_buf[offset], sizeof(err_log_buf) - offset, fmt, ap);
 		va_end(ap);
+		Serial.println(err_log_buf);
 
 		if (ll >= ll_warning)
 			write_led(led_red, HIGH);

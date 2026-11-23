@@ -16,6 +16,9 @@
 #endif
 #if defined(WEMOS32)
 //
+#elif defined(WAVESHARE_ESP32_ETH)
+#include <SPI.h>
+#include <ETH.h>
 #elif defined(WEMOS32_ETH)
 #include <ESP32-ENC28J60.h>
 #elif !defined(TEENSY4_1)
@@ -97,6 +100,13 @@ int pin_SD_MOSI= -1;
 int pin_SD_SCLK= -1;
 int pin_SD_CS  = -1;
 std::optional<int> spi_speed { 14 };
+#elif defined(WAVESHARE_ESP32_ETH)
+SPIClass hspi(HSPI);
+int pin_SD_MISO= 5;
+int pin_SD_MOSI= 6;
+int pin_SD_SCLK= 7;
+int pin_SD_CS  = 4;
+std::optional<int> spi_speed { 14 };
 #else
 int pin_SD_MISO= 19;
 int pin_SD_MOSI= 23;
@@ -147,8 +157,9 @@ void draw_status(const uint32_t v) {
   CrashReport.breadcrumb(5, v);
 #endif
 
-#if defined(WT_ETH01)
-  Serial.printf("draw_status: %04x\r\n", v);
+#if defined(WT_ETH01) || defined(WAVESHARE_ESP32_ETH)
+  Serial.printf(" SYSTEM STATE: 0x%04x\r\n", v);
+  Serial.flush();
 #else
 	if (TM) {
 		draw_status_ts = millis();
@@ -167,7 +178,7 @@ int get_diskspace(void *const context)
 }
 
 void write_led(const int gpio, const int state) {
-#if 0
+#if 1
   const char *which = "?";
   if (gpio == led_green)
     which = "green";
@@ -182,6 +193,7 @@ void write_led(const int gpio, const int state) {
 }
 
 void fail_flash() {
+  Serial.flush();
 	DOLOG(logging::ll_error, "fail_flash", "-", "System cannot continue");
 
 	write_led(led_green,  LOW);
@@ -283,7 +295,7 @@ bool load_configuration() {
 
 	data_file.close();
 
-#if !defined(TEENSY4_1) && !defined(OLIMEX)
+#if !defined(TEENSY4_1) && !defined(OLIMEX) && !defined(WAVESHARE_ESP32_ETH) && !defined(WT_ETH01) && !defined(WEMOS32_ETH)
 	auto n = wifi_targets.size();
 	Serial.printf("Loaded configuration parameters for %zu WiFi access points\r\n", n);
 	if (n == 0) {
@@ -454,11 +466,12 @@ const char *reset_name(const esp_reset_reason_t rr)
 
 void setup() {
 	Serial.begin(115200);
+  auto end = millis() + 2500;
 #if defined(TEENSY4_1)
-	while(!Serial) {
+	while(!Serial && end > millis()) {
   }
 #else
-	while(!Serial)
+	while(!Serial && end > millis())
 		yield();
 	Serial.setDebugOutput(true);
 #endif
@@ -470,7 +483,7 @@ void setup() {
 	}
 #endif
 
-#if !defined(TEENSY4_1) && !defined(WT_ETH01) && !defined(OLIMEX)
+#if !defined(TEENSY4_1) && !defined(WT_ETH01) && !defined(OLIMEX) && !defined(WAVESHARE_ESP32_ETH)
 	TM = new TM1637();
 	TM->begin(21, 22, 4);  // TEENSY4.1: pins
 	TM->setBrightness(1);
@@ -490,12 +503,22 @@ void setup() {
 
 	draw_status(2);
 
-	Serial.println(F("iESP, (C) 2023-2026 by Folkert van Heusden <mail@vanheusden.com>"));
+	Serial.println(F("iESP, (C) 2023-2026 by Folkert van Heusden <folkert@vanheusden.com>"));
 	Serial.println(F("Compiled on " __DATE__ " " __TIME__));
 	Serial.print(F("GIT hash: "));
 	Serial.println(version_str);
 	Serial.print(F("System name: "));
 	Serial.println(name);
+
+#if !defined(TEENSY4_1)
+	auto reset_reason = esp_reset_reason();
+	if (reset_reason != ESP_RST_POWERON)
+		DOLOG(logging::ll_error, "setup", "-", "Reset reason: %s (%d), software version %s, name: %s", reset_name(reset_reason), reset_reason, version_str, name);
+	else
+		DOLOG(logging::ll_info, "setup", "-", "System (re-)started, software version %s, name: %s", version_str, name);
+#else
+		DOLOG(logging::ll_info, "setup", "-", "System started, software version %s, name: %s", version_str, name);
+#endif
 
 	draw_status(3);
 
@@ -517,11 +540,13 @@ void setup() {
 #endif
 	{
 		Serial.println(F("LittleFS.begin() failed"));
-		draw_status(5);
 	}
 
+	draw_status(5);
+  Serial.println(psramInit());
+
 	draw_status(6);
-	
+
 	if (load_configuration() == false) {
 		Serial.println(F("Failed to load configuration, using defaults!"));
 #if 0
@@ -535,10 +560,15 @@ void setup() {
 //		fail_flash();
 	}
 
+	draw_status(8);
+
 #if defined(TEENSY4_1)
 	qn::Ethernet.setHostname(name);
 #else
-	wifi_connected = setup_wifi();
+  if (wifi_targets.empty() == false)
+    wifi_connected = setup_wifi();
+  else
+    WiFi.onEvent(WiFiEventHandler);
 	set_hostname(name);
 #endif
 #if defined(WEMOS32_ETH)
@@ -560,6 +590,24 @@ void setup() {
 		Serial.println(F("ENC28J60 failed"));
 		fail_flash();
 	}
+
+#elif defined(WAVESHARE_ESP32_ETH)
+#ifdef ETH_POWER_PIN
+  pinMode(ETH_POWER_PIN, OUTPUT);
+  digitalWrite(ETH_POWER_PIN, HIGH);
+#endif
+
+#define ETH_PHY_TYPE ETH_PHY_W5500
+#define ETH_PHY_ADDR 1
+#define ETH_PHY_CS   14
+#define ETH_PHY_IRQ  10
+#define ETH_PHY_RST  9
+#define ETH_SPI_SCK  13
+#define ETH_SPI_MISO 12
+#define ETH_SPI_MOSI 11
+  hspi.begin(ETH_SPI_SCK, ETH_SPI_MISO, ETH_SPI_MOSI, ETH_PHY_CS);
+  if (ETH.begin(ETH_PHY_TYPE, ETH_PHY_ADDR, ETH_PHY_CS, ETH_PHY_IRQ, ETH_PHY_RST, hspi) == false)
+    Serial.print(F("Failed to initialize Ethernet"));
 
 #elif defined(TEENSY4_1)
 	if (qn::Ethernet.begin(mac) == 0) {
@@ -589,7 +637,7 @@ void setup() {
 #endif
 	initlogger();
 
-	draw_status(8);
+	draw_status(9);
 	ntp.begin();
 
 #if defined(ESP32)
@@ -627,17 +675,6 @@ void setup() {
 
 	draw_status(16);
 	scsi_dev = new scsi(bs, trim_level);
-
-#if !defined(TEENSY4_1)
-	draw_status(20);
-	auto reset_reason = esp_reset_reason();
-	if (reset_reason != ESP_RST_POWERON)
-		DOLOG(logging::ll_error, "setup", "-", "Reset reason: %s (%d), software version %s, name: %s", reset_name(reset_reason), reset_reason, version_str, name);
-	else
-		DOLOG(logging::ll_info, "setup", "-", "System (re-)started, software version %s, name: %s", version_str, name);
-#else
-		DOLOG(logging::ll_info, "setup", "-", "System started, software version %s, name: %s", version_str, name);
-#endif
 
 	draw_status(28);
 #if defined(TEENSY4_1)
@@ -681,14 +718,15 @@ void setup() {
 		Serial.println(F("Clock frequency set"));
 	else
 		Serial.println(F("Clock frequency NOT set"));
+  Serial.flush();
 
 	draw_status(50);
 
 	xTaskCreate(loopw, /* Function to implement the task */
 			"loop2", /* Name of the task */
-			10000,  /* Stack size in words */
+			16384,  /* Stack size in words */
 			nullptr,  /* Task input parameter */
-			127,  /* Priority of the task */
+			1,  /* Priority of the task */
 			&task2  /* Task handle. */
 		   );
 #endif

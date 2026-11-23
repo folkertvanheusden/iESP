@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <esp_wifi.h>
 #include <string>
-#if defined(WT_ETH01)
+#if defined(WT_ETH01) || defined(WAVESHARE_ESP32_ETH)
 #include <ETH.h>
 #elif defined(WEMOS32_ETH)
 #include <ESP32-ENC28J60.h>
@@ -13,23 +13,13 @@
 #include "wifi.h"
 
 
-void WiFiEvent(WiFiEvent_t event)
+void WiFiEventHandler(WiFiEvent_t event)
 {
 	write_led(led_red, HIGH);
 
 	std::string msg = "WiFi event: ";
 
 	switch(event) {
-		case WIFI_REASON_UNSPECIFIED:
-			msg += "WIFI_REASON_UNSPECIFIED"; break;
-		case WIFI_REASON_AUTH_EXPIRE:
-			msg += "WIFI_REASON_AUTH_EXPIRE"; break;
-		case WIFI_REASON_AUTH_LEAVE:
-			msg += "WIFI_REASON_AUTH_LEAVE"; break;
-		case WIFI_REASON_ASSOC_EXPIRE:
-			msg += "WIFI_REASON_ASSOC_EXPIRE"; break;
-		case WIFI_REASON_ASSOC_TOOMANY:
-			msg += "WIFI_REASON_ASSOC_TOOMANY"; break;
 		case WIFI_REASON_NOT_AUTHED:
 			msg += "WIFI_REASON_NOT_AUTHED"; break;
 		case WIFI_REASON_NOT_ASSOCED:
@@ -133,7 +123,7 @@ bool setup_wifi()
 	write_led(led_green,  HIGH);
 	write_led(led_yellow, HIGH);
 
-	WiFi.onEvent(WiFiEvent);
+	WiFi.onEvent(WiFiEventHandler);
 
 	draw_status(20);
 	enable_wifi_debug();
