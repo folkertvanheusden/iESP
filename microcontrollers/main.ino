@@ -178,7 +178,7 @@ int get_diskspace(void *const context)
 }
 
 void write_led(const int gpio, const int state) {
-#if 1
+#if 0
   const char *which = "?";
   if (gpio == led_green)
     which = "green";
@@ -726,7 +726,7 @@ void setup() {
 			"loop2", /* Name of the task */
 			16384,  /* Stack size in words */
 			nullptr,  /* Task input parameter */
-			1,  /* Priority of the task */
+			configMAX_PRIORITIES - 2,  /* Priority of the task */
 			&task2  /* Task handle. */
 		   );
 #endif
