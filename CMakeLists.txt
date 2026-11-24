@@ -16,6 +16,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 add_executable(
 	iesp
 	backend.cpp
+	backend-cache.cpp
 	backend-file.cpp
 	backend-nbd.cpp
 	com.cpp

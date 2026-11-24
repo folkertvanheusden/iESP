@@ -42,6 +42,7 @@
 #include <TM1637.h>
 #endif
 
+#include "backend-cache.h"
 #if defined(TEENSY4_1)
 #include "backend-sdcard-teensy41.h"
 #include "com-arduino.h"
@@ -354,6 +355,12 @@ void heap_caps_alloc_failed_hook(size_t requested_size, uint32_t caps, const cha
 	write_led(led_red, HIGH);
 	DOLOG(logging::ll_error, "heap_caps_alloc_failed_hook", "-", "%s was called but failed to allocate %zu bytes with 0x%x capabilities (by %p)", function_name, requested_size, caps, __builtin_return_address(0));
 
+  static bool first = true;
+  if (first) {
+    first = false;
+    heap_caps_dump(MALLOC_CAP_8BIT);
+  }
+
 	esp_backtrace_print(25);
 	write_led(led_red, LOW);
 }
@@ -649,14 +656,34 @@ void setup() {
 #endif
 
 	draw_status(11);
+  backend *btemp { };
 #if defined(TEENSY4_1)
-	bs = new backend_sdcard_teensy41(led_green, led_yellow, disk_name);
+	btemp = new backend_sdcard_teensy41(led_green, led_yellow, disk_name);
 #elif defined(OLIMEX)
-	bs = new backend_sdcard(led_green, led_yellow, -1, -1, -1, -1, spi_speed, disk_name);
+	btemp = new backend_sdcard(led_green, led_yellow, -1, -1, -1, -1, spi_speed, disk_name);
 #else
   Serial.printf("LEDgreen: %d, LEDyellow: %d, MISO: %d, MOSI: %d, SCLK: %d, CS: %d\r\n", led_green, led_yellow, pin_SD_MISO, pin_SD_MOSI, pin_SD_SCLK, pin_SD_CS);
-	bs = new backend_sdcard(led_green, led_yellow, pin_SD_MISO, pin_SD_MOSI, pin_SD_SCLK, pin_SD_CS, spi_speed, disk_name);
+	btemp = new backend_sdcard(led_green, led_yellow, pin_SD_MISO, pin_SD_MOSI, pin_SD_SCLK, pin_SD_CS, spi_speed, disk_name);
 #endif
+
+#if defined(NOCACHE)
+  size_t free_cache_store = 0;
+#elif defined(ESP32)
+  size_t free_cache_store = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+#else
+  size_t free_cache_store = get_free_heap_space();
+#endif
+  constexpr const size_t min_free = 512 * 1024;  // 0.5 MB
+  // leave some room for std::list and std::unordered_map overhead
+  free_cache_store = (free_cache_store * 2) / 3;
+  if (free_cache_store > min_free + btemp->get_block_size() * 2) {
+    size_t cache_size = free_cache_store - min_free;
+    bs = new backend_cache(btemp, cache_size);
+    Serial.printf("Using disk-cache of %u kB\r\n", int(cache_size / 1024));
+  }
+  else {
+    bs = btemp;
+  }
 
 #if !defined(TEENSY4_1)
 	draw_status(12);
