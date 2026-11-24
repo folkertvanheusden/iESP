@@ -11,6 +11,7 @@
 #include <ws2tcpip.h>
 #endif
 
+#include "backend-cache.h"
 #include "backend-file.h"
 #include "backend-nbd.h"
 #include "com-sockets.h"
@@ -96,6 +97,7 @@ void help()
 	printf("-L x,y  set file log level (x) and screen log level (y)\n");
 	printf("-l x    set log file\n");
 	printf("-D      disable digest\n");
+	printf("-C x    use cache of x MB\n");
 	printf("-S x    enable SNMP agent on port x, usually 161\n");
 	printf("-U x    set username, retrieve password via environment variable PASSWORD (for CHAP authentication)\n");
 	printf("-P x    write PID-file\n");
@@ -134,15 +136,18 @@ int main(int argc, char *argv[])
 	bool           use_snmp   = false;
 	int            snmp_port  = 161;
 	bool           digest_chk = true;
+	size_t         cache_size = 0;
 	backend_type_t bt         = backend_type_t::BT_FILE;
 	const char    *logfile    = "/tmp/iesp.log";
 	logging::log_level_t ll_screen = logging::ll_error;
 	logging::log_level_t ll_file   = logging::ll_error;
 	std::optional<std::pair<std::string, std::string> > auth;
 	int o = -1;
-	while((o = getopt(argc, argv, "P:fS:Db:d:i:p:T:t:L:l:U:h")) != -1) {
+	while((o = getopt(argc, argv, "P:fS:Db:d:i:p:T:t:L:l:U:C:h")) != -1) {
 		if (o == 'P')
 			pid_file = optarg;  // used for scripting
+		else if (o == 'C')
+			cache_size = atoi(optarg) * 1024 * 1024;
 		else if (o == 'f')
 			do_daemon = true;
 		else if (o == 'S') {
@@ -208,10 +213,10 @@ int main(int argc, char *argv[])
 
 	iscsi_stats_t is { };
 
-	backend *b = nullptr;
+	backend *bp = nullptr;
 
 	if (bt == backend_type_t::BT_FILE)
-		b = new backend_file(dev);
+		bp = new backend_file(dev);
 	else if (bt == backend_type_t::BT_NBD) {
 		std::string::size_type colon = dev.find(":");
 		if (colon == std::string::npos) {
@@ -219,8 +224,13 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 
-		b = new backend_nbd(dev.substr(0, colon), std::stoi(dev.substr(colon + 1)));
+		bp = new backend_nbd(dev.substr(0, colon), std::stoi(dev.substr(colon + 1)));
 	}
+
+	if (cache_size == 0)
+		cache_size = bp->get_block_size() * 2;
+
+	backend *b = new backend_cache(bp, cache_size);
 
 	if (b == nullptr || b->begin() == false) {
 		fprintf(stderr, "Failed to initialize storage backend\n");
@@ -276,6 +286,7 @@ int main(int argc, char *argv[])
 	delete mth;
 
 	delete b;
+	delete bp;
 
 	if (pid_file.empty() == false) {
 		if (unlink(pid_file.c_str()) == -1)
