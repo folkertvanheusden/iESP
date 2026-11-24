@@ -21,6 +21,7 @@ For the ESP32/Teensy4.1:
 * pio run -t upload -e ESP32-wemos     # Wemos32    (WiFi)
 * pio run -t upload -e ESP32-WT-ETH01  # WT32-ETH01 (Ethernet)
 * pio run -t upload -e Teensy4_1       # Teensy4.1  (Ethernet)
+You can also disable the cache (add -DNOCACHE to build_flags in platformio.ini).
 
 For the Raspberry Pi Pico (RP2040W):
 * cd microcontrollers/RP2040
