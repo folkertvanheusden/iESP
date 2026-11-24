@@ -20,7 +20,7 @@ public:
 	{
 		store.clear();
 		for(auto & item: lru_list)
-			delete item.second;
+			delete [] item.second;
 		lru_list.clear();
 	}
 
