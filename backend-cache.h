@@ -12,6 +12,8 @@ private:
 	std::mutex        cache_lock;
 	cache            *c           {};
 
+	void invalidate_range(const uint64_t block_nr, const uint32_t n_blocks);
+
 public:
 	backend_cache(backend *const parent, const size_t max_n_bytes);
 	virtual ~backend_cache();

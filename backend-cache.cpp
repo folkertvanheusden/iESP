@@ -46,6 +46,12 @@ bool backend_cache::sync()
 	return parent->sync();
 }
 
+void backend_cache::invalidate_range(const uint64_t block_nr, const uint32_t n_blocks)
+{
+	for(uint32_t i=0; i<n_blocks; i++)
+		c->invalidate(block_nr + i);
+}
+
 bool backend_cache::write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data)
 {
 	std::unique_lock<std::mutex> lck(cache_lock);
@@ -56,6 +62,7 @@ bool backend_cache::write(const uint64_t block_nr, const uint32_t n_blocks, cons
 			c->put(block_nr + i, duplicate_new(&data[i * block_size], block_size));
 		return true;
 	}
+	invalidate_range(block_nr, n_blocks);
 	return false;
 }
 
@@ -67,6 +74,7 @@ bool backend_cache::trim(const uint64_t block_nr, const uint32_t n_blocks)
 			c->invalidate(block_nr + i);
 		return true;
 	}
+	invalidate_range(block_nr, n_blocks);
 	return false;
 }
 
@@ -98,6 +106,7 @@ backend::cmpwrite_result_t backend_cache::cmpwrite(const uint64_t block_nr, cons
                         c->put(block_nr + i, duplicate_new(&data_write[i * block_size], block_size));
 		return cmpwrite_result_t::CWR_OK;
 	}
+	invalidate_range(block_nr, n_blocks);
 	return rc;
 }
 
