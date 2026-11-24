@@ -48,6 +48,7 @@ bool backend_cache::sync()
 
 bool backend_cache::write(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data)
 {
+	std::unique_lock<std::mutex> lck(cache_lock);
 	auto block_size = get_block_size();
 	auto rc         = parent->write(block_nr, n_blocks, data);
 	if (rc == true) {
@@ -60,6 +61,7 @@ bool backend_cache::write(const uint64_t block_nr, const uint32_t n_blocks, cons
 
 bool backend_cache::trim(const uint64_t block_nr, const uint32_t n_blocks)
 {
+	std::unique_lock<std::mutex> lck(cache_lock);
 	if (parent->trim(block_nr, n_blocks)) {
 		for(uint32_t i=0; i<n_blocks; i++)
 			c->invalidate(block_nr + i);
@@ -70,6 +72,7 @@ bool backend_cache::trim(const uint64_t block_nr, const uint32_t n_blocks)
 
 bool backend_cache::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_t *const data)
 {
+	std::unique_lock<std::mutex> lck(cache_lock);
 	auto block_size = get_block_size();
 	for(uint32_t i=0; i<n_blocks; i++) {
 		auto *p = c->get(block_nr + i);
@@ -87,6 +90,7 @@ bool backend_cache::read(const uint64_t block_nr, const uint32_t n_blocks, uint8
 
 backend::cmpwrite_result_t backend_cache::cmpwrite(const uint64_t block_nr, const uint32_t n_blocks, const uint8_t *const data_write, const uint8_t *const data_compare)
 {
+	std::unique_lock<std::mutex> lck(cache_lock);
 	auto block_size = get_block_size();
 	auto rc         = parent->cmpwrite(block_nr, n_blocks, data_write, data_compare);
 	if (rc == cmpwrite_result_t::CWR_OK) {
