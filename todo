@@ -1,3 +1,6 @@
+- iowait tijd fixen
+- cache fill rate in output
+
 - rp2040 635e158a10fee84121db30e0e13fa4834586735a mergen naar gewone microcontrolles
 
 - https://mastodon.social/@PaulStoffregen/116362826859657477  (multiple sd kaartjes op 1 teensy 4.1)

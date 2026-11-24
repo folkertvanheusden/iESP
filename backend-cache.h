@@ -1,3 +1,4 @@
+#include <mutex>
 #include <string>
 
 #include "backend.h"
@@ -12,7 +13,8 @@ private:
 	std::mutex        cache_lock;
 	cache            *c           {};
 
-	void invalidate_range(const uint64_t block_nr, const uint32_t n_blocks);
+	void     invalidate_range(const uint64_t block_nr, const uint32_t n_blocks);
+	uint8_t *duplicate_block (const uint8_t *const p, const size_t s);
 
 public:
 	backend_cache(backend *const parent, const size_t max_n_bytes);

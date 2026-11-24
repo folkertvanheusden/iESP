@@ -20,7 +20,7 @@ public:
 	{
 		store.clear();
 		for(auto & item: lru_list)
-			delete [] item.second;
+			free(const_cast<uint8_t *>(item.second));
 		lru_list.clear();
 	}
 
@@ -29,7 +29,7 @@ public:
 		auto it = store.find(block_nr);
 		if (it == store.end())
 			return;
-		delete [] it->second->second;
+		free(const_cast<uint8_t *>(it->second->second));
 		lru_list.erase(it->second);
 		store.erase(it);
 	}
@@ -47,7 +47,7 @@ public:
 	{
 		auto it = store.find(block_nr);
 		if (it != store.end()) {
-			delete [] it->second->second;
+			free(const_cast<uint8_t *>(it->second->second));
 			it->second->second = data;
 			lru_list.splice(lru_list.begin(), lru_list, it->second);
 			return;
@@ -57,7 +57,7 @@ public:
 		store[block_nr] = lru_list.begin();
 		if (store.size() > capacity) {
 			store.erase(lru_list.back().first);
-			delete [] lru_list.back().second;
+			free(const_cast<uint8_t *>(lru_list.back().second));
 			lru_list.pop_back();
 		}
 	}
