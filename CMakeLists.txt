@@ -6,7 +6,7 @@ add_compile_options(-Wall -pedantic -D_FILE_OFFSET_BITS=64)  # -D_GLIBCXX_DEBUG 
 #add_compile_options(--coverage -O0 -fno-inline)
 #add_compile_options(-fno-inline)
 
-SET(IESP_VERSION "2.4")
+SET(IESP_VERSION "3.0")
 
 add_definitions(-DIESP_VERSION=\"${IESP_VERSION}\")
 

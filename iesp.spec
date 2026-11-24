@@ -1,5 +1,5 @@
 Name:       iesp
-Version:    2.3
+Version:    3.0
 Release:    0
 Summary:    An iSCSI target server application.
 License:    MIT
@@ -23,5 +23,5 @@ An iSCSI target server application.
 /usr/bin/iesp
 
 %changelog
-* Wed May 28 2025 Folkert van Heusden <mail@vanheusden.com>
+* Tue Nov 24 2026 Folkert van Heusden <folkert@vanheusden.com>
 -
