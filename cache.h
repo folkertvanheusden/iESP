@@ -1,14 +1,84 @@
-#include <cstdint>
 #include <list>
 #include <unordered_map>
 
+
+#if defined(ESP32)
+template <typename T>
+struct PSRAMListAllocator {
+	using value_type = T;
+
+	PSRAMListAllocator() = default;
+
+	template <typename U>
+	PSRAMListAllocator(const PSRAMListAllocator<U>&) {
+	}
+
+	T* allocate(std::size_t n) {
+		auto *temp = heap_caps_malloc(n * sizeof(T), MALLOC_CAP_SPIRAM);
+		return static_cast<T*>(temp);
+	}
+
+	void deallocate(T* p, std::size_t) {
+		free(p);
+	}
+
+	bool operator==(const PSRAMListAllocator&) const noexcept {
+		return true;
+	}
+
+	bool operator!=(const PSRAMListAllocator&) const noexcept {
+		return false;
+	}
+};
+
+template<typename T>
+class PSRAMUnorderedMapAllocator {
+    public:
+        using value_type = T;
+
+        PSRAMUnorderedMapAllocator() noexcept = default;
+    
+        template<typename U>
+        PSRAMUnorderedMapAllocator(const PSRAMUnorderedMapAllocator<U>& other) noexcept {
+	}
+
+	T* allocate(size_t size) {
+		auto *temp = heap_caps_malloc(size * sizeof(T), MALLOC_CAP_SPIRAM);
+		return static_cast<T*>(temp);
+	}
+
+	void deallocate(T* ptr, size_t size) noexcept {
+		free(ptr);
+	}   
+
+        template<typename U>
+        bool operator ==(const PSRAMUnorderedMapAllocator<U>& other) const noexcept {
+            return true;
+        }
+
+        template<typename U>
+        bool operator !=(const PSRAMUnorderedMapAllocator<U>& other) const noexcept {
+            return !(*this == other);
+        }
+};
+#endif
 
 class cache  // LRU
 {
 	const size_t capacity { };
 	using cache_kv = std::pair<uint64_t, const uint8_t *>;
+#if defined(ESP32)
+	std::list<cache_kv, PSRAMListAllocator<cache_kv> > lru_list;
+	using cache_map_value = std::pair<const uint64_t, std::list<cache_kv>::iterator>;
+	std::unordered_map<uint64_t, std::list<cache_kv>::iterator,
+			std::hash<uint64_t>,
+			std::equal_to<uint64_t>,
+			PSRAMUnorderedMapAllocator<cache_map_value>
+		> store;
+#else
 	std::list<cache_kv> lru_list;
 	std::unordered_map<uint64_t, std::list<cache_kv>::iterator> store;
+#endif
 
 public:
 	cache(const size_t capacity) :
