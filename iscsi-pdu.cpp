@@ -404,6 +404,14 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 		const std::vector<std::string> kvs {
 			"TargetPortalGroupTag=1",
 			"ErrorRecoveryLevel=0",
+			ses->get_header_digest() ? "HeaderDigest=CRC32C" : "HeaderDigest=None",
+			ses->get_data_digest  () ? "DataDigest=CRC32C"   : "DataDigest=None",
+			"DefaultTime2Wait=2",
+			"DefaultTime2Retain=20",
+			"InitialR2T=Yes",
+			myformat("FirstBurstLength=%d", MAX_DATA_SEGMENT_SIZE),
+			myformat("MaxBurstLength=%d", MAX_DATA_SEGMENT_SIZE),
+			myformat("MaxRecvDataSegmentLength=%d", MAX_DATA_SEGMENT_SIZE),
 		};
 
 		DOLOG(logging::ll_debug, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "handshake finished");
@@ -412,6 +420,8 @@ bool iscsi_pdu_login_reply::set(const iscsi_pdu_login_request & reply_to)
 		auto temp = text_array_to_data(kvs);
 		login_reply_reply_data.first  = temp.first;
 		login_reply_reply_data.second = temp.second;
+
+		NSG = 3;
 	}
 	else {
 		DOLOG(logging::ll_debug, "iscsi_pdu_login_reply::set", ses->get_endpoint_name(), "login mode, CSG %d, NSG %d", reply_to.get_CSG(), reply_to.get_NSG());
