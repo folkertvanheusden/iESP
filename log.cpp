@@ -110,7 +110,6 @@ namespace logging {
 		va_start(ap, fmt);
 		(void)vsnprintf(&err_log_buf[offset], sizeof(err_log_buf) - offset, fmt, ap);
 		va_end(ap);
-		Serial.println(err_log_buf);
 
 		if (ll >= ll_warning)
 			write_led(led_red, HIGH);
