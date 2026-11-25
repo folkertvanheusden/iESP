@@ -724,7 +724,7 @@ void server::handler()
 						ses->get_bytes_tx() / dkB, ses->get_bytes_rx() / dkB,
 						is->bytes_written / dkB, is->bytes_read / dkB,
 						is->n_syncs / dtook, is->blocks_trimmed * block_size / 1024 / 1024 / dtook,
-						is->io_wait * 100 / (dtook * 1000),  // io_wait is in uS
+						is->io_wait * 100 / (took * 1000),  // io_wait is in uS
 						busy * 0.1 / took, ses->get_error_count(), get_free_heap_space());
 
 					ses->reset_bytes_rx();
