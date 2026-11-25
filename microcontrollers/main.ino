@@ -480,7 +480,7 @@ void setup() {
 #else
 	while(!Serial && end > millis())
 		yield();
-	Serial.setDebugOutput(true);
+  Serial.setDebugOutput(bool(Serial));
 #endif
 
 #if defined(TEENSY4_1)
