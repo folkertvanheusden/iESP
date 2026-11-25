@@ -227,10 +227,14 @@ int main(int argc, char *argv[])
 		bp = new backend_nbd(dev.substr(0, colon), std::stoi(dev.substr(colon + 1)));
 	}
 
-	if (cache_size == 0)
-		cache_size = bp->get_block_size() * 2;
-
-	backend *b = new backend_cache(bp, cache_size);
+	backend *b { };
+	if (cache_size == 0) {
+		b = bp;
+		bp = nullptr;
+	}
+	else {
+		b = new backend_cache(bp, cache_size);
+	}
 
 	if (b == nullptr || b->begin() == false) {
 		fprintf(stderr, "Failed to initialize storage backend\n");
