@@ -36,6 +36,7 @@ const std::map<scsi::scsi_opcode, scsi_opcode_details> scsi_a3_data {
 	{ scsi::scsi_opcode::o_read_capacity_10,{ { 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07 }, 10, "read capacity 10" } },
 	{ scsi::scsi_opcode::o_read_10,		{ { 0xff, 0xfe, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 }, 10, "read 10"          } },
 	{ scsi::scsi_opcode::o_write_10,	{ { 0xff, 0xfa, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 }, 10, "write 10"         } },
+	{ scsi::scsi_opcode::o_mode_sense_10,	{ { 0xf8, 0xff, 0xff, 0x00, 0x00, 0x00, 0xff, 0xff, 0xc7, 0x00 }, 10, "mode sense 10"    } },
 	{ scsi::scsi_opcode::o_write_same_10,	{ { 0xff, 0x08, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0xff }, 10, "write same 10"    } },
 	{ scsi::scsi_opcode::o_write_same_16,	{ { 0xff, 0x08, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff }, 16, "write same 16" } },
 	{ scsi::scsi_opcode::o_write_verify_10,	{ { 0xff, 0xf2, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 }, 10, "write verify 10" } },
@@ -81,26 +82,29 @@ scsi_response scsi::test_unit_ready(const std::string & identifier, const uint64
 	return response;
 }
 
-scsi_response scsi::mode_sense_6(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data)
+scsi_response scsi::mode_sense(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data, const uint8_t opcode)
 {
 	scsi_response response(ir_as_is);
 
+	auto method    = opcode == 0x1a ? "scsi::mode_sense_6" : "scsi::mode_sense_10";
+	int  method_nr = opcode == 0x1a ? 6 : 10;
+
 	if (locking_status() == l_locked_other) {
-		DOLOG(logging::ll_error, "scsi::mode_sense_6", identifier, "MODE SENSE 6 failed due to reservations");
+		DOLOG(logging::ll_error, method, identifier, "MODE SENSE %d failed due to reservations", method_nr);
 		response.sense_data = error_reservation_conflict_1();
 	}
 	else {
-		DOLOG(logging::ll_debug, "scsi::mode_sense_6", identifier, "MODE SENSE 6");
+		DOLOG(logging::ll_debug, method, identifier, "MODE SENSE %d", method_nr);
 		if (CDB[1] & 8)
-			DOLOG(logging::ll_debug, "scsi::mode_sense_6", identifier, "MODE SENSE 6: DBD");
+			DOLOG(logging::ll_debug, method, identifier, "MODE SENSE %d: DBD", method_nr);
 		uint8_t page_control = CDB[2] >> 6;
 		const char *const pagecodes[] { "current values", "changeable values", "default values", "saved values " };
-		DOLOG(logging::ll_debug, "scsi::mode_sense_6", identifier, "MODE SENSE 6: PAGE CONTROL %s (%d)", pagecodes[page_control], page_control);
+		DOLOG(logging::ll_debug, method, identifier, "MODE SENSE %d: PAGE CONTROL %s (%d)", method_nr, pagecodes[page_control], page_control);
 		uint8_t page_code = CDB[2] & 0x3f;
-		DOLOG(logging::ll_debug, "scsi::mode_sense_6", identifier, "MODE SENSE 6: PAGE CODE %02xh", page_code);
-		DOLOG(logging::ll_debug, "scsi::mode_sense_6", identifier, "MODE SENSE 6: SUBPAGE CODE %02xh", CDB[3]);
-		DOLOG(logging::ll_debug, "scsi::mode_sense_6", identifier, "MODE SENSE 6: AllocationLength: %d", CDB[4]);
-		DOLOG(logging::ll_debug, "scsi::mode_sense_6", identifier, "MODE SENSE 6: Control: %02xh", CDB[5]);
+		DOLOG(logging::ll_debug, method, identifier, "MODE SENSE %d: PAGE CODE %02xh", method_nr, page_code);
+		DOLOG(logging::ll_debug, method, identifier, "MODE SENSE %d: SUBPAGE CODE %02xh", method_nr, CDB[3]);
+		DOLOG(logging::ll_debug, method, identifier, "MODE SENSE %d: AllocationLength: %d", method_nr, CDB[4]);
+		DOLOG(logging::ll_debug, method, identifier, "MODE SENSE %d: Control: %02xh", method_nr, CDB[5]);
 		response.io.is_inline          = true;
 		response.io.what.data.second   = 4;
 		response.io.what.data.first    = new uint8_t[response.io.what.data.second]();
@@ -954,7 +958,9 @@ std::optional<scsi_response> scsi::send(io_stats_t *const is, const uint64_t lun
 	if (opcode == o_test_unit_ready)
 		response = test_unit_ready(lun_identifier, lun, CDB, size, data);
 	else if (opcode == o_mode_sense_6)  // 0x1a
-		response = mode_sense_6(lun_identifier, lun, CDB, size, data);
+		response = mode_sense(lun_identifier, lun, CDB, size, data, opcode);
+	else if (opcode == o_mode_sense_10)  // 0x5a
+		response = mode_sense(lun_identifier, lun, CDB, size, data, opcode);
 	else if (opcode == o_inquiry)  // 0x12
 		response = inquiry(lun_identifier, lun, CDB, size, data);
 	else if (opcode == o_read_capacity_10)

@@ -62,7 +62,7 @@ private:
 #endif
 
 	scsi_response test_unit_ready(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
-	scsi_response mode_sense_6(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
+	scsi_response mode_sense(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data, const uint8_t opcode);
 	scsi_response inquiry(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
 	scsi_response read_capacity_10(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
 	scsi_response get_lba_status(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
@@ -103,6 +103,7 @@ public:
 		o_sync_cache_10    = 0x35,
 		o_write_same_10    = 0x41,
 		o_unmap            = 0x42,
+		o_mode_sense_10    = 0x5a,
 		o_read_16          = 0x88,
 		o_compare_and_write= 0x89,
 		o_write_16         = 0x8a,
