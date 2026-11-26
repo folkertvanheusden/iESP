@@ -45,11 +45,7 @@ uint64_t backend_file::get_size_in_blocks() const
 
 uint64_t backend_file::get_block_size() const
 {
-#if defined(ARDUINO)
 	return 512;
-#else
-	return 4096;
-#endif
 }
 
 bool backend_file::sync()

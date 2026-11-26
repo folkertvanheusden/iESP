@@ -135,7 +135,7 @@ uint64_t backend_nbd::get_size_in_blocks() const
 
 uint64_t backend_nbd::get_block_size() const
 {
-	return 4096;
+	return 512;
 }
 
 bool backend_nbd::invoke_nbd(const uint32_t command, const uint64_t offset, const uint32_t n_bytes, uint8_t *const data)
