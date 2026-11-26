@@ -1,5 +1,9 @@
 - different iscsi blocksize from physical blocksize to help throughput
 
+- lock conflicts worden soms als i/o error teruggeven, dat moet als locking probleem naar de initiator gaan
+
+- cache stats
+
 - cache fill rate in output
 
 - rp2040 635e158a10fee84121db30e0e13fa4834586735a mergen naar gewone microcontrolles
