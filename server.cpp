@@ -342,7 +342,7 @@ iscsi_fail_reason server::push_response(com_client *const cc, session *const ses
 			}
 
 			if (session->fua) {
-				if (s->sync(ses->get_io_stats()) == false) {
+				if (s->sync(ses->get_io_stats()) != rw_ok) {
 					DOLOG(logging::ll_error, "server::push_response", cc->get_endpoint_name(), "DATA-OUT problem syncing data");
 					return IFR_IO_ERROR;
 				}
