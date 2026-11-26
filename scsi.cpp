@@ -338,7 +338,7 @@ scsi_response scsi::get_lba_status(const std::string & identifier, const uint64_
 
 		auto vr = validate_request(lba);
 		if (vr.has_value()) {
-			DOLOG(logging::ll_debug, "scsi::get_lba_status", identifier, "GET LBA STATUS parameters invalid");
+			DOLOG(logging::ll_error, "scsi::get_lba_status", identifier, "GET LBA STATUS parameters invalid");
 			response.sense_data = vr.value();
 		}
 		else {
@@ -428,7 +428,7 @@ scsi_response scsi::write_verify(io_stats_t *const is, const std::string & ident
 
 	auto vr = validate_request(lba, transfer_length, CDB);
 	if (vr.has_value()) {
-		DOLOG(logging::ll_debug, "scsi::write_verify", identifier, "WRITE_1x parameters invalid");
+		DOLOG(logging::ll_error, "scsi::write_verify", identifier, "WRITE_1x parameters invalid");
 		response.sense_data = vr.value();
 	}
 	else if (data.first) {
@@ -513,7 +513,7 @@ scsi_response scsi::write_verify(io_stats_t *const is, const std::string & ident
 		}
 		else {
 			response.type = ir_empty_sense;
-			DOLOG(logging::ll_debug, "scsi::write_verify", identifier, "WRITE with 0 transfer_length");
+			DOLOG(logging::ll_error, "scsi::write_verify", identifier, "WRITE with 0 transfer_length");
 		}
 	}
 
@@ -552,7 +552,7 @@ scsi_response scsi::read_(const std::string & identifier, const uint64_t lun, co
 
 	auto vr = validate_request(lba, transfer_length, CDB);
 	if (vr.has_value()) {
-		DOLOG(logging::ll_debug, "scsi::read_", identifier, "READ_1x parameters invalid");
+		DOLOG(logging::ll_error, "scsi::read_", identifier, "READ_1x parameters invalid");
 		response.sense_data = vr.value();
 	}
 	else if (transfer_length == 0) {
@@ -684,11 +684,11 @@ scsi_response scsi::compare_and_write(io_stats_t *const is, const std::string & 
 
 	auto vr = validate_request(lba, block_count, CDB);
 	if (vr.has_value()) {
-		DOLOG(logging::ll_debug, "scsi::compare_and_write", identifier, "COMPARE AND WRITE parameters invalid");
+		DOLOG(logging::ll_error, "scsi::compare_and_write", identifier, "COMPARE AND WRITE parameters invalid");
 		response.sense_data = vr.value();
 	}
 	else if (block_count > max_compare_and_write_block_count) {
-		DOLOG(logging::ll_debug, "scsi::compare_and_write", identifier, "COMPARE AND WRITE: too many blocks in one go (%u versus %u)", block_count, max_compare_and_write_block_count);
+		DOLOG(logging::ll_error, "scsi::compare_and_write", identifier, "COMPARE AND WRITE: too many blocks in one go (%u versus %u)", block_count, max_compare_and_write_block_count);
 		response.sense_data = error_compare_and_write_count();
 	}
 	else {
@@ -730,7 +730,7 @@ scsi_response scsi::prefetch(const std::string & identifier, const uint64_t lun,
 
 	auto vr = validate_request(lba, transfer_length, nullptr);
 	if (vr.has_value()) {
-		DOLOG(logging::ll_debug, "scsi::prefetch", identifier, "PREFETCH parameters invalid");
+		DOLOG(logging::ll_error, "scsi::prefetch", identifier, "PREFETCH parameters invalid");
 		response.sense_data = vr.value();
 	}
 	else {
@@ -753,7 +753,7 @@ scsi_response scsi::reserve(const std::string & identifier, const uint64_t lun, 
 	if (reserve_device() == l_locked)
 		response.type = ir_empty_sense;
 	else {
-		DOLOG(logging::ll_debug, "scsi::reserve", identifier, "RESERVE 6 failed");
+		DOLOG(logging::ll_error, "scsi::reserve", identifier, "RESERVE 6 failed");
 		response.sense_data = error_reservation_conflict_1();
 	}
 #else
@@ -796,11 +796,11 @@ scsi_response scsi::unmap(io_stats_t *const is, const std::string & identifier, 
 		auto vr = validate_request(lba, transfer_length, nullptr);
 		if (vr.has_value() || transfer_length > MAX_UNMAP_BLOCKS) {
 			if (vr.has_value()) {
-				DOLOG(logging::ll_debug, "scsi::unmap", identifier,"UNMAP parameters invalid");
+				DOLOG(logging::ll_error, "scsi::unmap", identifier,"UNMAP parameters invalid");
 				response.sense_data = vr.value();
 			}
 			else {
-				DOLOG(logging::ll_debug, "scsi::unmap", identifier,"UNMAP parameters out of range");
+				DOLOG(logging::ll_error, "scsi::unmap", identifier,"UNMAP parameters out of range");
 				response.sense_data = error_out_of_range();
 			}
 			rc = rw_fail_general;
@@ -859,7 +859,7 @@ scsi_response scsi::write_same(io_stats_t *const is, const std::string & identif
 
 	auto vr = validate_request(lba, transfer_length, CDB);
 	if (vr.has_value()) {
-		DOLOG(logging::ll_debug, "scsi::write_same", identifier, "WRITE_SAME parameters invalid");
+		DOLOG(logging::ll_error, "scsi::write_same", identifier, "WRITE_SAME parameters invalid");
 		response.sense_data = vr.value();
 	}
 	else if (data.first) {
@@ -873,7 +873,7 @@ scsi_response scsi::write_same(io_stats_t *const is, const std::string & identif
 		if (received_blocks == 1)
 			DOLOG(logging::ll_debug, "scsi::write_same", identifier, "WRITE_SAME to LBA %" PRIu64 " is %zu in bytes", lba, backend_block_size);
 		else {
-			DOLOG(logging::ll_info, "scsi::write_same", identifier, "WRITE_SAME received block count (%u) != 1", received_blocks);
+			DOLOG(logging::ll_error, "scsi::write_same", identifier, "WRITE_SAME received block count (%u) != 1", received_blocks);
 			ok = false;
 		}
 
@@ -929,7 +929,7 @@ scsi_response scsi::write_same(io_stats_t *const is, const std::string & identif
 		else {
 			// TODO: error of transfer_length != 0?
 			response.type = ir_empty_sense;
-			DOLOG(logging::ll_debug, "scsi::write_same", identifier, "WRITE_SAME with 0 transfer_length");
+			DOLOG(logging::ll_error, "scsi::write_same", identifier, "WRITE_SAME with 0 transfer_length");
 		}
 	}
 
@@ -1013,23 +1013,23 @@ std::optional<std::vector<uint8_t> > scsi::validate_request(const uint64_t lba, 
 
 		if (opcode == o_read_10 || opcode == o_read_16) {
 			if (CDB[1] >> 5) {  // RDPROTECT / WRPROTECT
-				DOLOG(logging::ll_debug, "scsi::validate_request", "-", "RD/WR PROTECT not supported");
+				DOLOG(logging::ll_error, "scsi::validate_request", "-", "RD/WR PROTECT not supported");
 				return error_invalid_field();
 			}
 		}
 
 		if ((opcode == o_write_same_10 || opcode == o_write_same_16) && (CDB[1] & 16) == 16 && (CDB[1] & 8) == 0) {
-			DOLOG(logging::ll_debug, "scsi::validate_request", "-", "WRITE_SAME with ANCHOR=1 and UNMAP=0 is a failure");
+			DOLOG(logging::ll_error, "scsi::validate_request", "-", "WRITE_SAME with ANCHOR=1 and UNMAP=0 is a failure");
 			return error_invalid_field();
 		}
 
 		if ((opcode == o_write_same_10 || opcode == o_write_same_16) && n_blocks > MAX_WS_LEN) {
-			DOLOG(logging::ll_debug, "scsi::validate_request", "-", "WRITE_SAME maximum number of blocks");
+			DOLOG(logging::ll_error, "scsi::validate_request", "-", "WRITE_SAME maximum number of blocks");
 			return error_invalid_field();
 		}
 
 		if ((opcode == o_write_10 || opcode == o_write_16 || opcode == o_write_verify_10 || opcode == o_write_same_10 || opcode == o_write_same_16) && (CDB[1] >> 5) != 0) {
-			DOLOG(logging::ll_debug, "scsi::validate_request", "-", "WRITE_SAME with WRPROTECT set is not supported");
+			DOLOG(logging::ll_error, "scsi::validate_request", "-", "WRITE_SAME with WRPROTECT set is not supported");
 			return error_invalid_field();
 		}
 	}
@@ -1042,7 +1042,7 @@ std::optional<std::vector<uint8_t> > scsi::validate_request(const uint64_t lba) 
 	auto size_in_blocks = get_size_in_blocks();
 
 	if (lba >= size_in_blocks) {
-		DOLOG(logging::ll_debug, "scsi::validate_request", "-", "lba %" PRIu64 " >= size_in_blocks %" PRIu64, lba, size_in_blocks);
+		DOLOG(logging::ll_error, "scsi::validate_request", "-", "lba %" PRIu64 " >= size_in_blocks %" PRIu64, lba, size_in_blocks);
 		return error_out_of_range();
 	}
 
