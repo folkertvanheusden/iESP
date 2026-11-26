@@ -338,13 +338,13 @@ iscsi_fail_reason server::push_response(com_client *const cc, session *const ses
 
 			if (rc != scsi::rw_ok) {
 				DOLOG(logging::ll_info, "server::push_response", cc->get_endpoint_name(), "DATA-OUT problem writing to backend: %d", rc);
-				return IFR_IO_ERROR;
+				return rc == scsi::rw_fail_locked ? IFR_LOCKING_ISSUE : IFR_IO_ERROR;
 			}
 
 			if (session->fua) {
-				if (s->sync(ses->get_io_stats()) != rw_ok) {
+				if (auto rc2 = s->sync(ses->get_io_stats()); rc2 != scsi::rw_ok) {
 					DOLOG(logging::ll_error, "server::push_response", cc->get_endpoint_name(), "DATA-OUT problem syncing data");
-					return IFR_IO_ERROR;
+					return rc2 == scsi::rw_fail_locked ? IFR_LOCKING_ISSUE : IFR_IO_ERROR;
 				}
 			}
 
@@ -514,7 +514,7 @@ iscsi_fail_reason server::push_response(com_client *const cc, session *const ses
 			if (rc != scsi::rw_ok) {
 				delete [] out.data;
 				DOLOG(logging::ll_error, "server::push_response", cc->get_endpoint_name(), "reading %u bytes failed: %d", current_n, rc);
-				ifr = IFR_IO_ERROR;
+				ifr = rc == scsi::rw_fail_locked ? IFR_LOCKING_ISSUE : IFR_IO_ERROR;
 				break;
 			}
 
@@ -646,6 +646,8 @@ void server::handler()
 					}
 					else if (ifr == IFR_INVALID_COMMAND)
 						reason = 0x05;
+					else if (ifr == IFR_LOCKING_ISSUE)
+						reason = 0x18;  // reservation conflict
 					else {
 						DOLOG(logging::ll_error, "server::handler", endpoint, "internal error, IFR %d not known", ifr);
 					}
