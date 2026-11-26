@@ -687,7 +687,7 @@ void server::handler()
 					ses->inc_error_count();
 
 					fail_counter++;
-					if (fail_counter >= 16) {
+					if (fail_counter >= 32) {
 						ok = false;
 						DOLOG(logging::ll_info, "server::handler", endpoint, "disconnecting because of too many consecutive errors");
 					}
