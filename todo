@@ -1,6 +1,6 @@
 - different iscsi blocksize from physical blocksize to help throughput
 
-- lock conflicts worden soms als i/o error teruggeven, dat moet als locking probleem naar de initiator gaan
+- uC: static ip-address
 
 - cache stats
 
