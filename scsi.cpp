@@ -481,8 +481,12 @@ scsi_response scsi::write_verify(io_stats_t *const is, const std::string & ident
 				response.type = ir_empty_sense;
 				DOLOG(logging::ll_debug, "scsi::write_verify", identifier, "received_size == expected_size");
 
-				if (fua)
-					this->sync(is);
+				if (fua) {
+					if (this->sync(is) != rw_ok) {
+						DOLOG(logging::ll_warning, "scsi::write_verify", identifier, "SYNC error (FUA)");
+						response.sense_data = error_write_error();
+					}
+				}
 			}
 			else {  // allow R2T packets to come in
 				response.type           = ir_r2t;
@@ -571,7 +575,8 @@ scsi_response scsi::sync_cache(io_stats_t *const is, const std::string & identif
 	scsi_response response(ir_empty_sense);
 
 	DOLOG(logging::ll_debug, "scsi::sync_cache", identifier, "SYNC CACHE 10");
-	this->sync(is);
+	if (this->sync(is) != rw_ok)
+		response.sense_data = error_write_error();
 
 	return response;
 }
@@ -765,10 +770,12 @@ scsi_response scsi::release(const std::string & identifier, const uint64_t lun, 
 	DOLOG(logging::ll_debug, "scsi::release", identifier, "RELEASE 6");
 
 #if !defined(TEENSY4_1) && !defined(RP2040W)
-	unlock_device();
-	response.type         = ir_empty_sense;
+	if (unlock_device() == true)
+		response.type       = ir_empty_sense;
+	else
+		response.sense_data = error_reservation_conflict_1();
 #else
-	response.sense_data   = error_not_implemented();
+	response.sense_data = error_not_implemented();
 #endif
 
 	return response;
