@@ -94,6 +94,25 @@ bool backend_cache::trim(const uint64_t block_nr, const uint32_t n_blocks)
 	return false;
 }
 
+bool backend_cache::prefetch(const uint64_t block_nr, const uint32_t n_blocks)
+{
+	bool     ok         = true;
+	auto     block_size = get_block_size();
+	uint8_t *buffer     = new uint8_t[block_size];
+
+	std::unique_lock<std::mutex> lck(cache_lock);
+	for(uint32_t i=0; i<n_blocks; i++) {
+		if (parent->read(block_nr + i, 1, buffer) == false) {
+			ok = false;
+			break;
+		}
+		c->put(block_nr + i, duplicate_block(buffer, block_size));
+	}
+
+	delete [] buffer;
+	return ok;
+}
+
 bool backend_cache::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_t *const data)
 {
 	std::unique_lock<std::mutex> lck(cache_lock);

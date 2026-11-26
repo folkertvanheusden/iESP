@@ -729,7 +729,10 @@ scsi_response scsi::prefetch(const std::string & identifier, const uint64_t lun,
 		response.sense_data = vr.value();
 	}
 	else {
-		response.type = ir_empty_sense;
+		if (b->prefetch(lba, transfer_length))
+			response.type       = ir_empty_sense;
+		else
+			response.sense_data = error_read_error();
 	}
 
 	return response;
