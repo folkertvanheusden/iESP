@@ -1,5 +1,7 @@
 - different iscsi blocksize from physical blocksize to help throughput
 
+- PREFETCH should be async
+
 - uC: static ip-address
 
 - cache stats
