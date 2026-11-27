@@ -676,8 +676,9 @@ void setup() {
   constexpr const size_t min_free = 512 * 1024;  // 0.5 MB
   // leave some room for std::list and std::unordered_map overhead
   free_cache_store = (free_cache_store * 2) / 3;
+  size_t cache_size = 0;
   if (free_cache_store > min_free + btemp->get_block_size() * 2) {
-    size_t cache_size = free_cache_store - min_free;
+    cache_size = free_cache_store - min_free;
     bs = new backend_cache(btemp, cache_size);
     Serial.printf("Using disk-cache of %u kB\r\n", int(cache_size / 1024));
   }
@@ -701,7 +702,7 @@ void setup() {
 	}
 
 	draw_status(16);
-	scsi_dev = new scsi(bs, trim_level);
+	scsi_dev = new scsi(bs, trim_level, cache_size / bs->get_block_size());
 
 	draw_status(28);
 #if defined(TEENSY4_1)
@@ -751,7 +752,7 @@ void setup() {
 
 	xTaskCreate(loopw, /* Function to implement the task */
 			"loop2", /* Name of the task */
-			16384,  /* Stack size in words */
+			10000,  /* Stack size in words */
 			nullptr,  /* Task input parameter */
 			configMAX_PRIORITIES - 2,  /* Priority of the task */
 			&task2  /* Task handle. */

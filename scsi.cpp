@@ -26,7 +26,7 @@ const std::map<scsi::scsi_opcode, scsi_opcode_details> scsi_a3_data {
 	{ scsi::scsi_opcode::o_request_sense,   { { 0xff, 0x01, 0x00, 0x00, 0xff, 0x07 }, 6, "request sense"   } },
 	{ scsi::scsi_opcode::o_read_6,		{ { 0xff, 0x1f, 0xff, 0xff, 0xff, 0x07 }, 6, "read 6"          } },
 	{ scsi::scsi_opcode::o_write_6,		{ { 0xff, 0x1f, 0xff, 0xff, 0xff, 0x07 }, 6, "write 6"         } },
-//	{ scsi::scsi_opcode::o_seek,		{
+//	{ scsi::scsi_opcode::o_seek_6,		{
 	{ scsi::scsi_opcode::o_inquiry,		{ { 0xff, 0x01, 0xff, 0xff, 0xff, 0x07 }, 6, "inquiry"         } },
 #if !defined(TEENSY4_1) && !defined(RP2040W)
 	{ scsi::scsi_opcode::o_reserve_6,	{ { 0xff, 0x00, 0x00, 0x00, 0x00, 0x07 }, 6, "reserve 6"       } },
@@ -36,6 +36,7 @@ const std::map<scsi::scsi_opcode, scsi_opcode_details> scsi_a3_data {
 	{ scsi::scsi_opcode::o_read_capacity_10,{ { 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07 }, 10, "read capacity 10" } },
 	{ scsi::scsi_opcode::o_read_10,		{ { 0xff, 0xfe, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 }, 10, "read 10"          } },
 	{ scsi::scsi_opcode::o_write_10,	{ { 0xff, 0xfa, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x07 }, 10, "write 10"         } },
+	{ scsi::scsi_opcode::o_seek_10,		{ { 0x07, 0x00, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xc7, 0x00 }, 10, "seek 10"          } },
 	{ scsi::scsi_opcode::o_mode_sense_10,	{ { 0xf8, 0xff, 0xff, 0x00, 0x00, 0x00, 0xff, 0xff, 0xc7, 0x00 }, 10, "mode sense 10"    } },
 	{ scsi::scsi_opcode::o_write_same_10,	{ { 0xff, 0x08, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0xff }, 10, "write same 10"    } },
 	{ scsi::scsi_opcode::o_write_same_16,	{ { 0xff, 0x08, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff }, 16, "write same 16" } },
@@ -60,7 +61,11 @@ const std::map<scsi::scsi_opcode, scsi_opcode_details> scsi_a3_data {
 
 constexpr const uint8_t max_compare_and_write_block_count = 1;
 
-scsi::scsi(backend *const b, const int trim_level) : b(b), trim_level(trim_level), serial(b->get_serial())
+scsi::scsi(backend *const b, const int trim_level, const int cache_n_blocks_in) :
+	b(b),
+	trim_level(trim_level),
+	serial(b->get_serial()),
+	cache_n_blocks(cache_n_blocks_in)
 {
 }
 
@@ -113,6 +118,18 @@ scsi_response scsi::mode_sense(const std::string & identifier, const uint64_t lu
 		response.io.what.data.first[2] = 16;  // DPOFUA
 	}
 
+	return response;
+}
+
+scsi_response scsi::seek(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data, const uint8_t opcode)
+{
+	scsi_response response(ir_empty_sense);
+	uint32_t lba = opcode == 0x0b ? ((CDB[1] & 31) << 16) | (CDB[2] << 8) | CDB[3] : get_uint32_t(&CDB[2]);
+	auto     vr  = validate_request(lba, 1, CDB);
+	if (vr.has_value()) {
+		DOLOG(logging::ll_error, "scsi::seek", identifier, "SEEK parameter(s) invalid");
+		response.sense_data = vr.value();
+	}
 	return response;
 }
 
@@ -214,6 +231,12 @@ scsi_response scsi::inquiry(const std::string & identifier, const uint64_t lun, 
 			response.io.what.data.first[5] = max_compare_and_write_block_count;  // compare and write
 			response.io.what.data.first[6] = 0;  // OPTIMAL TRANSFER LENGTH GRANULARITY
 			response.io.what.data.first[7] = 0;
+#if !defined(TEENSY4_1)
+			response.io.what.data.first[16] = cache_n_blocks >> 24;  // 'MAXIMUM PREFETCH LENGTH': 256 blocks
+			response.io.what.data.first[17] = cache_n_blocks >> 16;
+			response.io.what.data.first[18] = cache_n_blocks >>  8;
+			response.io.what.data.first[19] = cache_n_blocks;
+#endif
 #if defined(ESP32)
 			response.io.what.data.first[22] = 1;  // 'MAXIMUM UNMAP LBA COUNT': 256 blocks
 #define MAX_UNMAP_BLOCKS 256
@@ -959,6 +982,8 @@ std::optional<scsi_response> scsi::send(io_stats_t *const is, const uint64_t lun
 		response = test_unit_ready(lun_identifier, lun, CDB, size, data);
 	else if (opcode == o_mode_sense_6 || opcode == o_mode_sense_10)  // 0x1a & 0x5a
 		response = mode_sense(lun_identifier, lun, CDB, size, data, opcode);
+	else if (opcode == o_seek_6 || opcode == o_seek_10)  // 0x0b & 0x2b
+		response = seek(lun_identifier, lun, CDB, size, data, opcode);
 	else if (opcode == o_inquiry)  // 0x12
 		response = inquiry(lun_identifier, lun, CDB, size, data);
 	else if (opcode == o_read_capacity_10)

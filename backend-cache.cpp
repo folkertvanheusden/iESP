@@ -1,5 +1,7 @@
 #include <cinttypes>
 #include <cstring>
+#include <optional>
+
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -22,6 +24,14 @@ backend_cache::backend_cache(backend *const parent_in, const size_t max_n_bytes)
 
 backend_cache::~backend_cache()
 {
+#if !defined(TEENSY4_1)
+	if (prefetcher) {
+		stop_flag = true;
+		prefetcher->join();
+		delete prefetcher;
+	}
+#endif
+
 	delete c;
 }
 
@@ -30,7 +40,16 @@ bool backend_cache::begin()
 	size_t n_elements = max_n_bytes / parent->get_block_size();
 	if (n_elements) {
 		c = new cache(n_elements);
-		return parent->begin();
+#if defined(TEENSY4_1)
+		return true;
+#else
+		if (parent->begin()) {
+			prefetcher = new std::thread([&] { prefetcher_thread(); });
+			return true;
+		}
+		delete c;
+		c = nullptr;
+#endif
 	}
 	return false;
 }
@@ -94,23 +113,62 @@ bool backend_cache::trim(const uint64_t block_nr, const uint32_t n_blocks)
 	return false;
 }
 
-bool backend_cache::prefetch(const uint64_t block_nr, const uint32_t n_blocks)
+#if !defined(TEENSY4_1)
+void backend_cache::prefetcher_thread()
 {
-	bool     ok         = true;
 	auto     block_size = get_block_size();
 	uint8_t *buffer     = new uint8_t[block_size];
-
-	std::unique_lock<std::mutex> lck(cache_lock);
-	for(uint32_t i=0; i<n_blocks; i++) {
-		if (parent->read(block_nr + i, 1, buffer) == false) {
-			ok = false;
-			break;
+	uint32_t current_id {};
+	while(!stop_flag) {
+		std::optional<uint64_t> current_block;
+		{
+			bool fetch {};
+			std::unique_lock<std::mutex> lck(prefetch_lock);
+			if (current_id == prefetch_id) {
+				if (prefetch_count == 0)
+					prefetch_cv.wait_for(lck, std::chrono::milliseconds(100));
+				else
+					fetch = true;
+			}
+			else {
+				current_id = prefetch_id;
+				fetch      = true;
+			}
+			if (fetch) {
+				current_block = prefetch_block_nr++;
+				prefetch_count--;
+				DOLOG(logging::ll_debug, "backend_cache", identifier, "prefetch %" PRIu64, current_block.value());
+			}
 		}
-		c->put(block_nr + i, duplicate_block(buffer, block_size));
+
+		if (current_block.has_value() == false)
+			continue;
+
+		std::unique_lock<std::mutex> lck(cache_lock);
+		if (parent->read(current_block.value(), 1, buffer) == true)
+			c->put(current_block.value(), duplicate_block(buffer, block_size));
+		else {
+			lck.unlock();
+			DOLOG(logging::ll_error, "backend_cache", identifier, "cannot read from parent");
+		}
 	}
 
 	delete [] buffer;
-	return ok;
+}
+#endif
+
+bool backend_cache::prefetch(const uint64_t block_nr, const uint32_t n_blocks)
+{
+#if defined(TEENSY4_1)
+	return true
+#else
+	std::unique_lock<std::mutex> lck(prefetch_lock);
+	prefetch_id++;
+	prefetch_block_nr = block_nr;
+	prefetch_count    = n_blocks;
+	prefetch_cv.notify_one();
+	return !!prefetcher;
+#endif
 }
 
 bool backend_cache::read(const uint64_t block_nr, const uint32_t n_blocks, uint8_t *const data)

@@ -1,4 +1,9 @@
+#if !defined(TEENSY4_1)
+#include <atomic>
+#include <condition_variable>
 #include <mutex>
+#include <thread>
+#endif
 #include <string>
 
 #include "backend.h"
@@ -8,13 +13,25 @@
 class backend_cache : public backend
 {
 private:
-	backend    *const parent      {};
-	const size_t      max_n_bytes {};
+	backend    *const parent            {};
+	const size_t      max_n_bytes       {};
 	std::mutex        cache_lock;
-	cache            *c           {};
+	cache            *c                 {};
 
-	void     invalidate_range(const uint64_t block_nr, const uint32_t n_blocks);
-	uint8_t *duplicate_block (const uint8_t *const p, const size_t s);
+#if !defined(TEENSY4_1)
+	std::thread      *prefetcher        {};
+	std::atomic_bool  stop_flag         {};
+	std::condition_variable prefetch_cv;
+	std::mutex        prefetch_lock;
+	uint64_t          prefetch_block_nr {};
+	uint32_t          prefetch_count    {};
+	uint32_t          prefetch_id       {};
+
+	void     prefetcher_thread();
+#endif
+
+	void     invalidate_range (const uint64_t block_nr, const uint32_t n_blocks);
+	uint8_t *duplicate_block  (const uint8_t *const p, const size_t s);
 
 public:
 	backend_cache(backend *const parent, const size_t max_n_bytes);

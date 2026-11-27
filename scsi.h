@@ -59,6 +59,7 @@ private:
 #if !(defined(TEENSY4_1) || defined(RP2040W))
 	std::mutex locked_by_lock;
 	std::optional<std::thread::id> locked_by;
+	const int  cache_n_blocks {};
 #endif
 
 	scsi_response test_unit_ready(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
@@ -68,6 +69,7 @@ private:
 	scsi_response get_lba_status(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
 	scsi_response write_verify(io_stats_t *const is, const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data, const uint8_t opcode);
 	scsi_response read_(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data, const uint8_t opcode);
+	scsi_response seek(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data, const uint8_t opcode);
 	scsi_response sync_cache(io_stats_t *const is, const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
 	scsi_response report_luns(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
 	scsi_response report_supported_operation_codes(const std::string & identifier, const uint64_t lun, const uint8_t *const CDB, const size_t size, std::pair<uint8_t *, size_t> data);
@@ -82,7 +84,7 @@ private:
 	std::optional<std::vector<uint8_t> > validate_request(const uint64_t lba) const;
 
 public:
-	scsi(backend *const b, const int trim_level);
+	scsi(backend *const b, const int trim_level, const int cache_n_blocks);
 	virtual ~scsi();
 
 	enum scsi_opcode {
@@ -90,7 +92,7 @@ public:
 		o_request_sense    = 0x02,
 		o_read_6           = 0x08,
 		o_write_6          = 0x0a,
-		o_seek             = 0x0b,
+		o_seek_6           = 0x0b,
 		o_inquiry          = 0x12,
 		o_reserve_6        = 0x16,
 		o_release_6        = 0x17,
@@ -98,6 +100,7 @@ public:
 		o_read_capacity_10 = 0x25,
 		o_read_10          = 0x28,
 		o_write_10         = 0x2a,
+		o_seek_10          = 0x2b,
 		o_write_verify_10  = 0x2e,
 		o_prefetch_10      = 0x34,
 		o_sync_cache_10    = 0x35,

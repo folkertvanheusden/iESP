@@ -240,7 +240,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "Failed to initialize storage backend\n");
 		return 1;
 	}
-	scsi sd(b, trim_level);
+	scsi sd(b, trim_level, cache_size / b->get_block_size());
 
 	com_sockets c(ip_address, port, &stop);
 	if (c.begin() == false) {
