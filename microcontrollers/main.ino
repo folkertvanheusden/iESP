@@ -38,8 +38,15 @@
 #endif
 #include <LittleFS.h>
 #include <NTP.h>
-#if !defined(WT_ETH01)
+#if !defined(WT_ETH01) && !defined(WAVESHARE_ESP32_ETH)
 #include <TM1637.h>
+#endif
+#if defined(WAVESHARE_ESP32_ETH)
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#define OLED_RESET     -1  // Reset pin # (or -1 if sharing Arduino reset pin)
+#define SCREEN_ADDRESS 0x3c  // 0x3d for 128x64, 0x3c for 128x32
+Adafruit_SSD1306 display(128, 32, &Wire, OLED_RESET);
 #endif
 
 #include "backend-cache.h"
@@ -147,7 +154,7 @@ int eth_wait_seconds     = 10;
 int update_df_interval   = 0;
 int percentage_diskspace = 0;
 
-#if !defined(WT_ETH01)
+#if !defined(WT_ETH01) && !defined(WAVESHARE_ESP32_ETH)
 TM1637 *TM { nullptr };
 #endif
 
@@ -158,13 +165,18 @@ void draw_status(const uint32_t v) {
   CrashReport.breadcrumb(5, v);
 #endif
 
-#if defined(WT_ETH01) || defined(WAVESHARE_ESP32_ETH)
+	draw_status_ts = millis();
+#if defined(WT_ETH01)
   Serial.printf(" SYSTEM STATE: 0x%04x\r\n", v);
   Serial.flush();
+#elif defined(WAVESHARE_ESP32_ETH)
+  display.setCursor(0, 0);     // Start at top-left corner
+  display.fillRect(0, 0, 128, 16, SSD1306_BLACK);
+  display.print(F("0x"));
+  display.print(v, HEX);
+  display.display();
 #else
 	if (TM) {
-		draw_status_ts = millis();
-
 		TM->setBrightness(8);
 		TM->displayInt(v);
 	}
@@ -386,7 +398,7 @@ void loopw(void *)
 
 		auto now = millis();
 		if (now - draw_status_ts > 5000) {
-#if !defined(WT_ETH01)
+#if !defined(WT_ETH01) && !defined(WAVESHARE_ESP32_ETH)
 			if (TM)
 				TM->setBrightness(1);
 #endif
@@ -490,7 +502,17 @@ void setup() {
 	}
 #endif
 
-#if !defined(TEENSY4_1) && !defined(WT_ETH01) && !defined(OLIMEX) && !defined(WAVESHARE_ESP32_ETH)
+#if defined(WAVESHARE_ESP32_ETH)
+  if (display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+    display.clearDisplay();
+    display.setTextSize(1);      // Normal 1:1 pixel scale
+    display.setTextColor(SSD1306_WHITE); // Draw white text
+    display.cp437(true);         // Use full 256 char 'Code Page 437' font
+  }
+  else {
+    Serial.println(F("Failed to initialize screen"));
+  }
+#elif !defined(TEENSY4_1) && !defined(WT_ETH01) && !defined(OLIMEX)
 	TM = new TM1637();
 	TM->begin(21, 22, 4);  // TEENSY4.1: pins
 	TM->setBrightness(1);
@@ -799,6 +821,13 @@ void loop()
     }
 #endif
 		Serial.printf("Will listen on (in a bit): %s (%s)\r\n", buffer, connection);
+
+#if defined(WAVESHARE_ESP32_ETH)
+    display.setCursor(0, 16);
+    display.fillRect(0, 16, 128, 16, SSD1306_BLACK);
+    display.print(buffer);
+    display.display();
+#endif
 
 		draw_status(205);
 #if defined(TEENSY4_1)
