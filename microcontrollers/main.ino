@@ -97,6 +97,10 @@ int led_red    = 5;
 int led_green  = 33;
 int led_yellow = 16;
 int led_red    = 32;
+#elif defined(WAVESHARE_ESP32_ETH)
+int led_green  = 45;
+int led_yellow = 46;
+int led_red    = 47;
 #else
 int led_green  = -1;
 int led_yellow = -1;
@@ -172,6 +176,7 @@ void draw_status(const uint32_t v) {
 #elif defined(WAVESHARE_ESP32_ETH)
   display.setCursor(0, 0);     // Start at top-left corner
   display.fillRect(0, 0, 128, 16, SSD1306_BLACK);
+  display.setTextSize(2);
   display.print(F("0x"));
   display.print(v, HEX);
   display.display();
@@ -503,9 +508,9 @@ void setup() {
 #endif
 
 #if defined(WAVESHARE_ESP32_ETH)
+  Wire.begin(21, 17);
   if (display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
     display.clearDisplay();
-    display.setTextSize(1);      // Normal 1:1 pixel scale
     display.setTextColor(SSD1306_WHITE); // Draw white text
     display.cp437(true);         // Use full 256 char 'Code Page 437' font
   }
@@ -823,8 +828,9 @@ void loop()
 		Serial.printf("Will listen on (in a bit): %s (%s)\r\n", buffer, connection);
 
 #if defined(WAVESHARE_ESP32_ETH)
-    display.setCursor(0, 16);
-    display.fillRect(0, 16, 128, 16, SSD1306_BLACK);
+    display.setCursor(0, 18);
+    display.fillRect(0, 18, 128, 14, SSD1306_BLACK);
+    display.setTextSize(1);
     display.print(buffer);
     display.display();
 #endif
