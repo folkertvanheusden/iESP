@@ -957,9 +957,7 @@ std::optional<scsi_response> scsi::send(io_stats_t *const is, const uint64_t lun
 
 	if (opcode == o_test_unit_ready)
 		response = test_unit_ready(lun_identifier, lun, CDB, size, data);
-	else if (opcode == o_mode_sense_6)  // 0x1a
-		response = mode_sense(lun_identifier, lun, CDB, size, data, opcode);
-	else if (opcode == o_mode_sense_10)  // 0x5a
+	else if (opcode == o_mode_sense_6 || opcode == o_mode_sense_10)  // 0x1a & 0x5a
 		response = mode_sense(lun_identifier, lun, CDB, size, data, opcode);
 	else if (opcode == o_inquiry)  // 0x12
 		response = inquiry(lun_identifier, lun, CDB, size, data);
