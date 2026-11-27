@@ -128,7 +128,7 @@ bool iscsi_pdu_bhs::set_ahs_segment(std::pair<const uint8_t *, size_t> ahs_in)
 
 	while(offset + 3 < ahs_in.second) {
 		size_t ahs_length = (ahs_in.first[offset + 0] << 8) | ahs_in.first[offset + 1];
-		if (offset + 3 + ahs_length > ahs_in.second)
+		if (offset + 3 + ahs_length > ahs_in.second || ahs_length == 0)
 			break;
 
 		if (ahs_length > 0) {
