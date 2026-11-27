@@ -278,34 +278,42 @@ bool iscsi_pdu_login_request::set_data(const std::pair<const uint8_t *, size_t> 
 		if (parts[1] == "Irrelevant")
 			continue;
 
-		if (parts[0] == "MaxBurstLength")
-			max_burst = std::min(max_burst, uint32_t(std::stoi(parts[1])));
-		else if (parts[0] == "FirstBurstLength")
-			max_burst = std::min(max_burst, uint32_t(std::stoi(parts[1])));
-		else if (parts[0] == "MaxRecvDataSegmentLength")
-			max_seg_len = std::min(max_seg_len, uint32_t(std::stoi(parts[1])));
-		else if (parts[0] == "InitiatorName")
-			initiator = parts[1];
-		else if (parts[0] == "HeaderDigest")
-			ses->set_header_digest(has_CRC32C(parts[1]));
-		else if (parts[0] == "DataDigest")
-			ses->set_data_digest(has_CRC32C(parts[1]));
-		else if (parts[0] == "CHAP_N")
-			CHAP_N = parts[1];
-		else if (parts[0] == "CHAP_R")
-			CHAP_R = parts[1];
-		else if (parts[0] == "SessionType") {
-			if (parts[1] == "Discovery")
-				ses->set_handshake_state(discovery);
-		}
-		else if (parts[0] == "AuthMethod") {
-			if (handshake_state == select_auth_type) {
-				bool has_chap { has_CHAP(parts[1]) };
-				if (with_chap.has_value() && has_chap == false) {
-					DOLOG(logging::ll_warning, "iscsi_pdu_login_request::set_data", ses->get_endpoint_name(), "No AuthMethod with CHAP");
-					return false;
+		try {
+			if (parts[0] == "MaxBurstLength")
+				max_burst = std::min(max_burst, uint32_t(std::stoi(parts[1])));
+			else if (parts[0] == "FirstBurstLength")
+				max_burst = std::min(max_burst, uint32_t(std::stoi(parts[1])));
+			else if (parts[0] == "MaxRecvDataSegmentLength")
+				max_seg_len = std::min(max_seg_len, uint32_t(std::stoi(parts[1])));
+			else if (parts[0] == "InitiatorName")
+				initiator = parts[1];
+			else if (parts[0] == "HeaderDigest")
+				ses->set_header_digest(has_CRC32C(parts[1]));
+			else if (parts[0] == "DataDigest")
+				ses->set_data_digest(has_CRC32C(parts[1]));
+			else if (parts[0] == "CHAP_N")
+				CHAP_N = parts[1];
+			else if (parts[0] == "CHAP_R")
+				CHAP_R = parts[1];
+			else if (parts[0] == "SessionType") {
+				if (parts[1] == "Discovery")
+					ses->set_handshake_state(discovery);
+			}
+			else if (parts[0] == "AuthMethod") {
+				if (handshake_state == select_auth_type) {
+					bool has_chap { has_CHAP(parts[1]) };
+					if (with_chap.has_value() && has_chap == false) {
+						DOLOG(logging::ll_warning, "iscsi_pdu_login_request::set_data", ses->get_endpoint_name(), "No AuthMethod with CHAP");
+						return false;
+					}
 				}
 			}
+		}
+		catch (std::invalid_argument const & ex) {
+			DOLOG(logging::ll_warning, "iscsi_pdu_login_request::set_data", ses->get_endpoint_name(), "value \"%s\" for \"%s\" is invalid", parts[1].c_str(), parts[0].c_str());
+		}
+		catch (std::out_of_range const& ex) {
+			DOLOG(logging::ll_warning, "iscsi_pdu_login_request::set_data", ses->get_endpoint_name(), "value \"%s\" for \"%s\" is out of range", parts[1].c_str(), parts[0].c_str());
 		}
 	}
 
