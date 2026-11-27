@@ -317,6 +317,11 @@ bool iscsi_pdu_login_request::set_data(const std::pair<const uint8_t *, size_t> 
 		}
 	}
 
+	if (max_seg_len == 0 || max_burst == 0) {
+		DOLOG(logging::ll_warning, "iscsi_pdu_login_request::set_data", ses->get_endpoint_name(), "MaxRecvDataSegmentLength (%d) and FirstBurstLength/MaxBurstLength (%d) must be > 0", max_seg_len, max_burst);
+		return false;
+	}
+
 	if (handshake_state == verify_password) {
 		if (CHAP_N != with_chap.value().first) {
 			ses->set_handshake_state(auth_failed);
