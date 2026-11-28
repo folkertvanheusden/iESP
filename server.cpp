@@ -315,6 +315,12 @@ iscsi_fail_reason server::push_response(com_client *const cc, session *const ses
 				return IFR_INVALID_FIELD;
 			}
 
+			if (data.value().second > session->bytes_left) {
+				DOLOG(logging::ll_info, "server::push_response", cc->get_endpoint_name(), "data size (%u) > data left (%u)",
+						data.value().second, session->bytes_left);
+				return IFR_INVALID_FIELD;
+			}
+
 			scsi::scsi_rw_result rc  = scsi::scsi_rw_result::rw_ok;
 			uint64_t             lba = session->buffer_lba + offset / block_size;
 
