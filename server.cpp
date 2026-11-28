@@ -608,8 +608,8 @@ void server::handler()
 			auto           block_size   = s->get_block_size();
 
 			do {
-				auto incoming = receive_pdu(cc, &ses, auth);
-				iscsi_pdu_bhs *pdu = std::get<0>(incoming);
+				auto           incoming = receive_pdu(cc, &ses, auth);
+				iscsi_pdu_bhs *pdu      = std::get<0>(incoming);
 
 				is->iscsiSsnCmdPDUs++;
 
@@ -661,10 +661,8 @@ void server::handler()
 					if (reject.has_value() == false) {
 						if (pdu) {
 							reject = generate_reject_pdu(*pdu, reason);
-							if (reject.has_value() == false) {
+							if (reject.has_value() == false)
 								DOLOG(logging::ll_error, "server::handler", endpoint, "cannot generate reject PDU");
-								continue;
-							}
 						}
 						else {
 							DOLOG(logging::ll_info, "server::handler", ses->get_endpoint_name(), "Unhandled error situation with no PDU to respond to");
