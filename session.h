@@ -8,6 +8,8 @@
 #include "iscsi.h"
 
 
+#define MAX_N_CONCURRENT_R2T 64
+
 class iscsi_pdu_scsi_cmd;
 
 typedef enum { discovery, select_auth_type, reply_with_chap_r, verify_password, auth_success, auth_failed, operational } handshake_state_t;
@@ -82,7 +84,7 @@ public:
 	void     set_ack_interval(const uint32_t bytes) { ack_interval = bytes; }
 	std::optional<uint32_t> get_ack_interval()      { return ack_interval;  }
 
-	void     init_r2t_session(const r2t_session & rs, const bool fua, iscsi_pdu_scsi_cmd *const pdu, const uint32_t transfer_tag);
+	bool     init_r2t_session(const r2t_session & rs, const bool fua, iscsi_pdu_scsi_cmd *const pdu, const uint32_t transfer_tag);
 	r2t_session *get_r2t_sesion(const uint32_t ttt);
 	void     remove_r2t_session(const uint32_t ttt);
 };
