@@ -118,7 +118,7 @@ int pin_SD_MISO= 5;
 int pin_SD_MOSI= 6;
 int pin_SD_SCLK= 7;
 int pin_SD_CS  = 4;
-std::optional<int> spi_speed { 14 };
+std::optional<int> spi_speed;
 #else
 int pin_SD_MISO= 19;
 int pin_SD_MOSI= 23;
