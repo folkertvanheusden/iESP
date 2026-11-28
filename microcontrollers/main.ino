@@ -188,6 +188,16 @@ void draw_status(const uint32_t v) {
 #endif
 }
 
+void draw_user_count(const size_t n) {
+#if defined(WAVESHARE_ESP32_ETH)
+  display.setCursor(64, 0);     // Start at top-left corner
+  display.fillRect(64, 0, 64, 16, SSD1306_BLACK);
+  display.setTextSize(1);
+  display.print(n);
+  display.display();
+#endif
+}
+
 int get_diskspace(void *const context)
 {
 	backend *const bf = reinterpret_cast<backend *>(context);

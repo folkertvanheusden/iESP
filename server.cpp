@@ -561,6 +561,10 @@ bool server::is_active()
 	return active;
 }
 
+#if defined(WAVESHARE_ESP32_ETH)
+extern void draw_user_count(const size_t n);
+#endif
+
 void server::handler()
 {
 	while(!stop) {
@@ -584,6 +588,9 @@ void server::handler()
 				i++;
 			}
 		}
+#if defined(WAVESHARE_ESP32_ETH)
+		draw_user_count(threads.size());
+#endif
 		threads_lock.unlock();
 
 		std::atomic_bool *flag = new std::atomic_bool(false);
@@ -761,6 +768,9 @@ void server::handler()
 
 		threads_lock.lock();
 		threads.push_back({ th, flag });
+#if defined(WAVESHARE_ESP32_ETH)
+		draw_user_count(threads.size());
+#endif
 		threads_lock.unlock();
 #else
 		active = false;
